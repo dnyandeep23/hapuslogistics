@@ -77,7 +77,10 @@ export default function BottomNav({ menus }: Props) {
         const remaining = uniqueOrdered.filter((item) => !primaryHrefSet.has(item.href));
         const hasOverflow = remaining.length > 0;
         const isMoreActive = remaining.some(
-            (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+            (item) => {
+                const itemPath = item.href.split("?")[0];
+                return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+            },
         );
 
         return {
@@ -101,8 +104,9 @@ export default function BottomNav({ menus }: Props) {
                 >
                     <nav className="flex justify-around items-center h-full px-2 space-x-2">
                         {bottomItems.map((item) => {
+                            const itemPath = item.href.split("?")[0];
                             const active =
-                                pathname === item.href;
+                                pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
                             return (
                                 <Link
@@ -178,7 +182,8 @@ export default function BottomNav({ menus }: Props) {
 
                         <nav className="space-y-2">
                             {remainingItems.map((item) => {
-                                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                                const itemPath = item.href.split("?")[0];
+                                const active = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
                                 return (
                                     <Link
                                         key={item.href}

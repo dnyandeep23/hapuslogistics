@@ -5,7 +5,7 @@ import { useAppSelector } from "@/lib/redux/hooks";
 import { AppDispatch } from "@/lib/redux/store";
 import { fetchUser } from "@/lib/redux/userSlice";
 import { useDispatch } from "react-redux";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
 import Skeleton from "@/components/Skeleton";
@@ -105,6 +105,8 @@ export default function UsersPage() {
   const { user } = useAppSelector((state) => state.user);
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { addToast } = useToast();
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -147,8 +149,54 @@ export default function UsersPage() {
   const isAdmin = user?.role === "admin" && !user?.isSuperAdmin;
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const isOperator = user?.role === "operator";
+  const isSuperAdminOperatorRoute = pathname === "/dashboard/operator";
+  const isSuperAdminUsersRoute = pathname === "/dashboard/users";
+  const canManageOperators = isAdmin || (isSuperAdmin && isSuperAdminOperatorRoute);
 
   const operatorStatus = (user?.operatorApprovalStatus || "none") as OperatorStatus;
+
+  const superAdminCategoryOptions = useMemo<SuperAdminUserCategory[]>(() => {
+    if (isSuperAdminOperatorRoute) return ["operator"];
+    if (isSuperAdminUsersRoute) return ["customer", "admin", "operator"];
+    return ["customer", "admin", "operator"];
+  }, [isSuperAdminOperatorRoute, isSuperAdminUsersRoute]);
+
+  const superAdminTitle = isSuperAdminOperatorRoute ? "Operator Management" : "User Management";
+  const superAdminSubtitle = isSuperAdminOperatorRoute
+    ? "Review and manage operator accounts platform-wide."
+    : "Filter by category and review users platform-wide.";
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    if (isSuperAdminOperatorRoute) {
+      if (superAdminCategory !== "operator") {
+        setSuperAdminCategory("operator");
+      }
+      return;
+    }
+  }, [
+    isSuperAdmin,
+    isSuperAdminOperatorRoute,
+    superAdminCategory,
+  ]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    if (isSuperAdminOperatorRoute || isSuperAdminUsersRoute) return;
+
+    const view = String(searchParams.get("view") ?? "").toLowerCase();
+    if (view === "operators" || view === "operator") {
+      setSuperAdminCategory("operator");
+      return;
+    }
+    if (view === "users" || view === "user" || view === "customers" || view === "customer") {
+      setSuperAdminCategory("customer");
+      return;
+    }
+    if (view === "admins" || view === "admin") {
+      setSuperAdminCategory("admin");
+    }
+  }, [isSuperAdmin, isSuperAdminOperatorRoute, isSuperAdminUsersRoute, searchParams]);
 
   const pendingOperators = useMemo(
     () =>
@@ -196,7 +244,7 @@ export default function UsersPage() {
   const hasNotificationOverflow = notifications.length > 5;
 
   const loadOperators = async () => {
-    if (!isAdmin) return;
+    if (!canManageOperators) return;
 
     try {
       setLoadingOperators(true);
@@ -343,7 +391,7 @@ export default function UsersPage() {
       setLoadingSuperAdminUsers(true);
       const params = new URLSearchParams({ category });
       if (emailSearch.trim()) {
-        params.set("email", emailSearch.trim());
+        params.set("q", emailSearch.trim());
       }
       const response = await fetch(`/api/superadmin/users?${params.toString()}`, {
         method: "GET",
@@ -435,18 +483,24 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
+    if (isAdmin && pathname === "/dashboard/users") {
+      router.replace("/dashboard/operator");
+      return;
+    }
+
     if (!isAdmin && !isSuperAdmin && !isOperator) {
       router.replace("/dashboard");
       return;
     }
 
-    if (isAdmin) {
+    if (canManageOperators) {
       loadOperators();
       loadNotifications();
       return;
     }
 
     if (isSuperAdmin) {
+      if (!superAdminCategoryOptions.includes(superAdminCategory)) return;
       loadSuperAdminUsers(superAdminCategory);
       return;
     }
@@ -457,7 +511,16 @@ export default function UsersPage() {
       loadNotifications();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, isSuperAdmin, isOperator, superAdminCategory]);
+  }, [
+    canManageOperators,
+    isAdmin,
+    isSuperAdmin,
+    isOperator,
+    superAdminCategory,
+    superAdminCategoryOptions,
+    pathname,
+    router,
+  ]);
 
   useEffect(() => {
     if (!isOperator) return;
@@ -697,13 +760,13 @@ export default function UsersPage() {
     }
   };
 
-  if (isSuperAdmin) {
+  if (isSuperAdmin && !isSuperAdminOperatorRoute) {
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-[#F6FF6A] sm:text-3xl">Users Management</h1>
-            <p className="text-sm text-white/70">Filter by category and review users platform-wide.</p>
+            <h1 className="text-2xl font-semibold text-[#F6FF6A] sm:text-3xl">{superAdminTitle}</h1>
+            <p className="text-sm text-white/70">{superAdminSubtitle}</p>
           </div>
           <button
             type="button"
@@ -717,7 +780,7 @@ export default function UsersPage() {
 
         <section className={sectionClassName}>
           <div className="flex flex-wrap gap-2">
-            {(["customer", "admin", "operator"] as SuperAdminUserCategory[]).map((category) => (
+            {superAdminCategoryOptions.map((category) => (
               <button
                 key={category}
                 type="button"
@@ -740,12 +803,12 @@ export default function UsersPage() {
               loadSuperAdminUsers(superAdminCategory, superAdminEmailSearch);
             }}
           >
-            <input
-              value={superAdminEmailSearch}
-              onChange={(event) => setSuperAdminEmailSearch(event.target.value)}
-              placeholder="Search by email"
-              className="min-w-0 flex-1 rounded-xl border border-white/20 bg-black/25 px-4 py-2.5 text-sm text-white outline-none transition focus:border-[#D5E400]/60"
-            />
+              <input
+                value={superAdminEmailSearch}
+                onChange={(event) => setSuperAdminEmailSearch(event.target.value)}
+                placeholder="Search by name or email"
+                className="min-w-0 flex-1 rounded-xl border border-white/20 bg-black/25 px-4 py-2.5 text-sm text-white outline-none transition focus:border-[#D5E400]/60"
+              />
             <button
               type="submit"
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D5E400]/60 bg-[#D5E400]/10 px-4 py-2 text-sm font-medium text-[#E4E67A] transition hover:bg-[#D5E400]/20"
@@ -1367,7 +1430,7 @@ export default function UsersPage() {
       <section className={sectionClassName}>
         <h2 className="text-lg font-semibold text-[#E4E67A]">Approved Operators</h2>
         <p className="mt-1 text-xs text-white/60">
-          Admin can remove approved operators from company directly from this list.
+          Admin/Super Admin can remove approved operators from company directly from this list.
         </p>
 
         <div className="mt-4 space-y-3">

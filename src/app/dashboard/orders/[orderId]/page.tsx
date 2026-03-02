@@ -9,6 +9,7 @@ import { downloadOrderInvoice } from "@/lib/orderInvoice";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
+import CustomDatePicker from "@/components/CustomDatePicker";
 
 interface OrderPackage extends Record<string, unknown> {
   id: string;
@@ -1691,11 +1692,13 @@ export default function OrderDetailPage() {
                             placeholder="Quantity"
                             className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
                           />
-                          <input
-                            type="date"
+                          <CustomDatePicker
                             value={pkg.pickUpDate ? String(pkg.pickUpDate).slice(0, 10) : ""}
-                            onChange={(event) => updatePackageDraft(index, { pickUpDate: event.target.value })}
-                            className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
+                            onChange={(value) => updatePackageDraft(index, { pickUpDate: value })}
+                            placeholder="Pickup date"
+                            restrictToAvailableDates={false}
+                            syncWithCartDate={false}
+                            disablePastDates={false}
                           />
                           <input
                             type="number"

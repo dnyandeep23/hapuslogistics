@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
-import { useToast } from "@/context/ToastContext";
 import Skeleton from "@/components/Skeleton";
 
 export type OperatorActiveOrder = {
@@ -42,7 +41,7 @@ export type OperatorActiveOrder = {
 };
 
 type Props = {
-  order: OperatorActiveOrder | null;
+  orders: OperatorActiveOrder[];
   loading: boolean;
   error: string;
   onRefresh: () => Promise<void>;
@@ -56,85 +55,38 @@ const getStatusBadge = (status: string): string => {
   return "bg-amber-500/20 text-amber-300 border-amber-500/40";
 };
 
-const formatDate = (value: string) => {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "--";
-  return parsed.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
+const toDialablePhone = (value: string | undefined) =>
+  String(value ?? "").trim().replace(/[^\d+]/g, "");
 
 export default function OperatorActiveOrderCard({
-  order,
+  orders,
   loading,
   error,
   onRefresh,
 }: Props) {
-  const { addToast } = useToast();
-  const [uploadingType, setUploadingType] = useState<"pickup" | "drop" | null>(null);
-  const [isDesktopLikeDevice, setIsDesktopLikeDevice] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const evaluateDevice = () => {
-      if (typeof window === "undefined") return;
-      const hasFinePointer = window.matchMedia("(pointer: fine)").matches;
-      const hasHover = window.matchMedia("(hover: hover)").matches;
-      const hasTouch =
-        "ontouchstart" in window ||
-        (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
-      setIsDesktopLikeDevice(hasFinePointer && hasHover && !hasTouch);
-    };
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
-    evaluateDevice();
-    window.addEventListener("resize", evaluateDevice);
-    return () => window.removeEventListener("resize", evaluateDevice);
-  }, []);
+  const filteredOrders = useMemo(() => {
+    if (!normalizedSearchQuery) return orders;
 
-  const handleUpload = async (
-    event: ChangeEvent<HTMLInputElement>,
-    proofType: "pickup" | "drop",
-  ) => {
-    if (isDesktopLikeDevice) {
-      addToast(
-        "Use a mobile/tablet with back camera to process pickup and drop verification.",
-        "warning",
-      );
-      if (event.target) event.target.value = "";
-      return;
-    }
+    return orders.filter((order) => {
+      const searchableText = [order.trackingId, order.sender?.name, order.receiver?.name]
+        .map((value) => String(value ?? "").trim())
+        .join(" ")
+        .toLowerCase();
+      return searchableText.includes(normalizedSearchQuery);
+    });
+  }, [normalizedSearchQuery, orders]);
 
-    const file = event.target.files?.[0];
-    if (!file || !order?.id) return;
-
+  const handleRefresh = async () => {
     try {
-      setUploadingType(proofType);
-      const formData = new FormData();
-      formData.append("proofType", proofType);
-      formData.append("image", file);
-
-      const response = await fetch(`/api/operator/orders/${order.id}/proof`, {
-        method: "POST",
-        body: formData,
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        addToast(payload?.message || "Failed to upload proof image.", "error");
-        return;
-      }
-
-      addToast(payload?.message || "Proof uploaded successfully.", "success");
+      setRefreshing(true);
       await onRefresh();
-    } catch (uploadError: unknown) {
-      addToast(
-        uploadError instanceof Error ? uploadError.message : "Failed to upload proof image.",
-        "error",
-      );
     } finally {
-      setUploadingType(null);
-      if (event.target) event.target.value = "";
+      setRefreshing(false);
     }
   };
 
@@ -142,187 +94,129 @@ export default function OperatorActiveOrderCard({
     <section className="space-y-4">
       <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-[#E4E67A]">My Order</h2>
-          {order?.status && (
-            <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusBadge(
-                order.status,
-              )}`}
-            >
-              {order.status}
-            </span>
-          )}
+          <div>
+            <h2 className="text-xl font-semibold text-[#E4E67A]">Active Orders</h2>
+            <p className="text-xs text-white/55">Showing all active packages assigned to you.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Icon icon="mdi:refresh" className={refreshing ? "animate-spin" : ""} />
+            {refreshing ? "Refreshing" : "Refresh"}
+          </button>
         </div>
 
         {loading ? (
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl bg-black/25 p-3 space-y-2">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-              <div className="rounded-xl bg-black/25 p-3 space-y-2">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-black/25 p-3 space-y-2">
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-4 w-56" />
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {Array.from({ length: 2 }).map((_, index) => (
-                <div
-                  key={`operator-proof-skeleton-${index}`}
-                  className="rounded-xl border border-white/15 bg-black/25 p-3 space-y-3"
-                >
-                  <Skeleton className="h-3 w-32" />
-                  <Skeleton className="h-28 w-full rounded-lg" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-10 w-40" />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={`operator-active-order-skeleton-${index}`}
+                className="rounded-xl border border-white/15 bg-black/25 p-3"
+              >
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-52" />
+                  <div className="flex gap-2 pt-1">
+                    <Skeleton className="h-8 w-28" />
+                    <Skeleton className="h-8 w-28" />
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
             {error}
           </div>
-        ) : !order ? (
+        ) : orders.length === 0 ? (
           <div className="rounded-xl border border-white/15 bg-black/25 p-4 text-sm text-white/70">
             No active order is assigned for your current bus period.
           </div>
         ) : (
-          <div className="space-y-4">
-            {isDesktopLikeDevice && (
-              <div className="rounded-xl border border-amber-400/45 bg-amber-400/10 p-3 text-sm text-amber-100">
-                You are on desktop. To process pickup/drop verification, please login using a mobile or tablet
-                device with a back camera.
+          <div className="space-y-3">
+            <div className="rounded-xl border border-white/15 bg-black/25 p-3">
+              <label className="mb-2 block text-xs uppercase tracking-wide text-white/50">Search Active Orders</label>
+              <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-black/35 px-3 py-2">
+                <Icon icon="mdi:magnify" className="text-lg text-white/60" />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search tracking ID, sender name, receiver name..."
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/45"
+                />
+              </div>
+            </div>
+
+            {filteredOrders.length === 0 ? (
+              <div className="rounded-xl border border-white/15 bg-black/25 p-4 text-sm text-white/70">
+                No active orders matched <span className="font-medium text-white">{searchQuery}</span>.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredOrders.map((order) => {
+                  const senderPhoneLink = toDialablePhone(order.sender?.phone);
+                  const receiverPhoneLink = toDialablePhone(order.receiver?.phone);
+
+                  return (
+                    <article
+                      key={order.id}
+                      className="rounded-xl border border-white/15 bg-black/25 p-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="font-mono text-sm text-[#E4E67A]">{order.trackingId}</p>
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${getStatusBadge(order.status)}`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-white/70">
+                        {order.pickupLocation.name} to {order.dropLocation.name}
+                      </p>
+                      <p className="mt-1 text-[11px] text-white/55">
+                        Sender: {order.sender?.name || "--"} | Receiver: {order.receiver?.name || "--"}
+                      </p>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {senderPhoneLink ? (
+                          <a
+                            href={`tel:${senderPhoneLink}`}
+                            className="inline-flex items-center justify-center gap-1 rounded-md border border-green-500/60 bg-green-500/10 px-2 py-1.5 text-xs font-medium text-green-300 hover:bg-green-500/20"
+                          >
+                            <Icon icon="mdi:phone" className="text-sm" />
+                            Call Sender
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center justify-center gap-1 rounded-md border border-white/20 px-2 py-1.5 text-xs text-white/50">
+                            <Icon icon="mdi:phone-off" className="text-sm" />
+                            Sender N/A
+                          </span>
+                        )}
+
+                        {receiverPhoneLink ? (
+                          <a
+                            href={`tel:${receiverPhoneLink}`}
+                            className="inline-flex items-center justify-center gap-1 rounded-md border border-red-500/60 bg-red-500/10 px-2 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/20"
+                          >
+                            <Icon icon="mdi:phone" className="text-sm" />
+                            Call Receiver
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center justify-center gap-1 rounded-md border border-white/20 px-2 py-1.5 text-xs text-white/50">
+                            <Icon icon="mdi:phone-off" className="text-sm" />
+                            Receiver N/A
+                          </span>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-wide text-white/50">Pickup</p>
-                <p className="mt-1 font-medium text-white">{order.pickupLocation.name}</p>
-                <p className="text-sm text-white/70">
-                  {order.pickupLocation.city}, {order.pickupLocation.state}
-                </p>
-              </div>
-              <div className="rounded-xl bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-wide text-white/50">Drop</p>
-                <p className="mt-1 font-medium text-white">{order.dropLocation.name}</p>
-                <p className="text-sm text-white/70">
-                  {order.dropLocation.city}, {order.dropLocation.state}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/15 bg-black/25 p-3">
-              <p className="text-xs uppercase tracking-wide text-white/50">Tracking</p>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/80">
-                <span className="font-mono text-[#E4E67A]">{order.trackingId}</span>
-                <span>Pickup date: {formatDate(order.orderDate)}</span>
-              </div>
-            </div>
-
-            {order.operatorNote ? (
-              <div className="rounded-xl border border-amber-300/45 bg-amber-500/10 p-3">
-                <p className="text-xs uppercase tracking-wide text-amber-200">Admin Note</p>
-                <p className="mt-1 text-sm text-amber-100/90">{order.operatorNote}</p>
-              </div>
-            ) : null}
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-white/15 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-wide text-white/50">Pickup Verification</p>
-                {order.pickupProofImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={order.pickupProofImage}
-                    alt="Pickup proof"
-                    className="mt-2 h-28 w-full rounded-lg border border-white/20 object-cover"
-                  />
-                ) : (
-                  <p className="mt-2 text-sm text-white/70">Open camera and capture pickup proof image.</p>
-                )}
-                <p className="mt-2 text-xs text-white/55">
-                  Once uploaded, proof image is confirmed and cannot be changed.
-                </p>
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#D5E400]/70 px-3 py-2 text-sm font-medium text-[#E4E67A] hover:bg-[#D5E400]/10">
-                  <Icon icon="mdi:camera" />
-                  {isDesktopLikeDevice
-                    ? "Use Mobile/Tablet for Pickup"
-                    : order.pickupProofImage
-                      ? "Pickup Verified (Locked)"
-                    : uploadingType === "pickup"
-                      ? "Uploading..."
-                      : "Open Camera (Pickup)"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    disabled={uploadingType !== null || isDesktopLikeDevice || Boolean(order.pickupProofImage)}
-                    onChange={(event) => handleUpload(event, "pickup")}
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-xl border border-white/15 bg-black/25 p-3">
-                <p className="text-xs uppercase tracking-wide text-white/50">Drop Verification</p>
-                {order.dropProofImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={order.dropProofImage}
-                    alt="Drop proof"
-                    className="mt-2 h-28 w-full rounded-lg border border-white/20 object-cover"
-                  />
-                ) : (
-                  <p className="mt-2 text-sm text-white/70">Open camera and capture drop proof image.</p>
-                )}
-                <p className="mt-2 text-xs text-white/55">
-                  Once uploaded, proof image is confirmed and cannot be changed.
-                </p>
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#D5E400]/70 px-3 py-2 text-sm font-medium text-[#E4E67A] hover:bg-[#D5E400]/10">
-                  <Icon icon="mdi:camera" />
-                  {isDesktopLikeDevice
-                    ? "Use Mobile/Tablet for Drop"
-                    : order.dropProofImage
-                      ? "Drop Verified (Locked)"
-                    : uploadingType === "drop"
-                      ? "Uploading..."
-                      : "Open Camera (Drop)"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    disabled={
-                      isDesktopLikeDevice ||
-                      uploadingType !== null ||
-                      Boolean(order.dropProofImage) ||
-                      !order.pickupProofImage ||
-                      order.status.toLowerCase() !== "in-transit"
-                    }
-                    onChange={(event) => handleUpload(event, "drop")}
-                  />
-                </label>
-                {isDesktopLikeDevice ? (
-                  <p className="mt-2 text-xs text-amber-300">
-                    Verification upload is available only on mobile/tablet with back camera.
-                  </p>
-                ) : order.dropProofImage ? (
-                  <p className="mt-2 text-xs text-emerald-300">
-                    Drop proof confirmed. Changes are locked.
-                  </p>
-                ) : !order.pickupProofImage ? (
-                  <p className="mt-2 text-xs text-amber-300">Capture pickup first to enable drop verification.</p>
-                ) : null}
-              </div>
-            </div>
           </div>
         )}
       </div>

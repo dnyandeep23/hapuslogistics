@@ -106,7 +106,8 @@ export default function Sidebar({ user, role = "user", menus, isExpanded, setIsE
                 {/* Menu (spaced nicely) */}
                 <nav className="flex-1 w-full px-2 space-y-3">
                     {items.map((item) => {
-                        const active = pathname === item.href;
+                        const itemPath = item.href.split("?")[0];
+                        const active = pathname === itemPath;
 
                         return (
                             <Link

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const categoryRaw = String(searchParams.get("category") ?? "customer").trim().toLowerCase();
-    const emailSearch = String(searchParams.get("email") ?? "").trim().toLowerCase();
+    const searchTerm = String(searchParams.get("q") ?? searchParams.get("email") ?? "").trim();
     const category: QueryRole =
       categoryRaw === "admin" || categoryRaw === "operator" || categoryRaw === "customer"
         ? (categoryRaw as QueryRole)
@@ -57,8 +57,12 @@ export async function GET(request: NextRequest) {
       role: roleFilter,
       ...(category === "admin" ? { isSuperAdmin: { $ne: true } } : {}),
     };
-    if (emailSearch) {
-      query.email = { $regex: emailSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    if (searchTerm) {
+      const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.$or = [
+        { email: { $regex: escapedSearchTerm, $options: "i" } },
+        { name: { $regex: escapedSearchTerm, $options: "i" } },
+      ];
     }
 
     const users = await User.find(query)

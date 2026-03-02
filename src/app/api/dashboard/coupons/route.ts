@@ -38,10 +38,23 @@ const parseDiscount = (value: unknown) => {
   return parsed;
 };
 
-const parseExpiryDate = (value: unknown) => {
-  const parsed = new Date(String(value ?? ""));
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
+const parseExpiryDateInput = (
+  value: unknown,
+): { valid: boolean; value: Date | null } => {
+  if (value === undefined || value === null) {
+    return { valid: true, value: null };
+  }
+
+  const raw = String(value).trim();
+  if (!raw) {
+    return { valid: true, value: null };
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return { valid: false, value: null };
+  }
+  return { valid: true, value: parsed };
 };
 
 const parseMaxUsesPerUser = (value: unknown) => {
@@ -62,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     const coupons = await Coupon.find({})
       .sort({ createdAt: -1 })
-      .lean<Array<{ _id: unknown; code: string; discount: number; isActive: boolean; expiryDate: Date; maxUsesPerUser?: number }>>();
+      .lean<Array<{ _id: unknown; code: string; discount: number; isActive: boolean; expiryDate?: Date | null; maxUsesPerUser?: number }>>();
 
     return NextResponse.json(
       {
@@ -72,7 +85,7 @@ export async function GET(request: NextRequest) {
           code: coupon.code,
           discount: coupon.discount,
           isActive: Boolean(coupon.isActive),
-          expiryDate: new Date(coupon.expiryDate).toISOString(),
+          expiryDate: coupon.expiryDate ? new Date(coupon.expiryDate).toISOString() : null,
           maxUsesPerUser: Number.isFinite(Number(coupon.maxUsesPerUser))
             ? Math.max(1, Math.floor(Number(coupon.maxUsesPerUser)))
             : 1,
@@ -106,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     const code = normalizeCode(body.code);
     const discount = parseDiscount(body.discount);
-    const expiryDate = parseExpiryDate(body.expiryDate);
+    const expiryDateParsed = parseExpiryDateInput(body.expiryDate);
     const isActive = body.isActive === undefined ? true : Boolean(body.isActive);
     const maxUsesPerUser = parseMaxUsesPerUser(body.maxUsesPerUser ?? 1);
 
@@ -116,8 +129,8 @@ export async function POST(request: NextRequest) {
     if (discount === null) {
       return NextResponse.json({ success: false, message: "Discount must be between 0 and 100." }, { status: 400 });
     }
-    if (!expiryDate) {
-      return NextResponse.json({ success: false, message: "Valid expiry date is required." }, { status: 400 });
+    if (!expiryDateParsed.valid) {
+      return NextResponse.json({ success: false, message: "Expiry date must be a valid date." }, { status: 400 });
     }
     if (maxUsesPerUser === null) {
       return NextResponse.json({ success: false, message: "Max uses per user must be at least 1." }, { status: 400 });
@@ -126,7 +139,7 @@ export async function POST(request: NextRequest) {
     const coupon = await Coupon.create({
       code,
       discount,
-      expiryDate,
+      expiryDate: expiryDateParsed.value,
       isActive,
       maxUsesPerUser,
     });
@@ -140,7 +153,7 @@ export async function POST(request: NextRequest) {
           code: coupon.code,
           discount: coupon.discount,
           isActive: coupon.isActive,
-          expiryDate: coupon.expiryDate.toISOString(),
+          expiryDate: coupon.expiryDate ? coupon.expiryDate.toISOString() : null,
           maxUsesPerUser: coupon.maxUsesPerUser,
         },
       },
@@ -201,11 +214,11 @@ export async function PATCH(request: NextRequest) {
       updates.discount = discount;
     }
     if (body.expiryDate !== undefined) {
-      const expiryDate = parseExpiryDate(body.expiryDate);
-      if (!expiryDate) {
-        return NextResponse.json({ success: false, message: "Valid expiry date is required." }, { status: 400 });
+      const expiryDateParsed = parseExpiryDateInput(body.expiryDate);
+      if (!expiryDateParsed.valid) {
+        return NextResponse.json({ success: false, message: "Expiry date must be a valid date." }, { status: 400 });
       }
-      updates.expiryDate = expiryDate;
+      updates.expiryDate = expiryDateParsed.value;
     }
     if (body.isActive !== undefined) {
       updates.isActive = Boolean(body.isActive);
@@ -227,7 +240,7 @@ export async function PATCH(request: NextRequest) {
       code: string;
       discount: number;
       isActive: boolean;
-      expiryDate: Date;
+      expiryDate?: Date | null;
       maxUsesPerUser?: number;
     } | null>();
 
@@ -244,7 +257,7 @@ export async function PATCH(request: NextRequest) {
           code: updated.code,
           discount: updated.discount,
           isActive: updated.isActive,
-          expiryDate: new Date(updated.expiryDate).toISOString(),
+          expiryDate: updated.expiryDate ? new Date(updated.expiryDate).toISOString() : null,
           maxUsesPerUser: Number.isFinite(Number(updated.maxUsesPerUser))
             ? Math.max(1, Math.floor(Number(updated.maxUsesPerUser)))
             : 1,

@@ -160,6 +160,11 @@ const orderSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  bookedByAdminId: {
+    type: Schema.Types.ObjectId,
+    ref: "users",
+    default: null,
+  },
   expiresAt: {
     type: Date,
     required: true,

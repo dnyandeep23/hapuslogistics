@@ -74,6 +74,15 @@ class ApiError extends Error {
   }
 }
 
+const buildActiveCouponFilter = () => ({
+  isActive: true,
+  $or: [
+    { expiryDate: { $exists: false } },
+    { expiryDate: null },
+    { expiryDate: { $gt: new Date() } },
+  ],
+});
+
 function isRetryableTransactionError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
 
@@ -506,9 +515,8 @@ export async function POST(req: NextRequest) {
     if (couponCode) {
       const normalizedCoupon = String(couponCode).trim().toUpperCase();
       const coupon = await Coupon.findOne({
+        ...buildActiveCouponFilter(),
         code: normalizedCoupon,
-        isActive: true,
-        expiryDate: { $gt: new Date() },
       })
         .select("_id code discount maxUsesPerUser")
         .lean<{

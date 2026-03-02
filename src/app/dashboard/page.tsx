@@ -155,7 +155,7 @@ export default function DashboardPage() {
   const [loadingAdminBuses, setLoadingAdminBuses] = useState(false);
   const [showAdminBusForm, setShowAdminBusForm] = useState(false);
   const [editingBusId, setEditingBusId] = useState<string | null>(null);
-  const [operatorActiveOrder, setOperatorActiveOrder] = useState<OperatorActiveOrder | null>(null);
+  const [operatorActiveOrders, setOperatorActiveOrders] = useState<OperatorActiveOrder[]>([]);
   const [operatorOrderLoading, setOperatorOrderLoading] = useState(false);
   const [operatorOrderError, setOperatorOrderError] = useState("");
 
@@ -282,6 +282,10 @@ export default function DashboardPage() {
   };
 
   const handleUsersClick = () => {
+    if (user?.role === "admin" && !user?.isSuperAdmin) {
+      router.push('/dashboard/operator');
+      return;
+    }
     router.push('/dashboard/users');
   };
 
@@ -335,14 +339,19 @@ export default function DashboardPage() {
       const response = await fetch("/api/operator/active-order", { method: "GET", cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) {
-        setOperatorOrderError(payload?.message || "Failed to load active order.");
-        setOperatorActiveOrder(null);
+        setOperatorOrderError(payload?.message || "Failed to load active orders.");
+        setOperatorActiveOrders([]);
         return;
       }
-      setOperatorActiveOrder(payload?.order ?? null);
+      const orders = Array.isArray(payload?.orders)
+        ? payload.orders
+        : payload?.order
+          ? [payload.order]
+          : [];
+      setOperatorActiveOrders(orders);
     } catch (error: unknown) {
-      setOperatorOrderError(error instanceof Error ? error.message : "Failed to load active order.");
-      setOperatorActiveOrder(null);
+      setOperatorOrderError(error instanceof Error ? error.message : "Failed to load active orders.");
+      setOperatorActiveOrders([]);
     } finally {
       setOperatorOrderLoading(false);
     }
@@ -1355,7 +1364,7 @@ export default function DashboardPage() {
       {isOperatorRole ? (
         <div className="space-y-8">
           <OperatorActiveOrderCard
-            order={operatorActiveOrder}
+            orders={operatorActiveOrders}
             loading={operatorOrderLoading}
             error={operatorOrderError}
             onRefresh={loadOperatorActiveOrder}

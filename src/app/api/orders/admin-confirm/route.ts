@@ -225,6 +225,7 @@ export async function POST(request: NextRequest) {
       couponCode: holdSession.couponCode ?? undefined,
       couponDiscount: holdSession.couponDiscount ?? undefined,
       bookedByAdmin: true,
+      bookedByAdminId: actor._id,
     });
 
     await order.save({ session: tx });

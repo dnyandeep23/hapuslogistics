@@ -43,6 +43,16 @@ export interface AppliedCoupon {
   [key: string]: unknown;
 }
 
+export interface AvailableCoupon {
+  id: string;
+  code: string;
+  discount: number;
+  expiryDate: string | null;
+  maxUsesPerUser: number;
+  usedCount: number;
+  remainingUses: number;
+}
+
 export interface BookingSessionResponse {
   sessionId: string;
   razorpayOrderId: string;
@@ -169,6 +179,26 @@ export const calculatePrice = async (
   } catch (error) {
     console.error('Error calculating price:', error);
     throw error;
+  }
+};
+
+export const getAvailableCoupons = async (userId: string) => {
+  try {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    const response = await fetch(`/api/coupons${query}`, { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiErrorMessage(data, "Failed to fetch available coupons"));
+    }
+
+    const coupons = Array.isArray((data as { coupons?: unknown[] }).coupons)
+      ? (data as { coupons: unknown[] }).coupons
+      : [];
+
+    return coupons as AvailableCoupon[];
+  } catch (error) {
+    console.error("Error loading available coupons:", error);
+    return [];
   }
 };
 

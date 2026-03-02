@@ -1,16 +1,69 @@
 import { Icon } from "@iconify/react";
 import Image from "next/image";
-import { useState, useEffect } from "react";
-import { calculatePrice } from "@/services/logistics";
+import { useState, useEffect, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
+import { AvailableCoupon, calculatePrice, getAvailableCoupons } from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
 
-export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: any) {
-    const pickUpLoc = pickupLocations.find((opt: any) => opt._id === formData.pickupLocationId);
-    const dropLoc = dropLocations.find((opt: any) => opt._id === formData.dropLocationId);
+type LocationOption = {
+    _id: string;
+    name: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+};
+
+type CartItem = {
+    packageImage: string;
+    packageName?: string;
+    packageSize: string;
+    packageWeight: number;
+    packageQuantities: number;
+    packageType?: string;
+    pickUpDate?: string;
+    price?: number;
+};
+
+type FormDataState = {
+    pickupLocationId: string;
+    dropLocationId: string;
+    coupon?: string;
+    senderName: string;
+    senderContact: string;
+    receiverName: string;
+    receiverContact: string;
+    cart: CartItem[];
+};
+
+type PricingInfoState = {
+    items: CartItem[];
+    subtotal: number;
+    discount: number;
+    total: number;
+    coupon: { code: string; discount: number } | null;
+};
+
+type StepThreeProps = {
+    errors: Record<string, string>;
+    setFormData: (next: FormDataState) => void;
+    formData: FormDataState;
+    pickupLocations: LocationOption[];
+    dropLocations: LocationOption[];
+    pricingInfo: PricingInfoState | null;
+    setPricingInfo: Dispatch<SetStateAction<PricingInfoState | null>>;
+    userId?: string;
+};
+
+export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: StepThreeProps) {
+    const pickUpLoc = pickupLocations.find((opt) => opt._id === formData.pickupLocationId);
+    const dropLoc = dropLocations.find((opt) => opt._id === formData.dropLocationId);
+    const displayedItems = pricingInfo?.items ?? formData.cart;
 
     const [coupon, setCoupon] = useState(formData.coupon || "");
     const [couponStatus, setCouponStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
     const [couponError, setCouponError] = useState("");
+    const [availableCoupons, setAvailableCoupons] = useState<AvailableCoupon[]>([]);
+    const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
 
     const [isLoadingPrice, setIsLoadingPrice] = useState(false);
     const [pricingError, setPricingError] = useState<string | null>(null);
@@ -18,6 +71,34 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
     useEffect(() => {
         setCoupon(formData.coupon || "");
     }, [formData.coupon]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadAvailableCoupons = async () => {
+            if (!userId) {
+                setAvailableCoupons([]);
+                setIsLoadingCoupons(false);
+                return;
+            }
+            setIsLoadingCoupons(true);
+            const coupons = await getAvailableCoupons(String(userId));
+            if (!isMounted) return;
+
+            const sortedCoupons = [...coupons].sort((left, right) => {
+                if (right.discount !== left.discount) return right.discount - left.discount;
+                return left.code.localeCompare(right.code);
+            });
+
+            setAvailableCoupons(sortedCoupons);
+            setIsLoadingCoupons(false);
+        };
+
+        loadAvailableCoupons();
+        return () => {
+            isMounted = false;
+        };
+    }, [userId]);
 
     useEffect(() => {
         const fetchPrice = async () => {
@@ -45,11 +126,12 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                     } else {
                         setCouponStatus("idle");
                     }
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.error(error);
+                    const errorMessage = error instanceof Error ? error.message : "";
                     setCouponStatus(hasCoupon ? "error" : "idle");
-                    setCouponError(error.message || "");
-                    setPricingError(error.message || "An error occurred while calculating the price.");
+                    setCouponError(errorMessage);
+                    setPricingError(errorMessage || "An error occurred while calculating the price.");
                 } finally {
                     setIsLoadingPrice(false);
                 }
@@ -74,22 +156,47 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
         setFormData({ ...formData, coupon: normalizedCoupon });
     };
 
-    const handleCouponInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleCouponInputChange = (e: ChangeEvent<HTMLInputElement>) => {
         const newCoupon = e.target.value.toUpperCase();
         setCoupon(newCoupon);
         if (formData.coupon) {
             setFormData({ ...formData, coupon: "" });
-            setPricingInfo((prev: any) => ({
-                ...prev,
-                discount: 0,
-                total: prev.subtotal,
-                coupon: null,
-            }));
+            setPricingInfo((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        discount: 0,
+                        total: Number(prev?.subtotal ?? prev?.total ?? 0),
+                        coupon: null,
+                    }
+                    : prev
+            );
         }
         setCouponStatus("idle");
         setCouponError("");
         setPricingError(null);
     };
+
+    const handleSelectCoupon = (selectedCode: string) => {
+        setCoupon(selectedCode);
+        setCouponStatus("loading");
+        setCouponError("");
+        setFormData({ ...formData, coupon: selectedCode });
+    };
+
+    const formatExpiryLabel = (value: string | null) => {
+        if (!value) return "No Expiry";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "Expiry N/A";
+        return parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    };
+    const shouldShowCouponSection =
+        isLoadingCoupons ||
+        availableCoupons.length > 0 ||
+        Boolean(formData.coupon) ||
+        couponStatus === "loading" ||
+        couponStatus === "success" ||
+        couponStatus === "error";
 
     const pickupDate = formData.cart?.[0]?.pickUpDate
         ? formData.cart[0].pickUpDate.split("-").reverse().join("/")
@@ -140,7 +247,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 </div>
 
                 <div className="space-y-3 mt-6">
-                    {(pricingInfo?.items || formData.cart).map((item: any, index: number) => (
+                    {displayedItems.map((item: CartItem, index: number) => (
                         <div key={index} className="flex w-full bg-[#7277678b] rounded-xl">
                             {/* Image */}
                             <div className="relative -18 w-20 m-2 rounded-lg bg-black/10">
@@ -283,12 +390,13 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
             </div>
 
             {/* Coupon & Amount */}
-            <div className="flex justify-between items-start mt-6">
+            <div className={`flex items-start mt-6 ${shouldShowCouponSection ? "justify-between" : "justify-end"}`}>
 
                 {/* Coupon */}
+                {shouldShowCouponSection ? (
                 <div>
                     <p className="mb-2 font-semibold">Have a coupon code?</p>
-                    {couponStatus === 'success' && pricingInfo.coupon ? (
+                    {couponStatus === 'success' && pricingInfo?.coupon ? (
                         <div>
                             <div className="flex items-center gap-2">
                                 <div className="bg-[#CDD645]/10 border border-[#F0FF73] justify-center min-w-sm h-16 text-[#F0FF73] font-bold px-3 py-1 rounded-lg flex items-center gap-2">
@@ -297,7 +405,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     <span>{pricingInfo.coupon.code}</span>
                                 </div>
                                 <button
-                                    onClick={() => handleCouponInputChange({ target: { value: "" } } as React.ChangeEvent<HTMLInputElement>)}
+                                    onClick={() => handleCouponInputChange({ target: { value: "" } } as ChangeEvent<HTMLInputElement>)}
                                     className="text-sm text-gray-400 hover:text-white"
                                 >
                                     Change
@@ -325,26 +433,56 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                             {couponStatus === 'error' && <p className="text-red-400 text-sm mt-1">{couponError}</p>}
 
                             <div className="mt-3 flex flex-col items-start gap-2">
-                                <span className="text-sm text-[#F0FF73]/80">Or select:</span>
-                                {['HAPUS10', 'FIRST30'].map(code => (
-                                <button
-                                    key={code}
-                                    onClick={() => {
-                                        setCoupon(code);
-                                        setCouponStatus("loading");
-                                        setCouponError("");
-                                        setFormData({ ...formData, coupon: code });
-                                    }}
-                                    className="bg-[#CDD645]/5 border-dashed border border-[#F0FF73] cursor-pointer min-w-sm h-16 rounded-md hover:bg-[#CDD645]/20 text-[#F0FF73] text-base flex items-center justify-center group font-mono px-2 py-1 gap-2 "
-                                >
-                                    <span>
-                                        {code} </span> <span className="group-hover:flex hidden font-bold font-sans rounded-xl bg-green-500/30 px-1.5 py-0.5 text-xs items-center gap-0.5"> <Icon icon="mdi:tick-decagram" /> apply</span>
-                                </button>
-                                ))}
+                                <span className="text-sm text-[#F0FF73]/80">
+                                    Available coupons (highest discount first):
+                                </span>
+                                {isLoadingCoupons ? (
+                                    <div className="flex w-full max-w-[720px] gap-2 overflow-x-auto pb-1">
+                                        {Array.from({ length: 3 }).map((_, index) => (
+                                            <div key={`coupon-list-skeleton-${index}`} className="min-w-[220px] rounded-xl border border-white/20 bg-black/20 p-3">
+                                                <Skeleton className="h-4 w-24" />
+                                                <Skeleton className="mt-2 h-3 w-32" />
+                                                <Skeleton className="mt-2 h-3 w-20" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : availableCoupons.length > 0 ? (
+                                    <div className="flex w-full max-w-[720px] gap-2 overflow-x-auto pb-1">
+                                        {availableCoupons.map((availableCoupon) => {
+                                            const isSelected = coupon === availableCoupon.code || formData.coupon === availableCoupon.code;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={availableCoupon.id}
+                                                    onClick={() => handleSelectCoupon(availableCoupon.code)}
+                                                    className={`min-w-[220px] rounded-xl border px-3 py-2 text-left transition ${
+                                                        isSelected
+                                                            ? "border-[#F0FF73] bg-[#CDD645]/20"
+                                                            : "border-[#F0FF73]/40 bg-[#CDD645]/5 hover:bg-[#CDD645]/15"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-mono text-base text-[#F0FF73]">{availableCoupon.code}</span>
+                                                        <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-semibold text-green-300">
+                                                            {availableCoupon.discount}% OFF
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-2 text-xs text-white/70">
+                                                        <p>{formatExpiryLabel(availableCoupon.expiryDate)}</p>
+                                                        <p>
+                                                            Remaining uses: {availableCoupon.remainingUses}/{availableCoupon.maxUsesPerUser}
+                                                        </p>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                     )}
                 </div>
+                ) : null}
 
 
                 {/* Amount */}
@@ -361,7 +499,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                     {!isLoadingPrice && !pricingError && pricingInfo && (
                         <>
                             <div className="border-b border-gray-600 pb-2 mb-2">
-                                {pricingInfo.items.map((item: any, index: number) => {
+                                {pricingInfo.items.map((item: CartItem, index: number) => {
                                     const unitPrice = item.price / item.packageQuantities;
                                     return (
                                         <div key={index} className="flex justify-between items-center text-sm mb-1">

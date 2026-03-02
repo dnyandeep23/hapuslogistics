@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Coupon from "@/app/api/models/couponModel";
 import CouponUsage from "@/app/api/models/couponUsageModel";
+import User from "@/app/api/models/userModel";
 
 export class CouponUsageLimitError extends Error {
   status: number;
@@ -14,6 +15,18 @@ export class CouponUsageLimitError extends Error {
 
 function normalizeCouponCode(couponCode: unknown): string {
   return typeof couponCode === "string" ? couponCode.trim().toUpperCase() : "";
+}
+
+function getActiveCouponFilter(code: string) {
+  return {
+    code,
+    isActive: true,
+    $or: [
+      { expiryDate: { $exists: false } },
+      { expiryDate: null },
+      { expiryDate: { $gt: new Date() } },
+    ],
+  };
 }
 
 export async function reserveCouponUsageForUser(params: {
@@ -31,7 +44,7 @@ export async function reserveCouponUsageForUser(params: {
       ? new mongoose.Types.ObjectId(params.userId)
       : params.userId;
 
-  const coupon = await Coupon.findOne({ code: normalizedCode })
+  const coupon = await Coupon.findOne(getActiveCouponFilter(normalizedCode))
     .select("_id maxUsesPerUser")
     .lean<{ _id: mongoose.Types.ObjectId; maxUsesPerUser?: number } | null>()
     .session(params.session);
@@ -63,6 +76,60 @@ export async function reserveCouponUsageForUser(params: {
     );
 
     if (updateResult.modifiedCount > 0 || updateResult.upsertedCount > 0) {
+      const now = new Date();
+      const incrementExistingResult = await User.updateOne(
+        {
+          _id: userObjectId,
+          "couponUsageStats.couponId": coupon._id,
+        },
+        {
+          $inc: { "couponUsageStats.$.uses": 1 },
+          $set: {
+            "couponUsageStats.$.couponCode": normalizedCode,
+            "couponUsageStats.$.lastUsedAt": now,
+          },
+        },
+        { session: params.session },
+      );
+
+      if (incrementExistingResult.modifiedCount === 0) {
+        const addNewResult = await User.updateOne(
+          {
+            _id: userObjectId,
+            "couponUsageStats.couponId": { $ne: coupon._id },
+          },
+          {
+            $push: {
+              couponUsageStats: {
+                couponId: coupon._id,
+                couponCode: normalizedCode,
+                uses: 1,
+                lastUsedAt: now,
+              },
+            },
+          },
+          { session: params.session },
+        );
+
+        if (addNewResult.modifiedCount === 0 && addNewResult.upsertedCount === 0) {
+          // Rare race fallback: another write inserted row before $push matched.
+          await User.updateOne(
+            {
+              _id: userObjectId,
+              "couponUsageStats.couponId": coupon._id,
+            },
+            {
+              $inc: { "couponUsageStats.$.uses": 1 },
+              $set: {
+                "couponUsageStats.$.couponCode": normalizedCode,
+                "couponUsageStats.$.lastUsedAt": now,
+              },
+            },
+            { session: params.session },
+          );
+        }
+      }
+
       return;
     }
 

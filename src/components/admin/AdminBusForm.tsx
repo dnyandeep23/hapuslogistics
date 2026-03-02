@@ -1030,19 +1030,28 @@ export default function AdminBusForm({
   ]);
 
   const applyResolvedInlineLocation = useCallback((resolved: ResolvedLocation) => {
-    setInlineLocationForm((prev) => ({
-      ...prev,
-      name: prev.name.trim() ? prev.name : String(resolved.name ?? "").trim() || prev.name,
-      address:
+    setInlineLocationForm((prev) => {
+      const resolvedName = String(resolved.name ?? "").trim();
+      const resolvedAddress =
         String(resolved.addressLine ?? "").trim() ||
-        String(resolved.displayName ?? "").trim() ||
-        prev.address,
-      city: String(resolved.city ?? "").trim() || prev.city,
-      state: String(resolved.state ?? "").trim() || prev.state,
-      zip: String(resolved.zip ?? "").trim() || prev.zip,
-      latitude: Number(resolved.latitude).toFixed(6),
-      longitude: Number(resolved.longitude).toFixed(6),
-    }));
+        String(resolved.displayName ?? "").trim();
+      const resolvedCity = String(resolved.city ?? "").trim();
+      const resolvedState = String(resolved.state ?? "").trim();
+      const resolvedZip = String(resolved.zip ?? "").trim();
+      const resolvedLatitude = Number(resolved.latitude).toFixed(6);
+      const resolvedLongitude = Number(resolved.longitude).toFixed(6);
+
+      return {
+        ...prev,
+        name: prev.name.trim() ? prev.name : resolvedName || prev.name,
+        address: prev.address.trim() ? prev.address : resolvedAddress || prev.address,
+        city: prev.city.trim() ? prev.city : resolvedCity || prev.city,
+        state: prev.state.trim() ? prev.state : resolvedState || prev.state,
+        zip: prev.zip.trim() ? prev.zip : resolvedZip || prev.zip,
+        latitude: String(prev.latitude ?? "").trim() ? prev.latitude : resolvedLatitude,
+        longitude: String(prev.longitude ?? "").trim() ? prev.longitude : resolvedLongitude,
+      };
+    });
 
     setInlineLocationFieldErrors((prev) => ({
       ...prev,

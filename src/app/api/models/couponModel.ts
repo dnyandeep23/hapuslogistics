@@ -4,7 +4,7 @@ export interface ICoupon extends Document {
     code: string;
     discount: number;
     isActive: boolean;
-    expiryDate: Date;
+    expiryDate?: Date | null;
     maxUsesPerUser: number;
 }
 
@@ -28,7 +28,8 @@ const CouponSchema: Schema = new Schema({
     },
     expiryDate: {
         type: Date,
-        required: true,
+        required: false,
+        default: null,
     },
     maxUsesPerUser: {
         type: Number,

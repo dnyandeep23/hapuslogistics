@@ -21,7 +21,8 @@ export const roleMenus: Record<string, MenuItem[]> = {
         { href: '/dashboard/buses', label: 'My Buses', icon: 'mdi:bus-multiple' },
         { href: '/dashboard/locations', label: 'Pickup/Drop', icon: 'mdi:map-marker-path' },
         { href: '/dashboard/orders', label: 'All Orders', icon: 'lets-icons:order' },
-        { href: '/dashboard/users', label: 'Operators', icon: 'mdi:account-multiple' },
+        { href: '/dashboard/pricing', label: 'Pricing', icon: 'mdi:cash-multiple' },
+        { href: '/dashboard/operator', label: 'Operators', icon: 'mdi:account-multiple' },
         { href: '/dashboard/support', label: 'Support', icon: 'fluent:person-support-16-filled' },
     ],
     superadmin: [
@@ -32,7 +33,9 @@ export const roleMenus: Record<string, MenuItem[]> = {
         { href: '/dashboard/buses', label: 'My Buses', icon: 'mdi:bus-multiple' },
         { href: '/dashboard/locations', label: 'Pickup/Drop', icon: 'mdi:map-marker-path' },
         { href: '/dashboard/orders', label: 'All Orders', icon: 'lets-icons:order' },
-        { href: '/dashboard/users', label: 'Manage Operators', icon: 'mdi:account-multiple' },
+        { href: '/dashboard/pricing', label: 'Pricing', icon: 'mdi:cash-multiple' },
+        { href: '/dashboard/operator', label: 'Operator Management', icon: 'mdi:account-multiple' },
+        { href: '/dashboard/users', label: 'User Management', icon: 'mdi:account-group-outline' },
     ],
 }
 

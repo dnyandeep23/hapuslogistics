@@ -17,7 +17,7 @@ type CouponItem = {
   code: string;
   discount: number;
   isActive: boolean;
-  expiryDate: string;
+  expiryDate: string | null;
   maxUsesPerUser: number;
 };
 
@@ -25,6 +25,7 @@ type CouponForm = {
   code: string;
   discount: string;
   expiryDate: string;
+  noExpiry: boolean;
   maxUsesPerUser: string;
   isActive: boolean;
 };
@@ -50,6 +51,7 @@ const emptyCouponForm: CouponForm = {
   code: "",
   discount: "10",
   expiryDate: "",
+  noExpiry: false,
   maxUsesPerUser: "1",
   isActive: true,
 };
@@ -59,7 +61,8 @@ const emptyBannerForm: BannerForm = {
   isActive: true,
 };
 
-const toDateInput = (value: string) => {
+const toDateInput = (value: string | null | undefined) => {
+  if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);
@@ -251,6 +254,7 @@ export default function SuperAdminCouponBannerSection({
         Array.isArray(payload.coupons)
           ? payload.coupons.map((coupon) => ({
               ...coupon,
+              expiryDate: coupon.expiryDate ? String(coupon.expiryDate) : null,
               maxUsesPerUser: Number.isFinite(Number(coupon.maxUsesPerUser))
                 ? Math.max(1, Math.floor(Number(coupon.maxUsesPerUser)))
                 : 1,
@@ -317,7 +321,7 @@ export default function SuperAdminCouponBannerSection({
 
     const code = couponForm.code.trim().toUpperCase();
     const discount = Number(couponForm.discount);
-    const expiryDate = couponForm.expiryDate;
+    const expiryDate = couponForm.noExpiry ? null : couponForm.expiryDate;
     const maxUsesPerUser = Number(couponForm.maxUsesPerUser);
 
     if (!code) {
@@ -328,11 +332,11 @@ export default function SuperAdminCouponBannerSection({
       setCouponError("Discount must be between 0 and 100.");
       return;
     }
-    if (!expiryDate) {
-      setCouponError("Expiry date is required.");
+    if (!couponForm.noExpiry && !expiryDate) {
+      setCouponError("Expiry date is required unless no expiry is enabled.");
       return;
     }
-    if (expiryDate < todayDateInput()) {
+    if (expiryDate && expiryDate < todayDateInput()) {
       setCouponError("Expiry date cannot be in the past.");
       return;
     }
@@ -374,7 +378,7 @@ export default function SuperAdminCouponBannerSection({
     setCouponMessage("");
     setCouponError("");
     const normalizedCode = coupon.code.trim().toUpperCase();
-    const normalizedExpiry = toDateInput(coupon.expiryDate);
+    const normalizedExpiry = coupon.expiryDate ? toDateInput(coupon.expiryDate) : null;
     if (!normalizedCode) {
       setCouponError("Coupon code cannot be empty.");
       return;
@@ -383,11 +387,7 @@ export default function SuperAdminCouponBannerSection({
       setCouponError("Discount must be between 0 and 100.");
       return;
     }
-    if (!normalizedExpiry) {
-      setCouponError("Valid expiry date is required.");
-      return;
-    }
-    if (normalizedExpiry < todayDateInput()) {
+    if (normalizedExpiry && normalizedExpiry < todayDateInput()) {
       setCouponError("Expiry date cannot be in the past.");
       return;
     }
@@ -611,16 +611,39 @@ export default function SuperAdminCouponBannerSection({
             </div>
             <div className="space-y-1">
               <p className="text-xs text-white/65">Expiry Date</p>
-              <CustomDatePicker
-                value={couponForm.expiryDate}
-                onChange={(nextValue) =>
-                  setCouponForm((prev) => ({ ...prev, expiryDate: nextValue }))
-                }
-                minDate={todayDateInput()}
-                restrictToAvailableDates={false}
-                syncWithCartDate={false}
-                placeholder="Select expiry date"
-              />
+              <div className="space-y-2">
+                <label className="inline-flex items-center gap-2 text-xs text-white/85">
+                  <input
+                    type="checkbox"
+                    checked={couponForm.noExpiry}
+                    onChange={(event) =>
+                      setCouponForm((prev) => ({
+                        ...prev,
+                        noExpiry: event.target.checked,
+                        expiryDate: event.target.checked ? "" : (prev.expiryDate || todayDateInput()),
+                      }))
+                    }
+                    className="h-3.5 w-3.5 accent-[#CDD645]"
+                  />
+                  No expiry
+                </label>
+                {!couponForm.noExpiry ? (
+                  <CustomDatePicker
+                    value={couponForm.expiryDate}
+                    onChange={(nextValue) =>
+                      setCouponForm((prev) => ({ ...prev, expiryDate: nextValue }))
+                    }
+                    minDate={todayDateInput()}
+                    restrictToAvailableDates={false}
+                    syncWithCartDate={false}
+                    placeholder="Select expiry date"
+                  />
+                ) : (
+                  <div className="rounded-xl border border-white/20 bg-black/30 px-3 py-3 text-xs text-white/65">
+                    This coupon never expires.
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-white/65">Max Uses / User</p>
@@ -746,25 +769,55 @@ export default function SuperAdminCouponBannerSection({
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] text-white/60">Expiry Date</p>
-                      <CustomDatePicker
-                        value={toDateInput(coupon.expiryDate)}
-                        onChange={(nextValue) =>
-                          setCoupons((prev) =>
-                            prev.map((item) =>
-                              item.id === coupon.id
-                                ? {
-                                    ...item,
-                                    expiryDate: nextValue ? new Date(nextValue).toISOString() : item.expiryDate,
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                        minDate={todayDateInput()}
-                        restrictToAvailableDates={false}
-                        syncWithCartDate={false}
-                        placeholder="Select expiry date"
-                      />
+                      <div className="space-y-1.5">
+                        <label className="inline-flex items-center gap-2 text-[11px] text-white/85">
+                          <input
+                            type="checkbox"
+                            checked={!coupon.expiryDate}
+                            onChange={(event) =>
+                              setCoupons((prev) =>
+                                prev.map((item) =>
+                                  item.id === coupon.id
+                                    ? {
+                                        ...item,
+                                        expiryDate: event.target.checked
+                                          ? null
+                                          : new Date(todayDateInput()).toISOString(),
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                            className="h-3.5 w-3.5 accent-[#CDD645]"
+                          />
+                          No expiry
+                        </label>
+                        {coupon.expiryDate ? (
+                          <CustomDatePicker
+                            value={toDateInput(coupon.expiryDate)}
+                            onChange={(nextValue) =>
+                              setCoupons((prev) =>
+                                prev.map((item) =>
+                                  item.id === coupon.id
+                                    ? {
+                                        ...item,
+                                        expiryDate: nextValue ? new Date(nextValue).toISOString() : null,
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                            minDate={todayDateInput()}
+                            restrictToAvailableDates={false}
+                            syncWithCartDate={false}
+                            placeholder="Select expiry date"
+                          />
+                        ) : (
+                          <div className="rounded-md border border-white/20 bg-black/40 px-2 py-2 text-[11px] text-white/65">
+                            Never expires
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] text-white/60">Max Uses / User</p>

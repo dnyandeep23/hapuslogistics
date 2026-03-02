@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       .lean<BusLean[]>();
 
     if (!Array.isArray(buses) || buses.length === 0) {
-      return NextResponse.json({ success: true, order: null }, { status: 200 });
+      return NextResponse.json({ success: true, order: null, orders: [] }, { status: 200 });
     }
 
     const busById = new Map<string, BusLean>();
@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
       .filter((id) => mongoose.Types.ObjectId.isValid(id))
       .map((id) => new mongoose.Types.ObjectId(id));
     if (busIds.length === 0 || !minDate || !maxDate) {
-      return NextResponse.json({ success: true, order: null }, { status: 200 });
+      return NextResponse.json({ success: true, order: null, orders: [] }, { status: 200 });
     }
 
     const orders = await Order.find({
@@ -316,6 +316,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
+        orders: activeOrders,
         order: activeOrders[0] ?? null,
       },
       { status: 200 },

@@ -52,7 +52,30 @@ function MapViewUpdater({ center, zoom }: { center: [number, number]; zoom: numb
   const map = useMap();
 
   useEffect(() => {
-    map.setView(center, zoom);
+    let cancelled = false;
+
+    const updateView = () => {
+      if (cancelled) return;
+
+      const container = map.getContainer?.();
+      const mapPane = map.getPane?.("mapPane");
+      if (!container || !container.isConnected || !mapPane) return;
+
+      try {
+        map.setView(center, zoom, { animate: false });
+      } catch {
+        // Ignore transient setView failures during mount/unmount transitions.
+      }
+    };
+
+    map.whenReady(() => {
+      if (cancelled) return;
+      requestAnimationFrame(updateView);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [center, map, zoom]);
 
   return null;

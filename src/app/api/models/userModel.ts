@@ -129,6 +129,34 @@ const userSchema = new mongoose.Schema(
         ref: "Order",
       },
     ],
+    couponUsageStats: {
+      type: [
+        {
+          couponId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Coupon",
+            required: true,
+          },
+          couponCode: {
+            type: String,
+            required: true,
+            trim: true,
+            uppercase: true,
+          },
+          uses: {
+            type: Number,
+            required: true,
+            min: 0,
+            default: 0,
+          },
+          lastUsedAt: {
+            type: Date,
+            default: null,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );
