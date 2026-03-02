@@ -115,14 +115,14 @@ export default function Sidebar({ user, role = "user", menus, isExpanded, setIsE
                                 className={`
           flex items-center py-2 px-4 rounded-xl
           transition-all duration-1000 ease-in-out
-          ${isExpanded ? "justify-start px-4 gap-3" : "justify-center flex-col text-xs gap-2 text-center"}
+          ${isExpanded ? "justify-start px-4 gap-3" : "justify-center w-18 flex-col text-xs gap-2 text-center"}
           ${active ? "bg-lime-500/10 text-[#E1FF00]" : "hover:bg-lime-800/50 text-[#B3D198]"}
         `}
                             >
                                 <Icon icon={item.icon ?? "mdi:circle"} className="text-3xl transition-transform duration-1000" />
 
                                 <span
-                                    className={`transition-all duration-1000 ease-in-out w-18`}
+                                    className={`transition-all duration-1000 ease-in-out `}
                                 >
                                     {item.label}
                                 </span>
