@@ -1028,70 +1028,72 @@ export default function UsersPage() {
           )}
         </section>
 
-        <section className={sectionClassName}>
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-[#E4E67A]">Find a Travel Company</h2>
-            <p className="text-sm text-white/65">Search, select, and send one request.</p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <input
-              value={companyQuery}
-              onChange={(event) => {
-                const nextQuery = event.target.value;
-                setCompanyQuery(nextQuery);
-                setSelectedCompanyId("");
-                loadCompanies(nextQuery);
-              }}
-              placeholder="Search company name"
-              className="w-full rounded-xl border border-white/20 bg-black/25 px-4 py-2.5 text-sm text-white outline-none transition focus:border-[#D5E400]/60"
-            />
-
-            <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-              {loadingCompanies ? (
-                <p className="text-sm text-white/65">Loading companies...</p>
-              ) : filteredCompanies.length === 0 ? (
-                <p className="text-sm text-white/65">No company found.</p>
-              ) : (
-                filteredCompanies.map((company) => {
-                  const isSelected = selectedCompanyId === company._id;
-                  return (
-                    <button
-                      key={company._id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCompanyId(company._id);
-                        setCompanyQuery(company.name);
-                      }}
-                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition ${
-                        isSelected
-                          ? "border-[#D5E400]/50 bg-[#D5E400]/10 text-[#E9F290]"
-                          : "border-white/15 bg-black/20 text-white/80 hover:border-white/30"
-                      }`}
-                    >
-                      <span>{company.name}</span>
-                      {isSelected && <Icon icon="solar:check-circle-bold" className="text-base" />}
-                    </button>
-                  );
-                })
-              )}
+        {operatorStatus !== "approved" ? (
+          <section className={sectionClassName}>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-[#E4E67A]">Find a Travel Company</h2>
+              <p className="text-sm text-white/65">Search, select, and send one request.</p>
             </div>
 
-            {selectedCompanyName && (
-              <p className="text-xs text-white/55">Selected company: {selectedCompanyName}</p>
-            )}
+            <div className="mt-4 space-y-3">
+              <input
+                value={companyQuery}
+                onChange={(event) => {
+                  const nextQuery = event.target.value;
+                  setCompanyQuery(nextQuery);
+                  setSelectedCompanyId("");
+                  loadCompanies(nextQuery);
+                }}
+                placeholder="Search company name"
+                className="w-full rounded-xl border border-white/20 bg-black/25 px-4 py-2.5 text-sm text-white outline-none transition focus:border-[#D5E400]/60"
+              />
 
-            <button
-              type="button"
-              disabled={!canSendRequest}
-              onClick={submitCompanyRequest}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#D5E400]/60 bg-[#D5E400]/10 px-4 py-2 text-sm font-medium text-[#E4E67A] transition hover:bg-[#D5E400]/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Icon icon="solar:paper-plane-outline" className="text-base" />
-              {savingCompanyRequest ? "Sending..." : "Send Request"}
-            </button>
-          </div>
-        </section>
+              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                {loadingCompanies ? (
+                  <p className="text-sm text-white/65">Loading companies...</p>
+                ) : filteredCompanies.length === 0 ? (
+                  <p className="text-sm text-white/65">No company found.</p>
+                ) : (
+                  filteredCompanies.map((company) => {
+                    const isSelected = selectedCompanyId === company._id;
+                    return (
+                      <button
+                        key={company._id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCompanyId(company._id);
+                          setCompanyQuery(company.name);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition ${
+                          isSelected
+                            ? "border-[#D5E400]/50 bg-[#D5E400]/10 text-[#E9F290]"
+                            : "border-white/15 bg-black/20 text-white/80 hover:border-white/30"
+                        }`}
+                      >
+                        <span>{company.name}</span>
+                        {isSelected && <Icon icon="solar:check-circle-bold" className="text-base" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {selectedCompanyName && (
+                <p className="text-xs text-white/55">Selected company: {selectedCompanyName}</p>
+              )}
+
+              <button
+                type="button"
+                disabled={!canSendRequest}
+                onClick={submitCompanyRequest}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#D5E400]/60 bg-[#D5E400]/10 px-4 py-2 text-sm font-medium text-[#E4E67A] transition hover:bg-[#D5E400]/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Icon icon="solar:paper-plane-outline" className="text-base" />
+                {savingCompanyRequest ? "Sending..." : "Send Request"}
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className={sectionClassName}>
           <div className="flex items-center justify-between gap-2">
