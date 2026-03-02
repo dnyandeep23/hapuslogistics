@@ -1,26 +1,92 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light theme defaults */
+  --bg: #F3F6EF;
+  --card: #FFFFFF;
+  --text: #1E241B;
+  --muted: #5F6B57;
+  --border: #D7DFCF;
+  --primary: #6FA83A;
+  --secondary: #E1B12C;
+  --accent: #4C6B2F;
+  --danger: #C0392B;
+  --success: #27AE60;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Dark theme - applied when `.dark` class is on <html> */
+.dark {
+  --bg: #2A3125;
+  --card: #313A2E;
+  --text: #E6F0DF;
+  --muted: #B8C3AE;
+  --border: #3E4739;
+  --primary: #6FA83A;
+  --secondary: #E1B12C;
+  --accent: #4C6B2F;
+  --danger: #C0392B;
+  --success: #27AE60;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #2A3125;
+    --card: #313A2E;
+    --text: #E6F0DF;
+    --muted: #B8C3AE;
+    --border: #3E4739;
+    --primary: #6FA83A;
+    --secondary: #E1B12C;
+    --accent: #4C6B2F;
+    --danger: #C0392B;
+    --success: #27AE60;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-roboto), system-ui, Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input:-webkit-autofill {
+  -webkit-text-fill-color: white;
+  -webkit-box-shadow: 0 0 0 1000px #000 inset;
+}
+
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-in-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.3s ease-in-out;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+opacity: 0;
+ display: hidden;
 }
