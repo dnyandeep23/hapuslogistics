@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/lib/redux/hooks";
+import Skeleton from "@/components/Skeleton";
 
 type AdminLocation = {
   _id: string;
@@ -426,7 +427,22 @@ export default function AdminLocationsPage() {
           </div>
 
           {loading ? (
-            <p className="mt-4 text-sm text-white/70">Loading locations...</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={`location-skeleton-${index}`}
+                  className="rounded-xl border border-white/15 bg-black/25 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-14 rounded-md" />
+                  </div>
+                  <Skeleton className="mt-3 h-3 w-full" />
+                  <Skeleton className="mt-2 h-3 w-3/4" />
+                  <Skeleton className="mt-3 h-3 w-2/3" />
+                </div>
+              ))}
+            </div>
           ) : filteredLocations.length === 0 ? (
             <p className="mt-4 text-sm text-white/70">No locations found.</p>
           ) : (

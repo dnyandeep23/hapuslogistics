@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
+import Skeleton from "@/components/Skeleton";
 
 export type OperatorActiveOrder = {
   id: string;
@@ -154,7 +155,37 @@ export default function OperatorActiveOrderCard({
         </div>
 
         {loading ? (
-          <p className="text-sm text-white/70">Loading active order...</p>
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl bg-black/25 p-3 space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+              <div className="rounded-xl bg-black/25 p-3 space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/15 bg-black/25 p-3 space-y-2">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div
+                  key={`operator-proof-skeleton-${index}`}
+                  className="rounded-xl border border-white/15 bg-black/25 p-3 space-y-3"
+                >
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-28 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-10 w-40" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
             {error}

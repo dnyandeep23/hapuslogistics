@@ -111,7 +111,12 @@ export default function ForgotPasswordPage() {
               "
               disabled={loading}
             >
-              {loading ? "Sending..." : "Send Security Code"}
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Icon icon="line-md:loading-loop" className="text-lg" />
+                  Sending...
+                </span>
+              ) : "Send Security Code"}
             </button>
             <div className="flex justify-between items-center text-sm text-white/80 mt-2">
               <span>Remembered your password? <Link href="/login" className="text-[#D5E400] underline cursor-pointer">Log In</Link></span>

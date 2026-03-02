@@ -9,6 +9,7 @@ import { useDispatch } from "react-redux";
 import Image from "next/image";
 import CustomDateRangePicker from "@/components/CustomDateRangePicker";
 import CustomTimePicker from "@/components/CustomTimePicker";
+import Skeleton from "@/components/Skeleton";
 import { AppDispatch } from "@/lib/redux/store";
 import { fetchUser } from "@/lib/redux/userSlice";
 import { useAppSelector } from "@/lib/redux/hooks";
@@ -1484,8 +1485,9 @@ export default function AdminBusForm({
 
   if (isEditMode && initializingEdit) {
     return (
-      <div className="rounded-2xl border border-white/15 bg-white/5 p-4 text-sm text-white/75">
-        Loading bus details...
+      <div className="rounded-2xl border border-white/15 bg-white/5 p-4">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="mt-3 h-4 w-2/3" />
       </div>
     );
   }
@@ -1899,7 +1901,7 @@ export default function AdminBusForm({
                         : "--"}
                     </span>
                   </p>
-                  {roadRouteLoading && <p className="mt-1 text-white/55">Calculating road route...</p>}
+                  {roadRouteLoading && <Skeleton className="mt-1 h-3 w-48" />}
                   {!roadRouteLoading && roadRouteError && (
                     <p className="mt-1 text-amber-200">
                       OpenRouteService unavailable. Form still works, but distance is hidden.
@@ -2256,7 +2258,7 @@ export default function AdminBusForm({
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
           <div className="text-xs text-white/55">
-            {loadingLocations ? "Loading location options..." : "Fields marked with * are required."}
+            {loadingLocations ? <Skeleton className="h-3 w-40" /> : "Fields marked with * are required."}
           </div>
           <div className="flex items-center gap-2">
             {currentStep > 1 && (

@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { getAvailableDates } from "@/services/logistics";
 import { useSelector } from "react-redux";
 import { selectPackage } from "@/lib/redux/packageSlice";
+import Skeleton from "@/components/Skeleton";
 
 interface CustomDatePickerProps {
   value: string;
@@ -263,7 +264,10 @@ export default function CustomDatePicker({
           </div>
 
           {isLoading && (
-            <p className="mt-3 text-xs text-white/60">Loading available dates...</p>
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-3 w-36" />
+              <Skeleton className="h-3 w-24" />
+            </div>
           )}
           {!isLoading && availabilityMessage && (
             <p className="mt-3 text-xs text-amber-200">{availabilityMessage}</p>

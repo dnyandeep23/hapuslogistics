@@ -329,7 +329,12 @@ export default function ResetPasswordPage() {
               "
               disabled={loading}
             >
-              {loading ? "Resetting..." : "Reset Password"}
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Icon icon="line-md:loading-loop" className="text-lg" />
+                  Resetting...
+                </span>
+              ) : "Reset Password"}
             </button>
           </form>
         </div>

@@ -144,7 +144,10 @@ export default function BottomNav({ menus }: Props) {
                 "
                             >
                                 <Icon icon="solar:logout-3-bold-duotone" className="text-2xl" />
-                                <span className="text-xs mt-1">{isLoggingOut ? "..." : "Logout"}</span>
+                                <span className="mt-1 inline-flex items-center gap-1 text-xs">
+                                    {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-sm" />}
+                                    {isLoggingOut ? "Logging out..." : "Logout"}
+                                </span>
                             </button>
                         )}
                     </nav>
@@ -201,7 +204,10 @@ export default function BottomNav({ menus }: Props) {
                                 className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#f0b2b2] transition-all hover:bg-red-800/20 disabled:opacity-60"
                             >
                                 <Icon icon="solar:logout-3-bold-duotone" className="text-xl" />
-                                <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
+                                <span className="inline-flex items-center gap-2">
+                                    {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-base" />}
+                                    {isLoggingOut ? "Logging out..." : "Logout"}
+                                </span>
                             </button>
                         </div>
                     </aside>

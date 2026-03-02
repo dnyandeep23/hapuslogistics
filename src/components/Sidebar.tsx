@@ -147,7 +147,10 @@ export default function Sidebar({ user, role = "user", menus, isExpanded, setIsE
             `}
                     >
                         <Icon icon="solar:logout-3-bold-duotone" className="text-3xl" />
-                        <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
+                        <span className="inline-flex items-center gap-2">
+                            {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-base" />}
+                            {isLoggingOut ? "Logging out..." : "Logout"}
+                        </span>
                     </button>
                 </div>
             </div>

@@ -282,7 +282,7 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
           disabled={isBusy}
           className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#CDD645]/70 bg-[#CDD645]/15 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#CDD645]/25 disabled:opacity-60"
         >
-          <Icon icon="mdi:magnify" />
+          <Icon icon={trackingFromDashboard ? "line-md:loading-loop" : "mdi:magnify"} />
           {trackingFromDashboard ? "Checking..." : "Track Order"}
         </button>
       ) : (
@@ -293,7 +293,7 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
             disabled={isBusy}
             className="inline-flex items-center gap-2 rounded-lg border border-[#CDD645]/70 bg-[#CDD645]/15 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#CDD645]/25 disabled:opacity-60"
           >
-            <Icon icon="mdi:email-send-outline" />
+            <Icon icon={requestingCode ? "line-md:loading-loop" : "mdi:email-send-outline"} />
             {requestingCode ? "Sending..." : "Send Code"}
           </button>
 
@@ -312,7 +312,7 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
                 disabled={isBusy}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#5EA8FF]/60 bg-[#5EA8FF]/15 px-4 py-2 text-sm font-semibold text-[#AFD4FF] transition hover:bg-[#5EA8FF]/25 disabled:opacity-60"
               >
-                <Icon icon="mdi:shield-check-outline" />
+                <Icon icon={verifyingCode ? "line-md:loading-loop" : "mdi:shield-check-outline"} />
                 {verifyingCode ? "Verifying..." : "Verify & Track"}
               </button>
             </>

@@ -19,6 +19,7 @@ import CustomDateRangePicker from '@/components/CustomDateRangePicker';
 import CustomDatePicker from '@/components/CustomDatePicker';
 import CustomTimePicker from '@/components/CustomTimePicker';
 import OperatorActiveOrderCard, { type OperatorActiveOrder } from '@/components/dashboard/OperatorActiveOrderCard';
+import Skeleton from '@/components/Skeleton';
 
 type AdminLocation = {
   _id: string;
@@ -1296,13 +1297,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="md:col-span-2 flex items-center justify-between gap-3">
-          <p className="text-xs text-white/70">
+          <div className="text-xs text-white/70">
             {loadingLocations
-              ? "Loading locations..."
+              ? <Skeleton className="h-3 w-28" />
               : busImages.length > 0
                 ? "1 image selected"
                 : "No new image selected"}
-          </p>
+          </div>
           <button
             type="submit"
             disabled={savingBus || loadingLocations}

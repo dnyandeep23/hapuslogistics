@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@iconify/react';
 import { useToast } from '@/context/ToastContext';
+import Skeleton from '@/components/Skeleton';
 
 interface Order {
     id: string;
@@ -116,8 +117,24 @@ export default function RecentOrders() {
 
     if (loading) {
         return (
-            <div className="text-center text-white">
-                <p>Loading recent orders...</p>
+            <div className="mt-12">
+                <div className="mb-6 flex items-center justify-between">
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-5 w-20" />
+                </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={`recent-order-skeleton-${index}`} className="overflow-hidden rounded-2xl bg-[#2A3324]">
+                            <Skeleton className="h-48 w-full rounded-none" />
+                            <div className="space-y-3 p-4">
+                                <Skeleton className="h-5 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                                <Skeleton className="h-5 w-20 rounded-full" />
+                                <Skeleton className="h-4 w-32" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }

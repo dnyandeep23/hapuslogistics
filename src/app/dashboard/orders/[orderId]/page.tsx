@@ -8,6 +8,7 @@ import { useToast } from "@/context/ToastContext";
 import { downloadOrderInvoice } from "@/lib/orderInvoice";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
+import Skeleton from "@/components/Skeleton";
 
 interface OrderPackage extends Record<string, unknown> {
   id: string;
@@ -527,8 +528,33 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-white/80">
-        <p>Loading package details...</p>
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-36" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5 space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-5 w-48" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-5 w-40" />
+            </div>
+          </div>
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5 space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+        </div>
       </div>
     );
   }

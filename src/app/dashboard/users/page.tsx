@@ -8,6 +8,7 @@ import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
+import Skeleton from "@/components/Skeleton";
 
 type OperatorStatus =
   | "none"
@@ -779,11 +780,20 @@ export default function UsersPage() {
               </thead>
               <tbody>
                 {loadingSuperAdminUsers ? (
-                  <tr>
-                    <td className="px-2 py-3 text-white/65" colSpan={7}>
-                      Loading users...
-                    </td>
-                  </tr>
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <tr key={`superadmin-user-skeleton-${index}`} className="border-b border-white/5">
+                      <td className="px-2 py-3" colSpan={7}>
+                        <div className="grid grid-cols-7 gap-2">
+                          {Array.from({ length: 7 }).map((__, colIndex) => (
+                            <Skeleton
+                              key={`superadmin-user-skeleton-cell-${index}-${colIndex}`}
+                              className="h-4 w-full"
+                            />
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 ) : superAdminUsers.length === 0 ? (
                   <tr>
                     <td className="px-2 py-3 text-white/65" colSpan={7}>
@@ -969,7 +979,10 @@ export default function UsersPage() {
           </div>
 
           {loadingCompanyOffer && (
-            <p className="mt-3 text-xs text-white/60">Checking if you have any company request...</p>
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-3 w-56" />
+              <Skeleton className="h-3 w-44" />
+            </div>
           )}
 
           {operatorStatus === "approved" && (
@@ -978,7 +991,7 @@ export default function UsersPage() {
                 Current company:{" "}
                 <span className="font-semibold">
                   {loadingCurrentCompany
-                    ? "Loading..."
+                    ? <Skeleton className="inline-block h-4 w-28 align-middle" />
                     : currentCompany?.companyName || "Assigned company"}
                 </span>
               </p>
@@ -1050,7 +1063,11 @@ export default function UsersPage() {
 
               <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                 {loadingCompanies ? (
-                  <p className="text-sm text-white/65">Loading companies...</p>
+                  <div className="space-y-2">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <Skeleton key={`company-skeleton-${index}`} className="h-11 w-full rounded-xl" />
+                    ))}
+                  </div>
                 ) : filteredCompanies.length === 0 ? (
                   <p className="text-sm text-white/65">No company found.</p>
                 ) : (
@@ -1105,7 +1122,15 @@ export default function UsersPage() {
 
           <div className="mt-4 space-y-3">
             {loadingNotifications ? (
-              <p className="text-sm text-white/65">Loading notifications...</p>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={`notification-skeleton-operator-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="mt-2 h-3 w-full" />
+                    <Skeleton className="mt-2 h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
             ) : notifications.length === 0 ? (
               <p className="text-sm text-white/65">No notifications yet.</p>
             ) : (
@@ -1230,7 +1255,23 @@ export default function UsersPage() {
         <h2 className="text-lg font-semibold text-[#E4E67A]">Pending Operator Requests</h2>
         <div className="mt-4 space-y-3">
           {loadingOperators ? (
-            <p className="text-sm text-white/65">Loading operators...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`pending-operator-skeleton-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-52" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton className="h-7 w-16 rounded-full" />
+                      <Skeleton className="h-7 w-16 rounded-lg" />
+                      <Skeleton className="h-7 w-16 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : pendingOperators.length === 0 ? (
             <p className="text-sm text-white/65">No pending requests.</p>
           ) : (
@@ -1287,7 +1328,19 @@ export default function UsersPage() {
         <h2 className="text-lg font-semibold text-[#E4E67A]">Offers Awaiting Response</h2>
         <div className="mt-4 space-y-3">
           {loadingOperators ? (
-            <p className="text-sm text-white/65">Loading operators...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={`offered-operator-skeleton-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-52" />
+                    </div>
+                    <Skeleton className="h-6 w-28 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : offeredOperators.length === 0 ? (
             <p className="text-sm text-white/65">No outgoing offers pending response.</p>
           ) : (
@@ -1319,7 +1372,23 @@ export default function UsersPage() {
 
         <div className="mt-4 space-y-3">
           {loadingOperators ? (
-            <p className="text-sm text-white/65">Loading operators...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`approved-operator-skeleton-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-52" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton className="h-7 w-20 rounded-full" />
+                      <Skeleton className="h-7 w-24 rounded-lg" />
+                      <Skeleton className="h-7 w-28 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : approvedOperators.length === 0 ? (
             <p className="text-sm text-white/65">No approved operators.</p>
           ) : (
@@ -1379,7 +1448,15 @@ export default function UsersPage() {
 
         <div className="mt-4 space-y-3">
           {loadingNotifications ? (
-            <p className="text-sm text-white/65">Loading notifications...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={`notification-skeleton-admin-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="mt-2 h-3 w-full" />
+                  <Skeleton className="mt-2 h-3 w-2/3" />
+                </div>
+              ))}
+            </div>
           ) : notifications.length === 0 ? (
             <p className="text-sm text-white/65">No notifications yet.</p>
           ) : (

@@ -415,11 +415,18 @@ function LoginPageContent() {
                   </button>
                   <button
                     type="button"
-                    className="text-[#D5E400] underline cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[#D5E400] underline cursor-pointer disabled:opacity-50"
                     onClick={handleResendAdminOtp}
                     disabled={loading}
                   >
-                    Resend Access Code
+                    {loading ? (
+                      <>
+                        <Icon icon="line-md:loading-loop" className="text-base" />
+                        Please wait...
+                      </>
+                    ) : (
+                      "Resend Access Code"
+                    )}
                   </button>
                 </div>
               </>
@@ -440,9 +447,12 @@ function LoginPageContent() {
     "
             >
               {loading
-                ? step === "otp"
-                  ? "Verifying..."
-                  : "Logging in..."
+                ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Icon icon="line-md:loading-loop" className="text-lg" />
+                    {step === "otp" ? "Verifying..." : "Logging in..."}
+                  </span>
+                )
                 : step === "otp"
                   ? "Verify Access"
                   : "Login"}

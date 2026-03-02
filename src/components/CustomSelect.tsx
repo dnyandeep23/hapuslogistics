@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Icon } from "@iconify/react";
 import { Location } from "@/services/logistics";
+import Skeleton from "@/components/Skeleton";
 
 interface CustomSelectProps {
     options: Location[];
@@ -59,6 +59,11 @@ export default function CustomSelect({
                             <p className="font-semibold">{selectedOption.name}, {selectedOption.city}</p>
                             <p className="text-xs text-gray-400">{selectedOption.address}, {selectedOption.state} {selectedOption.zip}</p>
                         </div>
+                    ) : isLoading ? (
+                        <div className="w-full space-y-1 pr-6">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                        </div>
                     ) : (
                         <span className="text-gray-400">{placeholder}</span>
                     )}
@@ -72,7 +77,12 @@ export default function CustomSelect({
                 <div className="absolute z-10 w-full mt-1 bg-[#1e241b] border border-[#CDD645]/60 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <ul>
                         {isLoading ? (
-                            <li className="px-4 py-2 text-gray-400">Loading...</li>
+                            <li className="space-y-2 px-4 py-3">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-3 w-1/2" />
+                                <Skeleton className="h-4 w-2/3" />
+                                <Skeleton className="h-3 w-2/5" />
+                            </li>
                         ) : options.length > 0 ? (
                             options.map((option) => (
                                 <li

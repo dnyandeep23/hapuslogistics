@@ -315,7 +315,15 @@ export default function StepTwo({
                         isUploading={isUploadingPackageImage}
                     />
                     {isUploadingPackageImage && (
-                        <p className="mt-2 text-xs text-[#F6FF6A]">Uploading image...</p>
+                        <div className="mt-2 space-y-2">
+                            <p className="inline-flex items-center gap-1 text-xs text-[#F6FF6A]">
+                                <Icon icon="line-md:loading-loop" className="text-sm" />
+                                Uploading image...
+                            </p>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#CDD645]/20">
+                                <div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-[#CDD645]" />
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

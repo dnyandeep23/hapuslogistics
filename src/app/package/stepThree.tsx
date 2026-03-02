@@ -2,6 +2,7 @@ import { Icon } from "@iconify/react";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { calculatePrice } from "@/services/logistics";
+import Skeleton from "@/components/Skeleton";
 
 export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: any) {
     const pickUpLoc = pickupLocations.find((opt: any) => opt._id === formData.pickupLocationId);
@@ -175,7 +176,11 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                 </span>
 
                                 <div className="absolute top-2 right-4 text-lg font-bold">
-                                    {isLoadingPrice ? "..." : item.price && `₹ ${item.price.toFixed(2)}`}
+                                    {isLoadingPrice ? (
+                                        <Skeleton className="h-6 w-16" />
+                                    ) : (
+                                        item.price && `₹ ${item.price.toFixed(2)}`
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -344,7 +349,14 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
                 {/* Amount */}
                 <div className="text-right space-y-1 w-96">
-                    {isLoadingPrice && <p>Calculating price...</p>}
+                    {isLoadingPrice && (
+                        <div className="space-y-2">
+                            <Skeleton className="ml-auto h-4 w-44" />
+                            <Skeleton className="ml-auto h-4 w-32" />
+                            <Skeleton className="ml-auto h-4 w-28" />
+                            <Skeleton className="ml-auto h-6 w-36" />
+                        </div>
+                    )}
                     {pricingError && <p className="text-red-400">{pricingError}</p>}
                     {!isLoadingPrice && !pricingError && pricingInfo && (
                         <>

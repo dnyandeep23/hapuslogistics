@@ -229,7 +229,12 @@ function RegisterPageContent() {
       hover:shadow-2xl hover:shadow-[#D5E400]/60
       hover:bg-[#D5E400] hover:text-black
       disabled:opacity-50" disabled={loading}>
-              {loading ? 'Registering...' : 'Register'}
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Icon icon="line-md:loading-loop" className="text-lg" />
+                  Registering...
+                </span>
+              ) : 'Register'}
             </button>
           </form>
           <div className="flex items-center gap-3 mt-4 text-white/80">

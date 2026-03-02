@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import CustomDatePicker from "@/components/CustomDatePicker";
+import Skeleton from "@/components/Skeleton";
 
 export type ManagedBannerSlide = {
   imageUrl: string;
@@ -687,9 +688,21 @@ export default function SuperAdminCouponBannerSection({
 
           <div className="mt-5 space-y-3">
             {loadingCoupons ? (
-              <div className="rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/70">
-                Loading coupons...
-              </div>
+              Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={`coupon-skeleton-${index}`}
+                  className="rounded-xl border border-white/15 bg-black/20 p-3"
+                >
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
+                    {Array.from({ length: 7 }).map((__, cellIndex) => (
+                      <div key={`coupon-skeleton-cell-${index}-${cellIndex}`} className="space-y-1">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-8 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
             ) : coupons.length === 0 ? (
               <div className="rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/70">
                 No coupons found.
@@ -923,9 +936,22 @@ export default function SuperAdminCouponBannerSection({
 
           <div className="mt-5 space-y-3">
             {loadingBanners ? (
-              <div className="rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/70">
-                Loading banners...
-              </div>
+              Array.from({ length: 2 }).map((_, index) => (
+                <div
+                  key={`banner-skeleton-${index}`}
+                  className="rounded-xl border border-white/15 bg-black/20 p-3"
+                >
+                  <div className="grid grid-cols-1 gap-2 lg:grid-cols-[120px_auto_auto_auto] lg:items-center">
+                    <Skeleton className="h-16 w-full rounded" />
+                    <Skeleton className="h-8 w-36" />
+                    <div className="flex gap-1">
+                      <Skeleton className="h-8 w-16" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                </div>
+              ))
             ) : banners.length === 0 ? (
               <div className="rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/70">
                 No banners configured yet.

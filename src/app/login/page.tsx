@@ -281,7 +281,12 @@ function LoginPageContent() {
       disabled:opacity-50
     "
             >
-              {loading ? "Logging in..." : "Login"}
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Icon icon="line-md:loading-loop" className="text-lg" />
+                  Logging in...
+                </span>
+              ) : "Login"}
             </button>
           </form>
 

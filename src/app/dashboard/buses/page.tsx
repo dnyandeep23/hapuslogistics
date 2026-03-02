@@ -5,6 +5,7 @@ import { useAppSelector } from "@/lib/redux/hooks";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import CustomDateRangePicker from "@/components/CustomDateRangePicker";
+import Skeleton from "@/components/Skeleton";
 
 type OperatorContactPeriod = {
   operatorId: unknown;
@@ -576,7 +577,32 @@ function AdminBusesPageContent() {
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-white/20 bg-black/20 p-4 text-white/80">Loading buses...</div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`bus-skeleton-${index}`}
+              className="rounded-xl border border-white/15 bg-black/25 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-5 w-24 rounded-full" />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filteredBuses.length === 0 ? (
         <div className="rounded-xl border border-white/20 bg-black/20 p-4 text-white/80">No buses found.</div>
       ) : viewMode === "grid" ? (

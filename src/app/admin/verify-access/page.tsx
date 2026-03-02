@@ -165,11 +165,18 @@ function AdminVerifyAccessPageContent() {
               </Link>
               <button
                 type="button"
-                className="text-[#D5E400] underline cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-[#D5E400] underline cursor-pointer disabled:opacity-50"
                 onClick={handleResend}
                 disabled={loading}
               >
-                Resend Access Code
+                {loading ? (
+                  <>
+                    <Icon icon="line-md:loading-loop" className="text-base" />
+                    Please wait...
+                  </>
+                ) : (
+                  "Resend Access Code"
+                )}
               </button>
             </div>
 
@@ -178,7 +185,12 @@ function AdminVerifyAccessPageContent() {
               disabled={loading}
               className="self-end mt-4 md:mt-6 px-6 md:px-8 py-2 rounded-full border border-[#D5E400] text-[#D5E400] font-semibold transition-all duration-300 hover:shadow-2xl hover:shadow-[#D5E400]/60 hover:bg-[#D5E400] hover:text-black disabled:opacity-50"
             >
-              {loading ? "Verifying..." : "Verify Access"}
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Icon icon="line-md:loading-loop" className="text-lg" />
+                  Verifying...
+                </span>
+              ) : "Verify Access"}
             </button>
           </form>
         </div>
