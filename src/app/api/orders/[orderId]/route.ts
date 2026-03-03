@@ -86,6 +86,29 @@ function normalizeDateOnly(value: unknown): Date | null {
   return date;
 }
 
+function isOrderInOperatorPeriods(
+  orderDateValue: unknown,
+  operatorId: string,
+  periods: unknown,
+): boolean {
+  const orderDate = normalizeDateOnly(orderDateValue);
+  if (!orderDate || !Array.isArray(periods)) return false;
+
+  return periods.some((period) => {
+    if (!isRecord(period)) return false;
+    if (toStringValue(period.operatorId) !== operatorId) return false;
+    const startDate = normalizeDateOnly(period.startDate);
+    const endDate = normalizeDateOnly(period.endDate);
+    if (!startDate || !endDate) return false;
+    return orderDate >= startDate && orderDate <= endDate;
+  });
+}
+
+function isBusAssignedToOperator(operatorId: string, periods: unknown): boolean {
+  if (!Array.isArray(periods)) return false;
+  return periods.some((period) => isRecord(period) && toStringValue(period.operatorId) === operatorId);
+}
+
 function mapLocation(value: unknown) {
   if (!isRecord(value)) {
     return {
@@ -552,6 +575,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
 
     const orderUserId = isRecord(order.user) ? toStringValue(order.user._id) : toStringValue(order.user);
     const isOrderOwner = orderUserId === toStringValue(user._id);
+    const currentUserId = toStringValue(user._id);
     const assignedBus = isRecord(order.assignedBus) ? order.assignedBus : null;
     const bookedBus = isRecord(order.bus) ? order.bus : null;
     const candidateBusRefs = [assignedBus, bookedBus].filter(
@@ -576,20 +600,14 @@ export async function GET(request: NextRequest, context: ParamsContext) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     } else if (!isOrderOwner && !isSuperAdmin && userRole === "operator") {
-      const orderDate = normalizeDateOnly(order.orderDate);
       const hasOperatorAccess = candidateBusRefs.some((busRef) => {
         const periodsRaw = Array.isArray(busRef.operatorContactPeriods)
           ? (busRef.operatorContactPeriods as unknown[])
           : [];
-
-        return periodsRaw.some((periodRaw) => {
-          if (!isRecord(periodRaw)) return false;
-          if (toStringValue(periodRaw.operatorId) !== toStringValue(user._id)) return false;
-          const startDate = normalizeDateOnly(periodRaw.startDate);
-          const endDate = normalizeDateOnly(periodRaw.endDate);
-          if (!startDate || !endDate || !orderDate) return false;
-          return orderDate >= startDate && orderDate <= endDate;
-        });
+        return (
+          isOrderInOperatorPeriods(order.orderDate, currentUserId, periodsRaw) ||
+          isBusAssignedToOperator(currentUserId, periodsRaw)
+        );
       });
 
       if (!hasOperatorAccess) {

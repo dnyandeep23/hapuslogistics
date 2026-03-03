@@ -13,6 +13,13 @@ import Skeleton from "@/components/Skeleton";
 import { AppDispatch } from "@/lib/redux/store";
 import { fetchUser } from "@/lib/redux/userSlice";
 import { useAppSelector } from "@/lib/redux/hooks";
+import {
+  DEFAULT_PACKAGE_CATEGORIES,
+  buildCategoryFareMap,
+  getActivePackageCategories,
+  normalizePackageCategories,
+  type PackageCategoryConfig,
+} from "@/lib/packageCatalog";
 
 const OpenStreetMapPicker = dynamic(() => import("@/components/OpenStreetMapPicker"), {
   ssr: false,
@@ -116,39 +123,18 @@ type ResolvedLocation = {
   state?: string;
   zip?: string;
 };
-
-type MaterialCategoryMeta = {
-  key: string;
-  icon: string;
-};
-
-const defaultMaterialFareMap: Record<string, number> = {
-  Wooden: 70,
-  "Plastic / Fibre": 60,
-  Iron: 80,
-  Electronics: 95,
-  "Mango Box": 55,
-  Other: 110,
-};
-
-const materialCategoryMeta: MaterialCategoryMeta[] = [
-  { key: "Wooden", icon: "mdi:tree" },
-  { key: "Plastic / Fibre", icon: "mdi:bottle-soda" },
-  { key: "Iron", icon: "mdi:anvil" },
-  { key: "Electronics", icon: "mdi:flash" },
-  { key: "Mango Box", icon: "mdi:package-variant" },
-  { key: "Other", icon: "mdi:shape-outline" },
-];
+const defaultActiveMaterialCategories = getActivePackageCategories(DEFAULT_PACKAGE_CATEGORIES);
+const defaultMaterialFareMapSeed = buildCategoryFareMap(defaultActiveMaterialCategories);
 
 const BUS_NUMBER_PATTERN = /^[A-Z]{2}-\d{2}-[A-Z]{2}-\d{4}$/;
 
-const makeDefaultRouteConfig = (): RouteConfigForm => ({
+const makeDefaultRouteConfig = (materialFareMap: Record<string, number>): RouteConfigForm => ({
   pickupLocationId: "",
   dropLocationId: "",
   distanceKm: 0,
   pickupTime: "08:00",
   dropTime: "18:00",
-  materialFares: { ...defaultMaterialFareMap },
+  materialFares: { ...materialFareMap },
   dateOverrides: [],
   minimized: false,
 });
@@ -215,6 +201,13 @@ export default function AdminBusForm({
   const [busNumber, setBusNumber] = useState("");
   const [capacity, setCapacity] = useState(40);
   const [autoRenewCapacity, setAutoRenewCapacity] = useState(false);
+  const [materialCategories, setMaterialCategories] = useState<PackageCategoryConfig[]>(
+    defaultActiveMaterialCategories,
+  );
+  const defaultMaterialFareMap = useMemo(
+    () => buildCategoryFareMap(materialCategories),
+    [materialCategories],
+  );
   const defaultPricingRange = useMemo(() => getDefaultPricingRange(), []);
   const [availabilityStartDate, setAvailabilityStartDate] = useState(defaultPricingRange.start);
   const [availabilityEndDate, setAvailabilityEndDate] = useState(defaultPricingRange.end);
@@ -222,7 +215,9 @@ export default function AdminBusForm({
     makeDefaultRoutePoint("pickup"),
     makeDefaultRoutePoint("drop"),
   ]);
-  const [routeConfigs, setRouteConfigs] = useState<RouteConfigForm[]>([makeDefaultRouteConfig()]);
+  const [routeConfigs, setRouteConfigs] = useState<RouteConfigForm[]>([
+    makeDefaultRouteConfig(defaultMaterialFareMapSeed),
+  ]);
   const [locations, setLocations] = useState<AdminLocation[]>([]);
   const [derivedLocationCoords, setDerivedLocationCoords] = useState<
     Record<string, { latitude: number; longitude: number }>
@@ -232,9 +227,9 @@ export default function AdminBusForm({
   const [roadRouteGeometry, setRoadRouteGeometry] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [roadRouteLoading, setRoadRouteLoading] = useState(false);
   const [roadRouteError, setRoadRouteError] = useState("");
-  const [fullRouteMaterialFares, setFullRouteMaterialFares] = useState<Record<string, number>>({
-    ...defaultMaterialFareMap,
-  });
+  const [fullRouteMaterialFares, setFullRouteMaterialFares] = useState<Record<string, number>>(
+    defaultMaterialFareMapSeed,
+  );
   const [pricingFormulaText, setPricingFormulaText] = useState("");
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [showInlineLocationCreator, setShowInlineLocationCreator] = useState<InlineLocationTarget>(null);
@@ -360,20 +355,26 @@ export default function AdminBusForm({
     return "";
   };
 
-  const parseFares = (fares: unknown) => {
-    const fallback = { ...defaultMaterialFareMap };
-    if (!fares || typeof fares !== "object") return fallback;
+  const parseFares = useCallback(
+    (fares: unknown) => {
+      const fallback = { ...defaultMaterialFareMap };
+      if (!fares || typeof fares !== "object") return fallback;
 
-    const entries = fares instanceof Map
-      ? Array.from(fares.entries())
-      : Object.entries(fares as Record<string, unknown>);
+      const source = fares instanceof Map
+        ? Object.fromEntries(fares.entries())
+        : (fares as Record<string, unknown>);
 
-    return entries.reduce<Record<string, number>>((acc, [key, value]) => {
-      const parsed = Number(value);
-      acc[key] = Number.isNaN(parsed) ? 0 : parsed;
-      return acc;
-    }, fallback);
-  };
+      const normalized: Record<string, number> = {};
+      for (const categoryName of Object.keys(fallback)) {
+        const parsed = Number(source[categoryName]);
+        normalized[categoryName] = Number.isFinite(parsed) && parsed >= 0
+          ? parsed
+          : fallback[categoryName];
+      }
+      return normalized;
+    },
+    [defaultMaterialFareMap],
+  );
 
   const parseLocationCoords = (location?: AdminLocation | null) => {
     if (!location) return null;
@@ -421,14 +422,14 @@ export default function AdminBusForm({
           distanceKm: Number((roadRouteSegments[index]?.distanceKm ?? getDistanceFromPreviousPoint(points, index + 1)).toFixed(2)),
           pickupTime: fromPoint.pointTime,
           dropTime: toPoint.pointTime,
-          materialFares: existing?.materialFares ?? { ...defaultMaterialFareMap },
+          materialFares: parseFares(existing?.materialFares),
           dateOverrides: existing?.dateOverrides ?? [],
           minimized: existing?.minimized ?? false,
         });
       }
       return nextConfigs;
     },
-    [getDistanceFromPreviousPoint, roadRouteSegments, routeConfigs],
+    [getDistanceFromPreviousPoint, parseFares, roadRouteSegments, routeConfigs],
   );
 
   const resetInlineLocationState = () => {
@@ -438,6 +439,42 @@ export default function AdminBusForm({
     setInlineLocationError("");
     setInlineLocationMessage("");
   };
+
+  const loadMaterialCategories = useCallback(async () => {
+    try {
+      const response = await fetch("/api/package-catalog", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) return;
+
+      const normalizedCategories = getActivePackageCategories(
+        normalizePackageCategories(payload?.categories, DEFAULT_PACKAGE_CATEGORIES),
+      );
+      if (normalizedCategories.length > 0) {
+        setMaterialCategories(normalizedCategories);
+      }
+    } catch {
+      setMaterialCategories(defaultActiveMaterialCategories);
+    }
+  }, []);
+
+  useEffect(() => {
+    setFullRouteMaterialFares((prev) => parseFares(prev));
+    setRouteConfigs((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) {
+        return [makeDefaultRouteConfig(defaultMaterialFareMap)];
+      }
+      return prev.map((route) => ({
+        ...route,
+        materialFares: parseFares(route.materialFares),
+        dateOverrides: Array.isArray(route.dateOverrides)
+          ? route.dateOverrides.map((override) => ({
+              ...override,
+              fares: parseFares(override.fares),
+            }))
+          : [],
+      }));
+    });
+  }, [defaultMaterialFareMap, parseFares]);
 
   const loadLocations = useCallback(async () => {
     if (!isAdminRole) return;
@@ -559,7 +596,7 @@ export default function AdminBusForm({
               : [],
             minimized: false,
           }))
-        : [makeDefaultRouteConfig()];
+        : [makeDefaultRouteConfig(defaultMaterialFareMap)];
 
     const sortedRoutePath = Array.isArray(bus.routePath)
       ? [...bus.routePath].sort((left, right) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0))
@@ -611,7 +648,7 @@ export default function AdminBusForm({
     setRouteConfigs(nextRoutes);
     setBusImages([]);
     setCurrentStep(1);
-  }, []);
+  }, [defaultMaterialFareMap, parseFares]);
 
   useEffect(() => {
     if (routePoints.length === 0) {
@@ -625,8 +662,9 @@ export default function AdminBusForm({
 
   useEffect(() => {
     if (!isAdminRole) return;
+    loadMaterialCategories();
     loadLocations();
-  }, [isAdminRole, loadLocations]);
+  }, [isAdminRole, loadLocations, loadMaterialCategories]);
 
   useEffect(() => {
     if (!isAdminRole || !isEditMode || !busId) return;
@@ -1139,18 +1177,24 @@ export default function AdminBusForm({
   }, [locationNameById, routePoints]);
 
   const normalizeFullRouteFares = useCallback((rawFares: Record<string, number>) => {
-    const normalized = { ...rawFares };
+    const normalized = parseFares(rawFares);
+    const otherCategory = materialCategories.find(
+      (category) => String(category.name ?? "").trim().toLowerCase() === "other",
+    );
+    if (!otherCategory) return normalized;
+    const otherKey = otherCategory.name;
+
     const maxNonOtherFare = Math.max(
       ...Object.entries(normalized)
-        .filter(([key]) => key !== "Other")
+        .filter(([key]) => key !== otherKey)
         .map(([, value]) => Number(value) || 0),
       0,
     );
-    if ((Number(normalized.Other) || 0) <= maxNonOtherFare) {
-      normalized.Other = maxNonOtherFare + 10;
+    if ((Number(normalized[otherKey]) || 0) <= maxNonOtherFare) {
+      normalized[otherKey] = maxNonOtherFare + 10;
     }
     return normalized;
-  }, []);
+  }, [materialCategories, parseFares]);
 
   const applyFullRoutePricingFormula = useCallback(
     (sourceFares: Record<string, number>) => {
@@ -2078,30 +2122,30 @@ export default function AdminBusForm({
                 Enter full-route price per category. Segment fares are auto-calculated by formula.
               </p>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {materialCategoryMeta.map((category) => (
+                {materialCategories.map((category) => (
                   <label
-                    key={`formula-fare-${category.key}`}
+                    key={`formula-fare-${category.name}`}
                     className="rounded-xl border border-white/10 bg-black/20 p-3 text-white/85"
                   >
                     <span className="flex items-center gap-2 text-base font-medium">
-                      <Icon icon={category.icon} className="text-xl text-[#DDEB83]" />
-                      {category.key}
+                      <Icon icon={category.icon || "mdi:shape-outline"} className="text-xl text-[#DDEB83]" />
+                      {category.name}
                     </span>
                     <input
                       type="number"
                       min={0}
-                      value={fullRouteMaterialFares[category.key] ?? 0}
+                      value={fullRouteMaterialFares[category.name] ?? 0}
                       onChange={(event) => {
                         const nextValue = Number(event.target.value) || 0;
                         const nextFares = {
                           ...fullRouteMaterialFares,
-                          [category.key]: nextValue,
+                          [category.name]: nextValue,
                         };
                         applyFullRoutePricingFormula(nextFares);
                       }}
                       className="mt-2 w-full rounded-lg border border-white/15 bg-transparent px-3 py-2 text-lg font-semibold text-[#F4F7CE] outline-none focus:border-[#DDEB83]/60"
                     />
-                    {category.key === "Other" && (
+                    {String(category.name ?? "").trim().toLowerCase() === "other" && (
                       <p className="mt-1 text-xs text-white/55">
                         Other is auto-kept higher than all standard categories.
                       </p>
@@ -2141,17 +2185,17 @@ export default function AdminBusForm({
                           : "Distance: --"}
                       </p>
                       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {materialCategoryMeta.map((category) => (
+                        {materialCategories.map((category) => (
                           <div
-                            key={`segment-preview-${routeIndex}-${category.key}`}
+                            key={`segment-preview-${routeIndex}-${category.name}`}
                             className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white/80"
                           >
                             <span className="flex items-center gap-1">
-                              <Icon icon={category.icon} className="text-sm text-[#DDEB83]" />
-                              {category.key}
+                              <Icon icon={category.icon || "mdi:shape-outline"} className="text-sm text-[#DDEB83]" />
+                              {category.name}
                             </span>
                             <p className="mt-0.5 text-sm font-semibold text-[#F4F7CE]">
-                              ₹{Number(route.materialFares[category.key] ?? 0)}
+                              ₹{Number(route.materialFares[category.name] ?? 0)}
                             </p>
                           </div>
                         ))}

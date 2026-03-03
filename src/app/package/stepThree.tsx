@@ -1,7 +1,7 @@
 import { Icon } from "@iconify/react";
 import Image from "next/image";
 import { useState, useEffect, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
-import { AvailableCoupon, calculatePrice, getAvailableCoupons } from "@/services/logistics";
+import { AvailableCoupon, calculatePrice, getAvailableCoupons, type PricingInfo } from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
 
 type LocationOption = {
@@ -35,29 +35,24 @@ type FormDataState = {
     cart: CartItem[];
 };
 
-type PricingInfoState = {
-    items: CartItem[];
-    subtotal: number;
-    discount: number;
-    total: number;
-    coupon: { code: string; discount: number } | null;
-};
-
 type StepThreeProps = {
     errors: Record<string, string>;
     setFormData: (next: FormDataState) => void;
     formData: FormDataState;
     pickupLocations: LocationOption[];
     dropLocations: LocationOption[];
-    pricingInfo: PricingInfoState | null;
-    setPricingInfo: Dispatch<SetStateAction<PricingInfoState | null>>;
+    pricingInfo: PricingInfo | null;
+    setPricingInfo: Dispatch<SetStateAction<PricingInfo | null>>;
     userId?: string;
 };
 
 export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: StepThreeProps) {
     const pickUpLoc = pickupLocations.find((opt) => opt._id === formData.pickupLocationId);
     const dropLoc = dropLocations.find((opt) => opt._id === formData.dropLocationId);
-    const displayedItems = pricingInfo?.items ?? formData.cart;
+    const displayedItems = formData.cart.map((item, index) => ({
+        ...item,
+        price: pricingInfo?.items?.[index]?.price ?? item.price,
+    }));
 
     const [coupon, setCoupon] = useState(formData.coupon || "");
     const [couponStatus, setCouponStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -286,7 +281,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     {isLoadingPrice ? (
                                         <Skeleton className="h-6 w-16" />
                                     ) : (
-                                        item.price && `₹ ${item.price.toFixed(2)}`
+                                        Number.isFinite(Number(item.price)) ? `₹ ${Number(item.price).toFixed(2)}` : ""
                                     )}
                                 </div>
                             </div>
@@ -499,18 +494,20 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                     {!isLoadingPrice && !pricingError && pricingInfo && (
                         <>
                             <div className="border-b border-gray-600 pb-2 mb-2">
-                                {pricingInfo.items.map((item: CartItem, index: number) => {
-                                    const unitPrice = item.price / item.packageQuantities;
+                                {displayedItems.map((item: CartItem, index: number) => {
+                                    const quantity = Number(item.packageQuantities) || 0;
+                                    const totalPrice = Number(item.price) || 0;
+                                    const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
                                     return (
                                         <div key={index} className="flex justify-between items-center text-sm mb-1">
                                             <span className="text-left">{item.packageName}</span>
-                                            {item.packageQuantities > 1 ? (
+                                            {quantity > 1 ? (
                                                 <div className="text-right">
-                                                    <span>{item.packageQuantities} &times; ₹{unitPrice.toFixed(2)}</span>
-                                                    <span className="ml-2">= ₹{item.price.toFixed(2)}</span>
+                                                    <span>{quantity} &times; ₹{unitPrice.toFixed(2)}</span>
+                                                    <span className="ml-2">= ₹{totalPrice.toFixed(2)}</span>
                                                 </div>
                                             ) : (
-                                                <span>₹ {item.price.toFixed(2)}</span>
+                                                <span>₹ {totalPrice.toFixed(2)}</span>
                                             )}
                                         </div>
                                     )

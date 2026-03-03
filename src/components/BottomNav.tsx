@@ -1,7 +1,7 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import type { MenuItem } from "../data/roleMenus";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
@@ -19,11 +19,21 @@ const PROFILE_ITEM: MenuItem = {
 
 export default function BottomNav({ menus }: Props) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const router = useRouter();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const currentPathWithQuery = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+
+    const isItemActive = useCallback((href: string) => {
+        if (href.includes("?")) {
+            return currentPathWithQuery === href;
+        }
+        const itemPath = href.split("?")[0];
+        return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+    }, [currentPathWithQuery, pathname]);
 
     const getLogoutRedirectPath = () => {
         if (user?.isSuperAdmin || user?.role === "admin") {
@@ -76,12 +86,7 @@ export default function BottomNav({ menus }: Props) {
         const primaryHrefSet = new Set(primary.map((item) => item.href));
         const remaining = uniqueOrdered.filter((item) => !primaryHrefSet.has(item.href));
         const hasOverflow = remaining.length > 0;
-        const isMoreActive = remaining.some(
-            (item) => {
-                const itemPath = item.href.split("?")[0];
-                return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
-            },
-        );
+        const isMoreActive = remaining.some((item) => isItemActive(item.href));
 
         return {
             bottomItems: primary,
@@ -89,7 +94,7 @@ export default function BottomNav({ menus }: Props) {
             hasMore: hasOverflow,
             moreActive: isMoreActive,
         };
-    }, [menus, pathname]);
+    }, [isItemActive, menus]);
 
     return (
         <>
@@ -104,9 +109,7 @@ export default function BottomNav({ menus }: Props) {
                 >
                     <nav className="flex justify-around items-center h-full px-2 space-x-2">
                         {bottomItems.map((item) => {
-                            const itemPath = item.href.split("?")[0];
-                            const active =
-                                pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+                            const active = isItemActive(item.href);
 
                             return (
                                 <Link
@@ -182,8 +185,7 @@ export default function BottomNav({ menus }: Props) {
 
                         <nav className="space-y-2">
                             {remainingItems.map((item) => {
-                                const itemPath = item.href.split("?")[0];
-                                const active = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+                                const active = isItemActive(item.href);
                                 return (
                                     <Link
                                         key={item.href}

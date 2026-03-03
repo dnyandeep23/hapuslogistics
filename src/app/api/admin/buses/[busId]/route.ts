@@ -11,6 +11,10 @@ import User from "@/app/api/models/userModel";
 import Bus from "@/app/api/models/busModel";
 import Order from "@/app/api/models/orderModel";
 import Location from "@/app/api/models/locationModel";
+import {
+  normalizeCategoryFaresForAllowedNames,
+  resolveActivePackageCatalog,
+} from "@/app/api/lib/packageCatalog";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const BUS_NUMBER_PATTERN = /^[A-Z]{2}-\d{2}-[A-Z]{2}-\d{4}$/;
@@ -339,7 +343,7 @@ const normalizeRoutePoints = (
   return { routePoints: normalizedPoints };
 };
 
-const parseRoutes = (routesConfigRaw: string) => {
+const parseRoutes = (routesConfigRaw: string, allowedCategoryNames: string[]) => {
   let parsedRoutes: unknown;
   try {
     parsedRoutes = JSON.parse(routesConfigRaw || "[]");
@@ -384,19 +388,20 @@ const parseRoutes = (routesConfigRaw: string) => {
     }
 
     const faresCandidate = route.materialFares;
-    if (!faresCandidate || typeof faresCandidate !== "object" || Array.isArray(faresCandidate)) {
+    const normalizedMaterialFares = normalizeCategoryFaresForAllowedNames(
+      faresCandidate,
+      allowedCategoryNames,
+    );
+    if (!normalizedMaterialFares.ok) {
       return { error: `Route ${index + 1}: material prices are required.` };
     }
+    if (normalizedMaterialFares.unknownKeys.length > 0) {
+      return {
+        error: `Route ${index + 1}: unknown category keys: ${normalizedMaterialFares.unknownKeys.join(", ")}.`,
+      };
+    }
 
-    const materialFares = Object.entries(faresCandidate as Record<string, unknown>).reduce<
-      Record<string, number>
-    >((acc, [key, value]) => {
-      const parsedValue = Number(value);
-      if (!Number.isNaN(parsedValue) && parsedValue >= 0) {
-        acc[key] = parsedValue;
-      }
-      return acc;
-    }, {});
+    const materialFares = normalizedMaterialFares.fares;
 
     if (Object.values(materialFares).every((fare) => fare <= 0)) {
       return { error: `Route ${index + 1}: add at least one valid price.` };
@@ -419,23 +424,20 @@ const parseRoutes = (routesConfigRaw: string) => {
       }
 
       const overrideFaresCandidate = overrideRecord.fares;
-      if (
-        !overrideFaresCandidate ||
-        typeof overrideFaresCandidate !== "object" ||
-        Array.isArray(overrideFaresCandidate)
-      ) {
+      const normalizedOverrideFares = normalizeCategoryFaresForAllowedNames(
+        overrideFaresCandidate,
+        allowedCategoryNames,
+      );
+      if (!normalizedOverrideFares.ok) {
         return { error: `Route ${index + 1}: invalid override fares.` };
       }
+      if (normalizedOverrideFares.unknownKeys.length > 0) {
+        return {
+          error: `Route ${index + 1}: unknown override category keys: ${normalizedOverrideFares.unknownKeys.join(", ")}.`,
+        };
+      }
 
-      const overrideFares = Object.entries(overrideFaresCandidate as Record<string, unknown>).reduce<
-        Record<string, number>
-      >((acc, [key, value]) => {
-        const parsedValue = Number(value);
-        if (!Number.isNaN(parsedValue) && parsedValue >= 0) {
-          acc[key] = parsedValue;
-        }
-        return acc;
-      }, {});
+      const overrideFares = normalizedOverrideFares.fares;
 
       if (Object.values(overrideFares).every((fare) => fare <= 0)) {
         return { error: `Route ${index + 1}: override requires at least one valid price.` };
@@ -525,6 +527,14 @@ export async function PATCH(
       formData.get("routePairsConfig") ?? formData.get("routesConfig") ?? "",
     ).trim();
     const routePointsConfigRaw = String(formData.get("routePointsConfig") ?? "").trim();
+    const packageCatalog = await resolveActivePackageCatalog();
+    const allowedCategoryNames = packageCatalog.categories.map((entry) => entry.name);
+    if (allowedCategoryNames.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No active package categories configured by super admin." },
+        { status: 400 },
+      );
+    }
 
     if (!busName || !busNumber || rawCapacity <= 0) {
       return NextResponse.json(
@@ -594,7 +604,7 @@ export async function PATCH(
       }
     }
 
-    const parsedRoutesResult = parseRoutes(routesConfigRaw);
+    const parsedRoutesResult = parseRoutes(routesConfigRaw, allowedCategoryNames);
     if (parsedRoutesResult.error || !parsedRoutesResult.routes) {
       return NextResponse.json(
         { success: false, message: parsedRoutesResult.error || "Invalid route configuration." },

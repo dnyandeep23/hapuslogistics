@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { downloadOrderInvoice } from "@/lib/orderInvoice";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
@@ -191,10 +191,45 @@ function getStatusBadge(status: string): string {
 }
 
 type RoleKey = "user" | "operator" | "admin" | "superadmin";
+type OperatorOrderTab = "active" | "upcoming" | "past";
+const OPERATOR_TAB_ORDER: OperatorOrderTab[] = ["active", "upcoming", "past"];
+
+const OPERATOR_ORDER_TAB_LABEL: Record<OperatorOrderTab, string> = {
+  active: "Active Orders",
+  upcoming: "Upcoming Orders",
+  past: "Past Orders",
+};
+
+function normalizeOperatorOrderTab(value: string | null): OperatorOrderTab {
+  if (value === "upcoming" || value === "past" || value === "active") {
+    return value;
+  }
+  return "active";
+}
+
+function classifyOperatorOrderTab(order: RoleDashboardOrder, now: Date): OperatorOrderTab {
+  const normalizedStatus = toSearchText(order.status);
+  if (normalizedStatus === "delivered" || normalizedStatus === "cancelled") {
+    return "past";
+  }
+
+  const orderDate = new Date(order.orderDate);
+  if (!Number.isFinite(orderDate.getTime())) {
+    return "upcoming";
+  }
+
+  const todayStart = startOfDay(now);
+  const tomorrowStart = addDays(todayStart, 1);
+
+  if (orderDate >= todayStart && orderDate < tomorrowStart) return "active";
+  if (orderDate >= tomorrowStart) return "upcoming";
+  return "past";
+}
 
 export default function OrderPage() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.user);
+  const searchParams = useSearchParams();
   const [userOrders, setUserOrders] = useState<UserDashboardOrder[]>([]);
   const [roleOrders, setRoleOrders] = useState<RoleDashboardOrder[]>([]);
   const [groupedByBus, setGroupedByBus] = useState<BusWiseOrders[]>([]);
@@ -206,7 +241,6 @@ export default function OrderPage() {
   const [requiredPhoneError, setRequiredPhoneError] = useState("");
   const [savingRequiredPhone, setSavingRequiredPhone] = useState(false);
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
-  const [actingOrderId, setActingOrderId] = useState<string | null>(null);
   const { addToast } = useToast();
   const router = useRouter();
 
@@ -217,6 +251,10 @@ export default function OrderPage() {
     return "user";
   }, [user?.isSuperAdmin, user?.role]);
   const normalizedSearch = toSearchText(searchTerm);
+  const operatorTab = useMemo<OperatorOrderTab>(
+    () => normalizeOperatorOrderTab(searchParams.get("tab")),
+    [searchParams],
+  );
   const requiresStaffPhone = role !== "user" && !toSearchText(user?.phone).length;
 
   const fetchOrders = async () => {
@@ -305,31 +343,6 @@ export default function OrderPage() {
       );
     } finally {
       setSavingRequiredPhone(false);
-    }
-  };
-
-  const handleOperatorAction = async (
-    orderId: string,
-    action: "mark_in_transit" | "mark_delivered",
-  ) => {
-    try {
-      setActingOrderId(orderId);
-      const response = await fetch("/api/dashboard/orders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, action }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        addToast(data?.message || "Failed to update order.", "error");
-        return;
-      }
-      addToast(data?.message || "Order updated.", "success");
-      await fetchOrders();
-    } catch (actionError: unknown) {
-      addToast(actionError instanceof Error ? actionError.message : "Failed to update order.", "error");
-    } finally {
-      setActingOrderId(null);
     }
   };
 
@@ -457,6 +470,85 @@ export default function OrderPage() {
       (a, b) => nearestDateDiff(a.orderDate, nowMs) - nearestDateDiff(b.orderDate, nowMs),
     );
   }, [filteredRoleOrders]);
+
+  const operatorOrdersByTab = useMemo<Record<OperatorOrderTab, RoleDashboardOrder[]>>(() => {
+    const now = new Date();
+    const bucketed: Record<OperatorOrderTab, RoleDashboardOrder[]> = {
+      active: [],
+      upcoming: [],
+      past: [],
+    };
+
+    for (const order of sortedRoleOrders) {
+      bucketed[classifyOperatorOrderTab(order, now)].push(order);
+    }
+
+    bucketed.upcoming.sort(
+      (a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime(),
+    );
+    bucketed.past.sort(
+      (a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime(),
+    );
+
+    return bucketed;
+  }, [sortedRoleOrders]);
+
+  const operatorTabIndex = OPERATOR_TAB_ORDER.indexOf(operatorTab);
+  const hasAnyOperatorOrders = OPERATOR_TAB_ORDER.some(
+    (tab) => operatorOrdersByTab[tab].length > 0,
+  );
+
+  const renderOperatorOrderCard = (order: RoleDashboardOrder) => {
+    return (
+      <article key={order.id} className="rounded-xl border border-[#4E5A45]/80 bg-[#222d1e] p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
+            <p className="text-sm text-white/90">
+              {order.pickupLocation?.name || "--"} to {order.dropLocation?.name || "--"}
+            </p>
+            <p className="text-xs text-white/60">
+              {formatDate(order.orderDate)} | {order.user?.name || "--"} ({order.user?.email || "--"})
+            </p>
+          </div>
+          <span className={`rounded-full border px-2.5 py-1 text-xs capitalize ${getStatusBadge(order.status)}`}>
+            {order.status}
+          </span>
+        </div>
+
+        <div className="mt-3 grid gap-2 text-xs text-white/70 sm:grid-cols-3">
+          <p>
+            <span className="text-white/45">Bus:</span> {order.bus?.busName || "--"} {order.bus?.busNumber ? `(${order.bus.busNumber})` : ""}
+          </p>
+          <p>
+            <span className="text-white/45">Amount:</span> {formatMoney(order.totalAmount)}
+          </p>
+          <p>
+            <span className="text-white/45">Proof:</span> Pickup {order.pickupProofImage ? "Uploaded" : "Pending"}, Drop {order.dropProofImage ? "Uploaded" : "Pending"}
+          </p>
+        </div>
+
+        {order.operatorNote ? (
+          <p className="mt-3 border-l-2 border-amber-300/50 pl-3 text-xs text-amber-100/90">
+            {order.operatorNote}
+          </p>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
+            className="rounded-md border border-[#6A774F] bg-[#25311E] px-3 py-1.5 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
+          >
+            View Details
+          </button>
+          <span className="inline-flex items-center rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/55">
+            Status auto-updates from proof capture
+          </span>
+        </div>
+      </article>
+    );
+  };
 
   const sortedUserOrders = useMemo(() => {
     const now = new Date();
@@ -1083,7 +1175,7 @@ export default function OrderPage() {
     <>
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-[#F6FF6A]">Assigned Orders</h1>
+          <h1 className="text-2xl font-bold text-[#F6FF6A]">{OPERATOR_ORDER_TAB_LABEL[operatorTab]}</h1>
           <div className="relative w-full max-w-sm">
             <Icon icon="mdi:magnify" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
             <input
@@ -1095,87 +1187,66 @@ export default function OrderPage() {
             />
           </div>
         </div>
-        {sortedRoleOrders.length === 0 ? (
+
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          {(["active", "upcoming", "past"] as const).map((tab) => {
+            const isActiveTab = operatorTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => router.push(`/dashboard/orders?tab=${tab}`)}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  isActiveTab
+                    ? "border-[#CDD645]/65 bg-[#CDD645]/20 text-[#F6FF6A]"
+                    : "border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
+                }`}
+              >
+                {OPERATOR_ORDER_TAB_LABEL[tab]} ({operatorOrdersByTab[tab].length})
+              </button>
+            );
+          })}
+        </div>
+
+        {!hasAnyOperatorOrders ? (
           <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-6 text-white/65">
-            {normalizedSearch
-              ? "No orders match your search."
-              : "No orders found for your assigned buses."}
+            {normalizedSearch ? "No orders match your search." : "No orders found for your assigned buses."}
           </div>
         ) : (
-          <div className="space-y-4">
-            {sortedRoleOrders.map((order) => (
-              <article key={order.id} className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
-                  <p className="text-xs text-white/65">{formatDate(order.orderDate)}</p>
-                </div>
-                <span className={`rounded-full border px-2.5 py-1 text-xs capitalize ${getStatusBadge(order.status)}`}>
-                  {order.status}
-                </span>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div className="rounded-lg bg-[#1F271A] p-3">
-                  <p className="text-xs text-white/50">Bus</p>
-                  <p className="text-sm text-white">{order.bus?.busName || "--"}</p>
-                  <p className="text-xs text-[#E4E67A]">{order.bus?.busNumber || "--"}</p>
-                </div>
-                <div className="rounded-lg bg-[#1F271A] p-3">
-                  <p className="text-xs text-white/50">Customer</p>
-                  <p className="text-sm text-white">{order.user?.name || "--"}</p>
-                  <p className="text-xs text-white/70">{order.user?.email || "--"}</p>
-                </div>
-                <div className="rounded-lg bg-[#1F271A] p-3">
-                  <p className="text-xs text-white/50">Route</p>
-                  <p className="text-sm text-white">{order.pickupLocation?.name || "--"}</p>
-                  <p className="text-xs text-white/70">{order.dropLocation?.name || "--"}</p>
-                </div>
-                <div className="rounded-lg bg-[#1F271A] p-3">
-                  <p className="text-xs text-white/50">Proof Status</p>
-                  <p className="text-xs text-white/80">
-                    Pickup: {order.pickupProofImage ? "Uploaded" : "Pending"} | Drop: {order.dropProofImage ? "Uploaded" : "Pending"}
-                  </p>
-                </div>
-                {order.operatorNote ? (
-                  <div className="rounded-lg border border-amber-300/35 bg-amber-500/10 p-3 md:col-span-2">
-                    <p className="text-xs text-amber-200">Operator Note</p>
-                    <p className="mt-1 text-xs text-amber-100/90">{order.operatorNote}</p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                  className="rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-1.5 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
+          <div className="overflow-hidden rounded-2xl border border-[#4E5A45]/80 bg-[#1d2619]">
+            <div
+              className="flex transition-transform duration-300 ease-in-out"
+              style={{
+                width: `${OPERATOR_TAB_ORDER.length * 100}%`,
+                transform: `translateX(-${(100 / OPERATOR_TAB_ORDER.length) * operatorTabIndex}%)`,
+              }}
+            >
+              {OPERATOR_TAB_ORDER.map((tab) => (
+                <section
+                  key={tab}
+                  className="p-4"
+                  style={{ width: `${100 / OPERATOR_TAB_ORDER.length}%` }}
                 >
-                  View Details
-                </button>
-                {order.allowedActions.includes("mark_in_transit") && (
-                  <button
-                    type="button"
-                    disabled={actingOrderId === order.id}
-                    onClick={() => handleOperatorAction(order.id, "mark_in_transit")}
-                    className="rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-200 hover:bg-sky-500/25 disabled:opacity-60"
-                  >
-                    {actingOrderId === order.id ? "Updating..." : "Mark In Transit"}
-                  </button>
-                )}
-                {order.allowedActions.includes("mark_delivered") && (
-                  <button
-                    type="button"
-                    disabled={actingOrderId === order.id}
-                    onClick={() => handleOperatorAction(order.id, "mark_delivered")}
-                    className="rounded-lg border border-green-400/50 bg-green-500/15 px-3 py-1.5 text-xs font-semibold text-green-200 hover:bg-green-500/25 disabled:opacity-60"
-                  >
-                    {actingOrderId === order.id ? "Updating..." : "Mark Delivered"}
-                  </button>
-                )}
-              </div>
-              </article>
-            ))}
+                  <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+                    <h2 className="text-lg font-semibold text-white">{OPERATOR_ORDER_TAB_LABEL[tab]}</h2>
+                    <span className="rounded-full bg-[#CDD645]/20 px-2.5 py-0.5 text-xs text-[#F6FF6A]">
+                      {operatorOrdersByTab[tab].length}
+                    </span>
+                  </div>
+                  {operatorOrdersByTab[tab].length === 0 ? (
+                    <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-5 text-sm text-white/65">
+                      {normalizedSearch
+                        ? `No ${tab} orders match your search.`
+                        : `No ${tab} orders found.`}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {operatorOrdersByTab[tab].map((order) => renderOperatorOrderCard(order))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
           </div>
         )}
       </div>

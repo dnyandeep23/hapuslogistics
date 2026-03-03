@@ -12,6 +12,7 @@ export const roleMenus: Record<string, MenuItem[]> = {
     ],
     operator: [
         { label: 'Dashboard', href: '/dashboard', icon: 'mdi:view-dashboard' },
+        { label: 'Orders', href: '/dashboard/orders?tab=active', icon: 'lets-icons:order' },
         { label: 'Company', href: '/dashboard/users', icon: 'mdi:office-building-outline' },
         { label: 'Support', href: '/dashboard/support', icon: 'fluent:person-support-16-filled' },
     ],
@@ -29,6 +30,7 @@ export const roleMenus: Record<string, MenuItem[]> = {
         { href: '/dashboard', label: 'Dashboard', icon: 'mdi:view-dashboard' },
         { href: '/dashboard/coupons', label: 'Coupons', icon: 'mdi:ticket-percent-outline' },
         { href: '/dashboard/banners', label: 'Banners', icon: 'mdi:image-multiple-outline' },
+        { href: '/dashboard/package-catalog', label: 'Package Master', icon: 'mdi:shape-plus-outline' },
         { href: '/package', label: 'Book Package', icon: 'mdi:package-variant-closed-plus' },
         { href: '/dashboard/buses', label: 'My Buses', icon: 'mdi:bus-multiple' },
         { href: '/dashboard/locations', label: 'Pickup/Drop', icon: 'mdi:map-marker-path' },

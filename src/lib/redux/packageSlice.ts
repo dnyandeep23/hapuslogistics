@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
+import { DEFAULT_PACKAGE_SIZES, getActivePackageSizes } from '@/lib/packageCatalog';
 
 interface PackageState {
     formData: any;
@@ -24,7 +25,7 @@ const defaultInitialState: PackageState = {
         packageName: '',
         packageType: '',
         otherPackageType: '',
-        packageSize: 'Small',
+        packageSize: getActivePackageSizes(DEFAULT_PACKAGE_SIZES)[0]?.name || 'Small',
         packageWeight: 0,
         packageQuantities: 1,
         pickUpDate: '',

@@ -8,17 +8,12 @@ import Bus from "../models/busModel";
 import BookingSession from "../models/bookingSessionModel";
 import User from "../models/userModel";
 import { cleanupExpiredBookingSessions } from "../lib/bookingSessionCleanup";
+import { resolveActivePackageCatalog } from "@/app/api/lib/packageCatalog";
 
 const PRICE_PER_KG = 2;
 const HOLD_DURATION_MS = 20 * 60 * 1000;
 const MAX_HOLD_TX_RETRIES = 5;
 const HOLD_TX_RETRY_BASE_DELAY_MS = 40;
-
-const SIZE_MULTIPLIERS: Record<string, number> = {
-  Small: 1,
-  Medium: 1.2,
-  Large: 1.5,
-};
 
 interface CartItem {
   packageType: string;
@@ -246,13 +241,20 @@ function findPricingProfile(
   return { fares: getEffectiveEntryFares(directEntry, orderDate) };
 }
 
-function calculateItemPrice(item: CartItem, pricingProfile: EffectivePricingProfile): number {
+function calculateItemPrice(
+  item: CartItem,
+  pricingProfile: EffectivePricingProfile,
+  sizeMultipliers: Record<string, number>,
+): number {
   const baseFare = pricingProfile.fares[item.packageType];
   if (baseFare === undefined) {
     throw new ApiError(`Fare for package type "${item.packageType}" not found`, 400);
   }
 
-  const sizeMultiplier = SIZE_MULTIPLIERS[item.packageSize] || 1;
+  const sizeMultiplier = sizeMultipliers[item.packageSize];
+  if (!Number.isFinite(sizeMultiplier) || sizeMultiplier <= 0) {
+    throw new ApiError(`Package size "${item.packageSize}" is not supported`, 400);
+  }
   return (baseFare + item.packageWeight * PRICE_PER_KG) * sizeMultiplier * item.packageQuantities;
 }
 
@@ -389,12 +391,49 @@ export async function POST(req: NextRequest) {
       throw new ApiError("All cart items must have the same pickup date", 400);
     }
 
+    const packageCatalog = await resolveActivePackageCatalog();
+    const allowedCategoryNames = new Set(
+      packageCatalog.categories.map((entry) => String(entry.name).trim()).filter(Boolean),
+    );
+    const sizeConstraints = new Map(
+      packageCatalog.sizes.map((entry) => [
+        String(entry.name).trim(),
+        {
+          maxWeightKg: Number(entry.maxWeightKg),
+          priceMultiplier: Number(entry.priceMultiplier),
+        },
+      ]),
+    );
+    const sizeMultipliers: Record<string, number> = {};
+    sizeConstraints.forEach((config, sizeName) => {
+      sizeMultipliers[sizeName] = Number.isFinite(config.priceMultiplier) && config.priceMultiplier > 0
+        ? config.priceMultiplier
+        : 1;
+    });
+
     for (const item of packageItemsRaw) {
       if (!item.packageType || !item.packageSize) {
         throw new ApiError("Each item must include packageType and packageSize", 400);
       }
+      if (!allowedCategoryNames.has(String(item.packageType))) {
+        throw new ApiError(`Package type \"${item.packageType}\" is not supported`, 400);
+      }
+      const sizeConfig = sizeConstraints.get(String(item.packageSize));
+      if (!sizeConfig) {
+        throw new ApiError(`Package size \"${item.packageSize}\" is not supported`, 400);
+      }
       if (typeof item.packageWeight !== "number" || item.packageWeight <= 0) {
         throw new ApiError("Each item must include positive packageWeight", 400);
+      }
+      if (
+        Number.isFinite(sizeConfig.maxWeightKg) &&
+        sizeConfig.maxWeightKg > 0 &&
+        item.packageWeight > sizeConfig.maxWeightKg
+      ) {
+        throw new ApiError(
+          `Weight for ${item.packageSize} cannot exceed ${sizeConfig.maxWeightKg} kg`,
+          400,
+        );
       }
       if (typeof item.packageQuantities !== "number" || item.packageQuantities <= 0) {
         throw new ApiError("Each item must include packageQuantities > 0", 400);
@@ -506,7 +545,7 @@ export async function POST(req: NextRequest) {
 
     const pricedItems = packageItems.map((item) => ({
       ...item,
-      price: calculateItemPrice(item, selectedBusPricingProfile),
+      price: calculateItemPrice(item, selectedBusPricingProfile, sizeMultipliers),
     }));
     const subtotal = pricedItems.reduce((sum, item) => sum + item.price, 0);
 

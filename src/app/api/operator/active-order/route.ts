@@ -9,8 +9,10 @@ import Order from "@/app/api/models/orderModel";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const ACTIVE_STATUSES = ["pending", "confirmed", "allocated", "in-transit"] as const;
+const FINAL_STATUSES = ["delivered", "cancelled"] as const;
+const ALL_ORDER_STATUSES = [...ACTIVE_STATUSES, ...FINAL_STATUSES] as const;
 
-type OrderStatus = (typeof ACTIVE_STATUSES)[number] | "delivered" | "cancelled";
+type OrderStatus = (typeof ALL_ORDER_STATUSES)[number];
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -90,6 +92,25 @@ const normalizeDateOnly = (value: unknown): Date | null => {
   return parsed;
 };
 
+const toIsoDateTime = (value: unknown): string => {
+  const parsed = new Date(toStringValue(value));
+  if (Number.isNaN(parsed.getTime())) return new Date(0).toISOString();
+  return parsed.toISOString();
+};
+
+const BUSINESS_TIMEZONE = "Asia/Kolkata";
+
+const toDateKeyInBusinessTimezone = (value: unknown): string | null => {
+  const parsed = new Date(toStringValue(value));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+};
+
 const getTokenUserId = (request: NextRequest): string | null => {
   const token = request.cookies.get("token")?.value;
   if (!token) return null;
@@ -147,14 +168,14 @@ export async function GET(request: NextRequest) {
       .lean<BusLean[]>();
 
     if (!Array.isArray(buses) || buses.length === 0) {
-      return NextResponse.json({ success: true, order: null, orders: [] }, { status: 200 });
+      return NextResponse.json(
+        { success: true, order: null, orders: [], upcomingOrders: [], pastOrders: [], processedCount: 0 },
+        { status: 200 },
+      );
     }
 
     const busById = new Map<string, BusLean>();
     const relevantPeriodsByBusId = new Map<string, OperatorPeriod[]>();
-
-    let minDate: Date | null = null;
-    let maxDate: Date | null = null;
 
     for (const bus of buses) {
       const busId = toStringValue(bus._id);
@@ -168,31 +189,22 @@ export async function GET(request: NextRequest) {
         : [];
 
       relevantPeriodsByBusId.set(busId, periods);
-
-      for (const period of periods) {
-        const startDate = normalizeDateOnly(period.startDate);
-        const endDate = normalizeDateOnly(period.endDate);
-        if (!startDate || !endDate) continue;
-        if (!minDate || startDate < minDate) minDate = startDate;
-        if (!maxDate || endDate > maxDate) maxDate = endDate;
-      }
     }
 
     const busIds = Array.from(busById.keys());
     const busObjectIds = busIds
       .filter((id) => mongoose.Types.ObjectId.isValid(id))
       .map((id) => new mongoose.Types.ObjectId(id));
-    if (busIds.length === 0 || !minDate || !maxDate) {
-      return NextResponse.json({ success: true, order: null, orders: [] }, { status: 200 });
+    if (busIds.length === 0) {
+      return NextResponse.json(
+        { success: true, order: null, orders: [], upcomingOrders: [], pastOrders: [], processedCount: 0 },
+        { status: 200 },
+      );
     }
 
-    const orders = await Order.find({
+    const candidateOrders = await Order.find({
       $or: [{ assignedBus: { $in: busObjectIds } }, { bus: { $in: busObjectIds } }],
-      status: { $in: ACTIVE_STATUSES },
-      orderDate: {
-        $gte: minDate,
-        $lte: maxDate,
-      },
+      status: { $in: ALL_ORDER_STATUSES },
     })
       .sort({ orderDate: 1, createdAt: -1 })
       .select(
@@ -200,28 +212,13 @@ export async function GET(request: NextRequest) {
       )
       .lean<OrderLean[]>();
 
-    let candidateOrders = orders;
-    if (candidateOrders.length === 0) {
-      // Legacy fallback where orderDate range or strict query excludes valid assigned-bus orders.
-      candidateOrders = await Order.find({
-        $or: [{ assignedBus: { $in: busObjectIds } }, { bus: { $in: busObjectIds } }],
-        status: { $in: ACTIVE_STATUSES },
-      })
-        .sort({ orderDate: 1, createdAt: -1 })
-        .select(
-          "_id trackingId status orderDate pickupLocation dropLocation assignedBus bus senderInfo receiverInfo pickupProofImage dropProofImage operatorNote adminNote createdAt",
-        )
-        .limit(500)
-        .lean<OrderLean[]>();
-    }
-
-    const activeOrders = candidateOrders
+    const mappedOrders = candidateOrders
       .map((order) => {
         const busId = toStringValue(order.assignedBus) || toStringValue(order.bus);
         const bus = busById.get(busId);
         if (!bus) return null;
 
-        const orderDate = normalizeDateOnly(order.orderDate);
+        const orderDate = normalizeDateOnly(order.orderDate) ?? normalizeDateOnly(new Date().toISOString());
         if (!orderDate) return null;
 
         const periods = relevantPeriodsByBusId.get(busId) ?? [];
@@ -247,7 +244,7 @@ export async function GET(request: NextRequest) {
             id: toStringValue(order._id),
             trackingId: toStringValue(order.trackingId, "TRACKING-PENDING"),
             status: (toStringValue(order.status, "pending").toLowerCase() as OrderStatus),
-            orderDate: new Date(order.orderDate ?? new Date()).toISOString(),
+            orderDate: toIsoDateTime(order.orderDate),
             sender: getContactInfo(order.senderInfo),
             receiver: getContactInfo(order.receiverInfo),
             pickupLocation: {
@@ -280,7 +277,7 @@ export async function GET(request: NextRequest) {
           id: toStringValue(order._id),
           trackingId: toStringValue(order.trackingId, "TRACKING-PENDING"),
           status,
-          orderDate: new Date(order.orderDate ?? new Date()).toISOString(),
+          orderDate: toIsoDateTime(order.orderDate),
           sender: getContactInfo(order.senderInfo),
           receiver: getContactInfo(order.receiverInfo),
           pickupLocation: {
@@ -307,16 +304,50 @@ export async function GET(request: NextRequest) {
         };
       })
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+      .sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
+
+    const todayKey = toDateKeyInBusinessTimezone(new Date().toISOString());
+
+    const activeOrders = mappedOrders
+      .filter((order) => {
+        const status = toStringValue(order.status).toLowerCase() as OrderStatus;
+        if (!ACTIVE_STATUSES.includes(status as (typeof ACTIVE_STATUSES)[number])) return false;
+        const orderDateKey = toDateKeyInBusinessTimezone(order.orderDate);
+        if (!todayKey || !orderDateKey) return false;
+        return orderDateKey === todayKey;
+      })
       .sort((a, b) => {
         const statusCompare = statusPriority(a.status) - statusPriority(b.status);
         if (statusCompare !== 0) return statusCompare;
         return new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime();
       });
 
+    const upcomingOrders = mappedOrders
+      .filter((order) => {
+        const status = toStringValue(order.status).toLowerCase() as OrderStatus;
+        if (FINAL_STATUSES.includes(status as (typeof FINAL_STATUSES)[number])) return false;
+        const orderDateKey = toDateKeyInBusinessTimezone(order.orderDate);
+        if (!todayKey || !orderDateKey) return true;
+        return orderDateKey !== todayKey;
+      })
+      .sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
+
+    const pastOrders = mappedOrders
+      .filter((order) => {
+        const status = toStringValue(order.status).toLowerCase() as OrderStatus;
+        return FINAL_STATUSES.includes(status as (typeof FINAL_STATUSES)[number]);
+      })
+      .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+
+    const processedCount = pastOrders.length;
+
     return NextResponse.json(
       {
         success: true,
         orders: activeOrders,
+        upcomingOrders,
+        pastOrders,
+        processedCount,
         order: activeOrders[0] ?? null,
       },
       { status: 200 },

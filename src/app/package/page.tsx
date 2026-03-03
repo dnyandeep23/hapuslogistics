@@ -12,6 +12,7 @@ import {
     getPickupLocations,
     getDropLocations,
     Location,
+    type PricingInfo,
     createBookingSession,
     confirmAdminBooking,
     confirmBookingPayment,
@@ -33,6 +34,16 @@ import {
 } from "@/lib/redux/packageSlice";
 import { AppDispatch } from "@/lib/redux/store";
 import LoadingScreen from "@/components/LoadingScreen";
+import {
+    DEFAULT_PACKAGE_CATEGORIES,
+    DEFAULT_PACKAGE_SIZES,
+    getActivePackageCategories,
+    getActivePackageSizes,
+    normalizePackageCategories,
+    normalizePackageSizes,
+    type PackageCategoryConfig,
+    type PackageSizeConfig,
+} from "@/lib/packageCatalog";
 
 export default function AddPackagePage() {
     const router = useRouter();
@@ -46,12 +57,22 @@ export default function AddPackagePage() {
     const [isLoadingPickup, setIsLoadingPickup] = useState(false);
     const [isLoadingDrop, setIsLoadingDrop] = useState(false);
     const [errors, setErrors] = useState<any>({});
-    const [pricingInfo, setPricingInfo] = useState<any>(null);
+    const [pricingInfo, setPricingInfo] = useState<PricingInfo | null>(null);
     const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
     const [orderData, setOrderData] = useState<any>(null);
     const [isUploadingPackageImage, setIsUploadingPackageImage] = useState(false);
     const [adminCustomerEmail, setAdminCustomerEmail] = useState("");
     const [showAdminConfirmModal, setShowAdminConfirmModal] = useState(false);
+    const [packageCategories, setPackageCategories] = useState<PackageCategoryConfig[]>(
+        getActivePackageCategories(DEFAULT_PACKAGE_CATEGORIES),
+    );
+    const [packageSizes, setPackageSizes] = useState<PackageSizeConfig[]>(
+        getActivePackageSizes(DEFAULT_PACKAGE_SIZES),
+    );
+    const defaultPackageSizeName = useMemo(
+        () => getActivePackageSizes(DEFAULT_PACKAGE_SIZES)[0]?.name || "Small",
+        [],
+    );
     const canProceedToPayment =
         Boolean(pricingInfo?.busId) &&
         Boolean(pricingInfo?.sessionId) &&
@@ -66,6 +87,37 @@ export default function AddPackagePage() {
             setIsLoadingPickup(false);
         };
         fetchPickups();
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const loadPackageCatalog = async () => {
+            try {
+                const response = await fetch("/api/package-catalog", { cache: "no-store" });
+                const payload = await response.json();
+                if (!response.ok || !active) return;
+
+                const normalizedCategories = getActivePackageCategories(
+                    normalizePackageCategories(payload?.categories, DEFAULT_PACKAGE_CATEGORIES),
+                );
+                const normalizedSizes = getActivePackageSizes(
+                    normalizePackageSizes(payload?.sizes, DEFAULT_PACKAGE_SIZES),
+                );
+
+                if (!active) return;
+                setPackageCategories(normalizedCategories);
+                setPackageSizes(normalizedSizes);
+            } catch {
+                if (!active) return;
+                setPackageCategories(getActivePackageCategories(DEFAULT_PACKAGE_CATEGORIES));
+                setPackageSizes(getActivePackageSizes(DEFAULT_PACKAGE_SIZES));
+            }
+        };
+
+        loadPackageCatalog();
+        return () => {
+            active = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -124,6 +176,35 @@ export default function AddPackagePage() {
     }, [currentStep, editIndex, formData.cart, dispatch]);
 
     useEffect(() => {
+        if (!Array.isArray(packageSizes) || packageSizes.length === 0) return;
+        const currentSize = String(currentPackage?.packageSize ?? "");
+        const validSize = packageSizes.some((entry) => entry.name === currentSize);
+        if (validSize) return;
+
+        dispatch(
+            setCurrentPackage({
+                ...currentPackage,
+                packageSize: packageSizes[0].name,
+            }),
+        );
+    }, [currentPackage, dispatch, packageSizes]);
+
+    useEffect(() => {
+        const currentType = String(currentPackage?.packageType ?? "");
+        if (!currentType) return;
+        const validType = packageCategories.some((entry) => entry.name === currentType);
+        if (validType) return;
+
+        dispatch(
+            setCurrentPackage({
+                ...currentPackage,
+                packageType: "",
+                otherPackageType: "",
+            }),
+        );
+    }, [currentPackage, dispatch, packageCategories]);
+
+    useEffect(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
     }, [currentStep]);
 
@@ -172,11 +253,12 @@ export default function AddPackagePage() {
     };
 
     const handleClearForm = () => {
+        const defaultSize = packageSizes[0]?.name || defaultPackageSizeName;
         dispatch(setCurrentPackage({
             packageName: "",
             packageType: "",
             otherPackageType: "",
-            packageSize: "Small",
+            packageSize: defaultSize,
             packageWeight: 0,
             packageQuantities: 1,
             packageImage: "",
@@ -198,7 +280,13 @@ export default function AddPackagePage() {
     const validatePackage = (pkg: any, cart: any[], editIndex: number | null) => {
         const newErrors: any = {};
         if (!pkg.packageType) newErrors.packageType = "Package type is required.";
-        if (pkg.packageType === "Other" && !pkg.otherPackageType) newErrors.otherPackageType = "Please specify the package type.";
+        const hasOtherCategory = packageCategories.some(
+            (entry) => String(entry.name ?? "").trim().toLowerCase() === "other",
+        );
+        const isOtherCategorySelected = String(pkg.packageType ?? "").trim().toLowerCase() === "other";
+        if (hasOtherCategory && isOtherCategorySelected && !pkg.otherPackageType) {
+            newErrors.otherPackageType = "Please specify the package type.";
+        }
         if (!pkg.packageSize) newErrors.packageSize = "Package size is required.";
         if (!pkg.packageWeight || pkg.packageWeight <= 0) newErrors.packageWeight = "Weight must be greater than 0.";
         if (!pkg.packageQuantities || pkg.packageQuantities <= 0) newErrors.packageQuantities = "Quantity must be at least 1.";
@@ -211,9 +299,14 @@ export default function AddPackagePage() {
                 newErrors.pickUpDate = `All packages must have the same pickup date: ${firstPackageDate}.`;
             }
         }
-        const sizeLimits: { [key: string]: number } = { "Small": 5, "Medium": 10, "Large": 20 };
-        if (pkg.packageSize && pkg.packageWeight > sizeLimits[pkg.packageSize]) {
-            newErrors.packageWeight = `Weight for a ${pkg.packageSize.toLowerCase()} package cannot exceed ${sizeLimits[pkg.packageSize]} kg.`;
+        const sizeLimits = packageSizes.reduce<Record<string, number>>((acc, entry) => {
+            acc[entry.name] = Number(entry.maxWeightKg) || 0;
+            return acc;
+        }, {});
+        const packageSizeLabel = String(pkg.packageSize ?? "");
+        const maxWeightForSize = sizeLimits[packageSizeLabel];
+        if (packageSizeLabel && maxWeightForSize > 0 && pkg.packageWeight > maxWeightForSize) {
+            newErrors.packageWeight = `Weight for a ${packageSizeLabel.toLowerCase()} package cannot exceed ${maxWeightForSize} kg.`;
         }
         return newErrors;
     };
@@ -341,6 +434,12 @@ export default function AddPackagePage() {
         }
 
         try {
+            if (!pricingInfo?.sessionId) {
+                addToast("Pricing session is not available. Please recalculate and try again.", "error");
+                setPaymentStatus('idle');
+                return;
+            }
+
             const sessionPayload = {
                 sessionId: pricingInfo.sessionId,
                 userId: user._id,
@@ -534,6 +633,8 @@ export default function AddPackagePage() {
                                             errors={errors}
                                             handleFileDrop={handleFileDrop}
                                             isUploadingPackageImage={isUploadingPackageImage}
+                                            packageCategories={packageCategories}
+                                            packageSizes={packageSizes}
                                         />
                                     )}
 

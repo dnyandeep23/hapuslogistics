@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MenuItem } from "../data/roleMenus";
 import { User } from "@/types";
 import { useAppDispatch } from "@/lib/redux/hooks";
@@ -19,10 +19,20 @@ type Props = {
 
 export default function Sidebar({ user, role = "user", menus, isExpanded, setIsExpanded }: Props) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const router = useRouter();
     const dispatch = useAppDispatch();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const items = menus[role] ?? menus["user"] ?? [];
+    const currentPathWithQuery = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+
+    const isItemActive = (href: string) => {
+        if (href.includes("?")) {
+            return currentPathWithQuery === href;
+        }
+        const itemPath = href.split("?")[0];
+        return pathname === itemPath;
+    };
 
     const getLogoutRedirectPath = () => {
         if (user?.isSuperAdmin || user?.role === "admin" || role === "admin" || role === "superadmin") {
@@ -106,8 +116,7 @@ export default function Sidebar({ user, role = "user", menus, isExpanded, setIsE
                 {/* Menu (spaced nicely) */}
                 <nav className="flex-1 w-full px-2 space-y-3">
                     {items.map((item) => {
-                        const itemPath = item.href.split("?")[0];
-                        const active = pathname === itemPath;
+                        const active = isItemActive(item.href);
 
                         return (
                             <Link

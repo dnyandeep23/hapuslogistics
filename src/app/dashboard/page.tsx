@@ -18,8 +18,17 @@ import { useDropzone } from 'react-dropzone';
 import CustomDateRangePicker from '@/components/CustomDateRangePicker';
 import CustomDatePicker from '@/components/CustomDatePicker';
 import CustomTimePicker from '@/components/CustomTimePicker';
-import OperatorActiveOrderCard, { type OperatorActiveOrder } from '@/components/dashboard/OperatorActiveOrderCard';
+import OperatorActiveOrderCard, {
+  type OperatorActiveOrder,
+  type OperatorOrderBuckets,
+} from '@/components/dashboard/OperatorActiveOrderCard';
 import Skeleton from '@/components/Skeleton';
+import {
+  DEFAULT_PACKAGE_CATEGORIES,
+  buildCategoryFareMap,
+  getActivePackageCategories,
+  normalizePackageCategories,
+} from '@/lib/packageCatalog';
 
 type AdminLocation = {
   _id: string;
@@ -74,23 +83,24 @@ type InlineLocationTarget = {
   field: "pickup" | "drop";
 } | null;
 
-const defaultMaterialFareMap: Record<string, number> = {
-  Wooden: 70,
-  "Plastic / Fibre": 60,
-  Iron: 80,
-  Electronics: 95,
-  "Mango Box": 55,
-  Other: 65,
-};
+const defaultMaterialFareMap: Record<string, number> = buildCategoryFareMap(
+  getActivePackageCategories(DEFAULT_PACKAGE_CATEGORIES),
+);
 
 const BUS_NUMBER_PATTERN = /^[A-Z]{2}-\d{2}-[A-Z]{2}-\d{4}$/;
+const EMPTY_OPERATOR_ORDER_BUCKETS: OperatorOrderBuckets = {
+  activeOrders: [],
+  upcomingOrders: [],
+  pastOrders: [],
+  processedCount: 0,
+};
 
-const makeDefaultRouteConfig = (): RouteConfigForm => ({
+const makeDefaultRouteConfig = (fareMap: Record<string, number> = defaultMaterialFareMap): RouteConfigForm => ({
   pickupLocationId: "",
   dropLocationId: "",
   pickupTime: "08:00",
   dropTime: "18:00",
-  materialFares: { ...defaultMaterialFareMap },
+  materialFares: { ...fareMap },
   dateOverrides: [],
   minimized: false,
 });
@@ -134,10 +144,11 @@ export default function DashboardPage() {
   const [busNumber, setBusNumber] = useState("");
   const [capacity, setCapacity] = useState(40);
   const [autoRenewCapacity, setAutoRenewCapacity] = useState(false);
+  const [materialFareMap, setMaterialFareMap] = useState<Record<string, number>>(defaultMaterialFareMap);
   const defaultPricingRange = useMemo(() => getDefaultPricingRange(), []);
   const [availabilityStartDate, setAvailabilityStartDate] = useState(defaultPricingRange.start);
   const [availabilityEndDate, setAvailabilityEndDate] = useState(defaultPricingRange.end);
-  const [routeConfigs, setRouteConfigs] = useState<RouteConfigForm[]>([makeDefaultRouteConfig()]);
+  const [routeConfigs, setRouteConfigs] = useState<RouteConfigForm[]>([makeDefaultRouteConfig(defaultMaterialFareMap)]);
   const [locations, setLocations] = useState<AdminLocation[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [showInlineLocationCreator, setShowInlineLocationCreator] = useState<InlineLocationTarget>(null);
@@ -155,7 +166,7 @@ export default function DashboardPage() {
   const [loadingAdminBuses, setLoadingAdminBuses] = useState(false);
   const [showAdminBusForm, setShowAdminBusForm] = useState(false);
   const [editingBusId, setEditingBusId] = useState<string | null>(null);
-  const [operatorActiveOrders, setOperatorActiveOrders] = useState<OperatorActiveOrder[]>([]);
+  const [operatorOrdersByStage, setOperatorOrdersByStage] = useState<OperatorOrderBuckets>(EMPTY_OPERATOR_ORDER_BUCKETS);
   const [operatorOrderLoading, setOperatorOrderLoading] = useState(false);
   const [operatorOrderError, setOperatorOrderError] = useState("");
 
@@ -225,20 +236,59 @@ export default function DashboardPage() {
     return "";
   };
 
-  const parseFares = (fares: unknown) => {
-    const fallback = { ...defaultMaterialFareMap };
+  const parseFares = useCallback((fares: unknown) => {
+    const fallback = { ...materialFareMap };
     if (!fares || typeof fares !== "object") return fallback;
 
-    const entries = fares instanceof Map
-      ? Array.from(fares.entries())
-      : Object.entries(fares as Record<string, unknown>);
+    const source = fares instanceof Map
+      ? Object.fromEntries(fares.entries())
+      : (fares as Record<string, unknown>);
 
-    return entries.reduce<Record<string, number>>((acc, [key, value]) => {
-      const parsed = Number(value);
-      acc[key] = Number.isNaN(parsed) ? 0 : parsed;
-      return acc;
-    }, fallback);
-  };
+    const normalized: Record<string, number> = {};
+    for (const categoryName of Object.keys(fallback)) {
+      const parsed = Number(source[categoryName]);
+      normalized[categoryName] = Number.isFinite(parsed) && parsed >= 0
+        ? parsed
+        : fallback[categoryName];
+    }
+    return normalized;
+  }, [materialFareMap]);
+
+  const loadMaterialFareMap = useCallback(async () => {
+    if (!isAdminRole) return;
+    try {
+      const response = await fetch("/api/package-catalog", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) return;
+
+      const categories = getActivePackageCategories(
+        normalizePackageCategories(payload?.categories, DEFAULT_PACKAGE_CATEGORIES),
+      );
+      if (categories.length > 0) {
+        setMaterialFareMap(buildCategoryFareMap(categories));
+      }
+    } catch {
+      setMaterialFareMap(defaultMaterialFareMap);
+    }
+  }, [isAdminRole]);
+
+  useEffect(() => {
+    setRouteConfigs((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) {
+        return [makeDefaultRouteConfig(materialFareMap)];
+      }
+      return prev.map((route) => ({
+        ...route,
+        materialFares: parseFares(route.materialFares),
+        dateOverrides: Array.isArray(route.dateOverrides)
+          ? route.dateOverrides.map((override) => ({
+              ...override,
+              fares: parseFares(override.fares),
+            }))
+          : [],
+      }));
+    });
+  }, [materialFareMap, parseFares]);
 
   const resetAdminBusForm = () => {
     setEditingBusId(null);
@@ -249,7 +299,7 @@ export default function DashboardPage() {
     const defaultRange = getDefaultPricingRange();
     setAvailabilityStartDate(defaultRange.start);
     setAvailabilityEndDate(defaultRange.end);
-    setRouteConfigs([makeDefaultRouteConfig()]);
+    setRouteConfigs([makeDefaultRouteConfig(materialFareMap)]);
     setBusImages([]);
     setAdminBusFieldErrors({});
     setShowInlineLocationCreator(null);
@@ -327,9 +377,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isAdminRole) return;
+    loadMaterialFareMap();
     loadLocations();
     loadAdminBuses();
-  }, [isAdminRole, loadAdminBuses, loadLocations]);
+  }, [isAdminRole, loadAdminBuses, loadLocations, loadMaterialFareMap]);
 
   const loadOperatorActiveOrder = useCallback(async () => {
     if (user?.role !== "operator") return;
@@ -340,18 +391,28 @@ export default function DashboardPage() {
       const payload = await response.json();
       if (!response.ok) {
         setOperatorOrderError(payload?.message || "Failed to load active orders.");
-        setOperatorActiveOrders([]);
+        setOperatorOrdersByStage(EMPTY_OPERATOR_ORDER_BUCKETS);
         return;
       }
-      const orders = Array.isArray(payload?.orders)
+      const activeOrders = Array.isArray(payload?.orders)
         ? payload.orders
         : payload?.order
           ? [payload.order]
           : [];
-      setOperatorActiveOrders(orders);
+      const upcomingOrders = Array.isArray(payload?.upcomingOrders) ? payload.upcomingOrders : [];
+      const pastOrders = Array.isArray(payload?.pastOrders) ? payload.pastOrders : [];
+      const processedCountRaw = Number(payload?.processedCount);
+      const processedCount = Number.isFinite(processedCountRaw) ? processedCountRaw : pastOrders.length;
+
+      setOperatorOrdersByStage({
+        activeOrders: activeOrders as OperatorActiveOrder[],
+        upcomingOrders: upcomingOrders as OperatorActiveOrder[],
+        pastOrders: pastOrders as OperatorActiveOrder[],
+        processedCount,
+      });
     } catch (error: unknown) {
       setOperatorOrderError(error instanceof Error ? error.message : "Failed to load active orders.");
-      setOperatorActiveOrders([]);
+      setOperatorOrdersByStage(EMPTY_OPERATOR_ORDER_BUCKETS);
     } finally {
       setOperatorOrderLoading(false);
     }
@@ -392,7 +453,7 @@ export default function DashboardPage() {
   };
 
   const addRouteConfig = () => {
-    setRouteConfigs((prev) => [...prev, makeDefaultRouteConfig()]);
+    setRouteConfigs((prev) => [...prev, makeDefaultRouteConfig(materialFareMap)]);
   };
 
   const removeRouteConfig = (index: number) => {
@@ -1364,10 +1425,11 @@ export default function DashboardPage() {
       {isOperatorRole ? (
         <div className="space-y-8">
           <OperatorActiveOrderCard
-            orders={operatorActiveOrders}
+            ordersByStage={operatorOrdersByStage}
             loading={operatorOrderLoading}
             error={operatorOrderError}
             onRefresh={loadOperatorActiveOrder}
+            showOnlyActive
           />
           <ServicesSection services={services} />
         </div>
