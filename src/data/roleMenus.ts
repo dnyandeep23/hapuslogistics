@@ -7,7 +7,7 @@ export type MenuItem = {
 export const roleMenus: Record<string, MenuItem[]> = {
     user: [
         { href: '/dashboard', label: 'Home', icon: 'material-symbols:home-rounded' },
-        { href: '/dashboard/orders', label: 'My Orders', icon: 'lets-icons:order' },
+        { href: '/dashboard/orders', label: 'My Orders', icon: 'lets-icons:order' }, { href: '/package', label: 'Add Package', icon: 'mdi:package-variant-closed-plus' },
         { href: '/dashboard/support', label: 'Support', icon: 'fluent:person-support-16-filled' },
     ],
     operator: [
