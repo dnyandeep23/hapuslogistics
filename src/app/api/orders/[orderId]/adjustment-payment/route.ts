@@ -42,7 +42,7 @@ export async function POST(
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload;
-    const actor = await User.findById(payload.id).select("_id role isSuperAdmin");
+    const actor = await User.findById(payload.id).select("_id role");
     if (!actor) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -56,7 +56,7 @@ export async function POST(
     }
 
     const isOwner = toStringValue(order.user) === toStringValue(actor._id);
-    const isAdmin = toStringValue(actor.role) === "admin" || Boolean(actor.isSuperAdmin);
+    const isAdmin = toStringValue(actor.role) === "admin";
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -113,7 +113,7 @@ export async function PATCH(
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload;
-    const actor = await User.findById(payload.id).select("_id role isSuperAdmin");
+    const actor = await User.findById(payload.id).select("_id role");
     if (!actor) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -127,7 +127,7 @@ export async function PATCH(
     }
 
     const isOwner = toStringValue(order.user) === toStringValue(actor._id);
-    const isAdmin = toStringValue(actor.role) === "admin" || Boolean(actor.isSuperAdmin);
+    const isAdmin = toStringValue(actor.role) === "admin";
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -185,4 +185,3 @@ export async function PATCH(
     );
   }
 }
-

@@ -3,15 +3,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
-import { fetchUser } from "@/lib/redux/userSlice";
+import { clearUser, fetchUser } from "@/lib/redux/userSlice";
+import { useRouter, useSearchParams } from "next/navigation";
+import Modal from "@/components/dashboard/Modal";
+import { useToast } from "@/context/ToastContext";
+import { formatIndiaPhoneInput, normalizeIndiaPhone } from "@/lib/phone";
 
-const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
-
-const normalizePhoneInput = (value: string) => value.replace(/[^\d+\s()-]/g, "").slice(0, 20);
-const cleanPhone = (value: string) => value.trim().replace(/[\s()-]/g, "");
-
-const roleLabel = (role: string | undefined, isSuperAdmin?: boolean) => {
-  if (isSuperAdmin) return "Super Admin";
+const roleLabel = (role: string | undefined) => {
   if (role === "admin") return "Admin";
   if (role === "operator") return "Operator";
   return "User";
@@ -30,6 +28,9 @@ const companyStatusLabel = (status: string | undefined, role: string | undefined
 
 export default function DashboardProfilePage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { addToast } = useToast();
   const { user } = useAppSelector((state) => state.user);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -37,21 +38,63 @@ export default function DashboardProfilePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     setName(user?.name ?? "");
-    setPhone(user?.phone ?? "");
+    setPhone(formatIndiaPhoneInput(user?.phone ?? ""));
   }, [user?.name, user?.phone]);
 
   const normalizedName = useMemo(() => name.trim().replace(/\s+/g, " "), [name]);
-  const cleanedPhoneValue = useMemo(() => cleanPhone(phone), [phone]);
-  const currentSavedPhone = useMemo(() => cleanPhone(user?.phone ?? ""), [user?.phone]);
-  const currentSavedName = useMemo(() => (user?.name ?? "").trim(), [user?.name]);
-  const hasChanged = normalizedName !== currentSavedName || cleanedPhoneValue !== currentSavedPhone;
-  const isOperatorMissingPhone = useMemo(
-    () => user?.role === "operator" && !currentSavedPhone,
-    [currentSavedPhone, user?.role],
+  const comparablePhoneValue = useMemo(
+    () => normalizeIndiaPhone(phone) ?? formatIndiaPhoneInput(phone),
+    [phone],
   );
+  const currentSavedPhone = useMemo(
+    () => normalizeIndiaPhone(user?.phone ?? "") ?? formatIndiaPhoneInput(user?.phone ?? ""),
+    [user?.phone],
+  );
+  const currentSavedName = useMemo(() => (user?.name ?? "").trim(), [user?.name]);
+  const hasChanged = normalizedName !== currentSavedName || comparablePhoneValue !== currentSavedPhone;
+  const isOperatorMissingPhone = useMemo(
+    () => user?.role === "operator" && !normalizeIndiaPhone(user?.phone),
+    [user?.phone, user?.role],
+  );
+  const mustChangePassword = Boolean(user?.mustChangePassword);
+  const assignedBusCount = Number(user?.assignedBusCount ?? 0);
+  const adminContactPhone = String(user?.adminContactPhone ?? "").trim();
+  const deletionBlockedByBusAssignments =
+    user?.role === "operator" && assignedBusCount > 0;
+  const forcePasswordChange = mustChangePassword || searchParams.get("forcePasswordChange") === "true";
+  const deletionExpiryLabel = useMemo(() => {
+    const expiresAt = user?.accountDeletionExpiresAt;
+    if (!expiresAt) return null;
+
+    const parsed = new Date(expiresAt);
+    if (Number.isNaN(parsed.getTime())) return null;
+
+    return parsed.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [user?.accountDeletionExpiresAt]);
+
+  const getLogoutRedirectPath = () => {
+    if (user?.role === "admin") return "/admin/login";
+    if (user?.role === "operator") return "/operator/login";
+    return "/login";
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -64,14 +107,14 @@ export default function DashboardProfilePage() {
       return;
     }
 
-    const normalizedPhone = cleanedPhoneValue;
-    if (!normalizedPhone) {
+    const normalizedPhone = normalizeIndiaPhone(phone);
+    if (normalizedPhone === "") {
       setFieldError("Contact number is required.");
       return;
     }
 
-    if (!PHONE_PATTERN.test(normalizedPhone)) {
-      setFieldError("Enter a valid contact number (10-15 digits).");
+    if (normalizedPhone === null) {
+      setFieldError("Enter a valid Indian mobile number.");
       return;
     }
 
@@ -101,11 +144,97 @@ export default function DashboardProfilePage() {
     }
   };
 
+  const handleScheduleAccountDeletion = async () => {
+    setDeleteAccountError("");
+
+    try {
+      setDeletingAccount(true);
+      const response = await fetch("/api/auth/me", {
+        method: "DELETE",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        if (payload?.code === "OPERATOR_ASSIGNED_TO_BUSES") {
+          await dispatch(fetchUser()).unwrap().catch(() => undefined);
+        }
+        setDeleteAccountError(payload?.message || "Failed to schedule account deletion.");
+        return;
+      }
+
+      const redirectPath = getLogoutRedirectPath();
+      sessionStorage.setItem("logout_redirect", redirectPath);
+      dispatch(clearUser());
+      addToast(payload?.message || "Account deletion scheduled.", "warning");
+      router.replace(`${redirectPath}?deletionScheduled=true`);
+    } catch (err: unknown) {
+      setDeleteAccountError(
+        err instanceof Error ? err.message : "Failed to schedule account deletion.",
+      );
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPasswordMessage("");
+    setPasswordError("");
+
+    if (!mustChangePassword && !currentPassword) {
+      setPasswordError("Current password is required.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New password and confirm password must match.");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setPasswordError(payload?.message || "Failed to update password.");
+        return;
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage(payload?.message || "Password updated successfully.");
+      await dispatch(fetchUser()).unwrap();
+
+      if (forcePasswordChange) {
+        addToast("Password updated. You can continue using the dashboard.", "success");
+        router.replace("/dashboard/profile");
+      }
+    } catch (err: unknown) {
+      setPasswordError(err instanceof Error ? err.message : "Failed to update password.");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
-      <div className="rounded-2xl border border-[#4E5A45] bg-[#243227]/95 p-5 sm:p-6">
+      <div className="dashboard-surface rounded-2xl p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.16em] text-[#D7E18D]/80">Dashboard Profile</p>
@@ -116,7 +245,7 @@ export default function DashboardProfilePage() {
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#C9D86C]/35 bg-[#C9D86C]/10 px-3 py-1.5 text-xs font-semibold text-[#EAF3A0]">
             <Icon icon="mdi:account-check-outline" className="text-base" />
-            {roleLabel(user.role, user.isSuperAdmin)}
+            {roleLabel(user.role)}
           </div>
         </div>
       </div>
@@ -136,19 +265,19 @@ export default function DashboardProfilePage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="dashboard-surface-soft rounded-2xl p-4">
           <p className="text-[11px] uppercase tracking-wide text-white/55">Full Name</p>
           <p className="mt-2 text-sm font-medium text-white">{user.name || "-"}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="dashboard-surface-soft rounded-2xl p-4">
           <p className="text-[11px] uppercase tracking-wide text-white/55">Email</p>
           <p className="mt-2 break-all text-sm font-medium text-white">{user.email}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="dashboard-surface-soft rounded-2xl p-4">
           <p className="text-[11px] uppercase tracking-wide text-white/55">Role</p>
-          <p className="mt-2 text-sm font-medium text-white">{roleLabel(user.role, user.isSuperAdmin)}</p>
+          <p className="mt-2 text-sm font-medium text-white">{roleLabel(user.role)}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="dashboard-surface-soft rounded-2xl p-4">
           <p className="text-[11px] uppercase tracking-wide text-white/55">Company Status</p>
           <p className="mt-2 text-sm font-medium text-white">
             {companyStatusLabel(user.operatorApprovalStatus, user.role)}
@@ -156,7 +285,7 @@ export default function DashboardProfilePage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#4E5A45] bg-[#243227] p-5 sm:p-6">
+      <div className="dashboard-surface rounded-2xl p-5 sm:p-6">
         <div className="mb-4 flex items-center gap-2">
           <Icon icon="mdi:account-edit-outline" className="text-lg text-[#DDE678]" />
           <h2 className="text-lg font-semibold text-[#F2F7B2]">Editable Details</h2>
@@ -174,7 +303,7 @@ export default function DashboardProfilePage() {
                 setName(event.target.value.slice(0, 80));
               }}
               placeholder="Your full name"
-              className="mt-2 w-full rounded-xl border border-white/20 bg-black/35 px-4 py-3 text-base text-white outline-none transition focus:border-[#D7E18D]/70"
+              className="dashboard-input mt-2 w-full rounded-xl px-4 py-3 text-base transition focus:border-[#D7E18D]/70"
             />
           </label>
 
@@ -186,15 +315,15 @@ export default function DashboardProfilePage() {
                 setFieldError("");
                 setError("");
                 setMessage("");
-                setPhone(normalizePhoneInput(event.target.value));
+                setPhone(formatIndiaPhoneInput(event.target.value));
               }}
-              placeholder="+919876543210"
-              className="mt-2 w-full rounded-xl border border-white/20 bg-black/35 px-4 py-3 text-base text-white outline-none transition focus:border-[#D7E18D]/70"
+              placeholder="+91 9876543210"
+              className="dashboard-input mt-2 w-full rounded-xl px-4 py-3 text-base transition focus:border-[#D7E18D]/70"
             />
           </label>
 
           <p className="text-xs text-white/60">
-            Format: optional + and 10-15 digits. Example: +919876543210
+            Format: +91 followed by a valid 10-digit Indian mobile number.
           </p>
 
           {fieldError && <p className="text-xs text-red-400">{fieldError}</p>}
@@ -229,6 +358,225 @@ export default function DashboardProfilePage() {
           </div>
         )}
       </div>
+
+      <div className={`rounded-2xl p-5 sm:p-6 ${
+        forcePasswordChange
+          ? "border-amber-400/45 bg-amber-500/10"
+          : "dashboard-surface"
+      }`}>
+        <div className="mb-4 flex items-center gap-2">
+          <Icon
+            icon={forcePasswordChange ? "mdi:shield-alert-outline" : "mdi:form-textbox-password"}
+            className={`text-lg ${forcePasswordChange ? "text-amber-200" : "text-[#DDE678]"}`}
+          />
+          <h2 className={`text-lg font-semibold ${forcePasswordChange ? "text-amber-100" : "text-[#F2F7B2]"}`}>
+            {forcePasswordChange ? "Update Temporary Password" : "Change Password"}
+          </h2>
+        </div>
+
+        {forcePasswordChange && (
+          <div className="mb-4 rounded-xl border border-amber-400/45 bg-amber-500/10 p-3 text-sm text-amber-100">
+            This account was created with a temporary password. Update it now before continuing.
+          </div>
+        )}
+
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          {!mustChangePassword && (
+            <label className="block text-sm text-white/85">
+              Current Password
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => {
+                  setPasswordError("");
+                  setPasswordMessage("");
+                  setCurrentPassword(event.target.value);
+                }}
+                placeholder="Current password"
+                className="dashboard-input mt-2 w-full rounded-xl px-4 py-3 text-base transition focus:border-[#D7E18D]/70"
+              />
+            </label>
+          )}
+
+          <label className="block text-sm text-white/85">
+            New Password
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(event) => {
+                setPasswordError("");
+                setPasswordMessage("");
+                setNewPassword(event.target.value);
+              }}
+              placeholder="New password"
+              className="dashboard-input mt-2 w-full rounded-xl px-4 py-3 text-base transition focus:border-[#D7E18D]/70"
+            />
+          </label>
+
+          <label className="block text-sm text-white/85">
+            Confirm New Password
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => {
+                setPasswordError("");
+                setPasswordMessage("");
+                setConfirmPassword(event.target.value);
+              }}
+              placeholder="Confirm new password"
+              className="dashboard-input mt-2 w-full rounded-xl px-4 py-3 text-base transition focus:border-[#D7E18D]/70"
+            />
+          </label>
+
+          <p className="text-xs text-white/60">
+            Operators can also configure Google login later using the same email address.
+          </p>
+
+          {passwordError && (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+              {passwordError}
+            </div>
+          )}
+          {passwordMessage && (
+            <div className="rounded-xl border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-300">
+              {passwordMessage}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="inline-flex items-center gap-2 rounded-full border border-[#D5E400] px-6 py-2 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-2xl hover:shadow-[#D5E400]/50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {changingPassword ? (
+                <>
+                  <Icon icon="svg-spinners:ring-resize" className="text-base" />
+                  Updating...
+                </>
+              ) : (
+                "Update Password"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="rounded-2xl border border-rose-500/35 bg-rose-950/20 p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Icon icon="mdi:alert-circle-outline" className="text-lg text-rose-300" />
+              <h2 className="text-lg font-semibold text-rose-200">Danger Zone</h2>
+            </div>
+            <p className="mt-2 text-sm text-rose-100/80">
+              Schedule account deletion with a 3-day recovery window. Logging in again before expiry cancels deletion automatically.
+            </p>
+            {deletionBlockedByBusAssignments ? (
+              <p className="mt-2 text-xs text-amber-200/90">
+                You are still assigned to {assignedBusCount} bus{assignedBusCount === 1 ? "" : "es"}.
+                {adminContactPhone
+                  ? ` Contact admin at ${adminContactPhone} to manage those assignments before deletion.`
+                  : " Contact your admin to manage those assignments before deletion."}
+              </p>
+            ) : null}
+            {deletionExpiryLabel && (
+              <p className="mt-2 text-xs text-rose-200/90">
+                Scheduled deletion expires on {deletionExpiryLabel}.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteAccountError("");
+              setDeleteModalOpen(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-full border border-rose-400/50 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20"
+          >
+            <Icon icon="mdi:delete-outline" className="text-base" />
+            Delete Account
+          </button>
+        </div>
+      </div>
+
+      <Modal
+        isOpen={deleteModalOpen}
+        title="Confirm Account Deletion"
+        onClose={() => {
+          if (deletingAccount) return;
+          setDeleteModalOpen(false);
+          setDeleteAccountError("");
+        }}
+      >
+        <div className="space-y-4">
+          {deletionBlockedByBusAssignments ? (
+            <>
+              <p className="text-sm text-white/80">
+                Account deletion is blocked because you are still assigned to {assignedBusCount} bus{assignedBusCount === 1 ? "" : "es"}.
+              </p>
+              <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 p-3 text-sm text-amber-100">
+                {adminContactPhone
+                  ? `Please contact your admin at ${adminContactPhone} to update bus assignments before deleting this operator account.`
+                  : "Please contact your admin to update bus assignments before deleting this operator account."}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-white/80">
+                Your account will be scheduled for deletion and you will be logged out immediately.
+                Log in again within 3 days to cancel the deletion request.
+              </p>
+              <div className="rounded-xl border border-rose-400/35 bg-rose-500/10 p-3 text-sm text-rose-100">
+                This affects your current account only. If you do not log back in before the expiry window ends,
+                the scheduled deletion will stay in place.
+              </div>
+            </>
+          )}
+          {deleteAccountError && (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-300">
+              {deleteAccountError}
+            </div>
+          )}
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setDeleteAccountError("");
+              }}
+              disabled={deletingAccount}
+              className="rounded-full border border-white/20 px-4 py-2 text-sm text-white/75 transition hover:bg-white/10 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={
+                deletionBlockedByBusAssignments
+                  ? () => {
+                      setDeleteModalOpen(false);
+                      setDeleteAccountError("");
+                    }
+                  : handleScheduleAccountDeletion
+              }
+              disabled={deletingAccount}
+              className="inline-flex items-center gap-2 rounded-full border border-rose-400/50 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              {deletionBlockedByBusAssignments ? (
+                "Close"
+              ) : deletingAccount ? (
+                <>
+                  <Icon icon="svg-spinners:ring-resize" className="text-base" />
+                  Scheduling...
+                </>
+              ) : (
+                "Confirm Deletion"
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

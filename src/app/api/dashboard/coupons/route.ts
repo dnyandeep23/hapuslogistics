@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 
 type AuthUser = {
   _id: string;
-  isSuperAdmin?: boolean;
+  role?: string;
 };
 
 const getAuthUser = async (request: NextRequest): Promise<AuthUser | null> => {
@@ -19,7 +19,7 @@ const getAuthUser = async (request: NextRequest): Promise<AuthUser | null> => {
   try {
     const payload = jwt.verify(token, JWT_SECRET) as { id?: string };
     if (!payload.id) return null;
-    const user = await User.findById(payload.id).select("_id isSuperAdmin").lean<AuthUser | null>();
+    const user = await User.findById(payload.id).select("_id role").lean<AuthUser | null>();
     return user;
   } catch {
     return null;
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect();
     const user = await getAuthUser(request);
-    if (!user || !user.isSuperAdmin) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
     const user = await getAuthUser(request);
-    if (!user || !user.isSuperAdmin) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 
@@ -180,7 +180,7 @@ export async function PATCH(request: NextRequest) {
   try {
     await dbConnect();
     const user = await getAuthUser(request);
-    if (!user || !user.isSuperAdmin) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 
@@ -277,7 +277,7 @@ export async function DELETE(request: NextRequest) {
   try {
     await dbConnect();
     const user = await getAuthUser(request);
-    if (!user || !user.isSuperAdmin) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 

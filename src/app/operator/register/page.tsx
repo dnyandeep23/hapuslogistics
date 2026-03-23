@@ -44,9 +44,10 @@ function RegisterPageContent() {
     setNotification({ message: '', type: '', showResend: false });
 
     try {
-      await registerUser({ name, email, password, role });
+      const response = await registerUser({ name, email, password, role });
       setNotification({
-        message: "Registration successful! A verification email has been sent.",
+        message:
+          response.message || "Registration successful! A verification email has been sent.",
         type: 'success',
         showResend: true,
       });

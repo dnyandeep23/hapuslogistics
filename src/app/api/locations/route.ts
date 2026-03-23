@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await User.findById(userId).select("role isSuperAdmin");
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    const user = await User.findById(userId).select("role");
+    if (!user || user.role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Admin access required." },
         { status: 403 },

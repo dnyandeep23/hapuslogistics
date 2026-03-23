@@ -5,6 +5,7 @@ import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
 import Bus from "@/app/api/models/busModel";
 import Notification from "@/app/api/models/notificationModel";
+import { normalizeIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -32,8 +33,8 @@ export async function POST(
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const admin = await User.findById(adminUserId).select("role isSuperAdmin travelCompanyId buses");
-    if (!admin || (admin.role !== "admin" && !admin.isSuperAdmin)) {
+    const admin = await User.findById(adminUserId).select("role travelCompanyId buses");
+    if (!admin || admin.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -90,10 +91,7 @@ export async function POST(
       return NextResponse.json({ success: false, message: "Bus not found." }, { status: 404 });
     }
 
-    if (
-      !admin.isSuperAdmin &&
-      String(bus.travelCompanyId ?? "") !== String(admin.travelCompanyId ?? "")
-    ) {
+    if (String(bus.travelCompanyId ?? "") !== String(admin.travelCompanyId ?? "")) {
       const canAccessByBusList = Array.isArray(admin.buses)
         ? admin.buses.some((id: unknown) => String(id) === busId)
         : false;
@@ -106,7 +104,7 @@ export async function POST(
     }
 
     const operator = await User.findById(operatorId).select(
-      "role name email phone operatorApprovalStatus travelCompanyId",
+      "role name email phone operatorApprovalStatus travelCompanyId accountDeletionRequestedAt accountDeletionExpiresAt",
     );
     if (!operator || operator.role !== "operator") {
       return NextResponse.json(
@@ -128,12 +126,23 @@ export async function POST(
       );
     }
 
-    const operatorPhone = String(operator.phone ?? "").trim();
+    if (operator.accountDeletionRequestedAt || operator.accountDeletionExpiresAt) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "OPERATOR_DELETION_SCHEDULED",
+          message: "This operator has scheduled account deletion. Ask them to log in again and cancel deletion before assigning any bus.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const operatorPhone = normalizeIndiaPhone(operator.phone);
     if (!operatorPhone) {
       return NextResponse.json(
         {
           success: false,
-          message: "Operator phone number is required before assignment.",
+          message: "Operator phone number must be a valid Indian mobile number before assignment.",
         },
         { status: 400 },
       );
@@ -210,8 +219,8 @@ export async function DELETE(
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const admin = await User.findById(adminUserId).select("role isSuperAdmin travelCompanyId buses");
-    if (!admin || (admin.role !== "admin" && !admin.isSuperAdmin)) {
+    const admin = await User.findById(adminUserId).select("role travelCompanyId buses");
+    if (!admin || admin.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -243,10 +252,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, message: "Bus not found." }, { status: 404 });
     }
 
-    if (
-      !admin.isSuperAdmin &&
-      String(bus.travelCompanyId ?? "") !== String(admin.travelCompanyId ?? "")
-    ) {
+    if (String(bus.travelCompanyId ?? "") !== String(admin.travelCompanyId ?? "")) {
       const canAccessByBusList = Array.isArray(admin.buses)
         ? admin.buses.some((id: unknown) => String(id) === busId)
         : false;

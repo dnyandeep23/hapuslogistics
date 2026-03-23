@@ -54,10 +54,6 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    isSuperAdmin: {
-      type: Boolean,
-      default: false,
-    },
     hasRegisteredBus: {
       type: Boolean,
       default: false,
@@ -90,6 +86,18 @@ const userSchema = new mongoose.Schema(
     invitedByAdminId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "users",
+    },
+    accountDeletionRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    accountDeletionExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
     },
 
     securityCode: {
@@ -162,11 +170,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", function syncAdminRole() {
-  if (this.isSuperAdmin) {
-    this.role = "admin";
-  }
-
-  if (this.role === "admin" && !this.isSuperAdmin) {
+  if (this.role === "admin") {
     this.hasRegisteredBus = Array.isArray(this.buses) && this.buses.length > 0;
   } else {
     this.hasRegisteredBus = true;

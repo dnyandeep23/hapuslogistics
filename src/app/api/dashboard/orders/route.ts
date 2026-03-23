@@ -7,6 +7,7 @@ import { sendEmail } from "@/app/api/lib/mailer";
 import User from "@/app/api/models/userModel";
 import Bus from "@/app/api/models/busModel";
 import Order from "@/app/api/models/orderModel";
+import { normalizeIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const OPERATOR_ACTIONS = ["mark_in_transit", "mark_delivered"] as const;
@@ -17,7 +18,6 @@ type UnknownRecord = Record<string, unknown>;
 type UserDoc = {
   _id?: unknown;
   role?: string;
-  isSuperAdmin?: boolean;
   travelCompanyId?: unknown;
   buses?: unknown[];
   phone?: unknown;
@@ -176,7 +176,7 @@ const getOperatorAllowedActions = (statusValue: unknown): OperatorAction[] => {
   return [];
 };
 
-const buildOrderItem = (order: OrderDoc, role: "admin" | "superadmin" | "operator") => {
+const buildOrderItem = (order: OrderDoc, role: "admin" | "operator") => {
   const assignedBus = order.assignedBus as UnknownRecord | undefined;
   const bookingBus = order.bus as UnknownRecord | undefined;
   const busRef = assignedBus && Object.keys(assignedBus).length > 0 ? assignedBus : bookingBus;
@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
     }
 
     const user = await User.findById(userId)
-      .select("role isSuperAdmin travelCompanyId buses phone")
+      .select("role travelCompanyId buses phone")
       .lean<UserDoc | null>();
 
     // console.log(user)
@@ -239,16 +239,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const role = user.isSuperAdmin ? "superadmin" : toStringValue(user.role) as "admin" | "operator" | "user";
-    if (role !== "admin" && role !== "superadmin" && role !== "operator") {
+    const role = toStringValue(user.role) as "admin" | "operator" | "user";
+    if (role !== "admin" && role !== "operator") {
       return NextResponse.json(
         { success: false, message: "Only admin or operator can access this API." },
         { status: 403 },
       );
     }
-    if (!toStringValue((user as { phone?: unknown }).phone).trim()) {
+    if (!normalizeIndiaPhone((user as { phone?: unknown }).phone)) {
       return NextResponse.json(
-        { success: false, message: "Add your contact number before continuing." },
+        { success: false, message: "Add your valid Indian contact number before continuing." },
         { status: 400 },
       );
     }
@@ -283,18 +283,7 @@ export async function GET(request: NextRequest) {
 
     let buses: BusDoc[] = [];
 
-    if (role === "superadmin") {
-      const busQuery: Record<string, unknown> = {};
-      if (busIdParam) {
-        if (!mongoose.Types.ObjectId.isValid(busIdParam)) {
-          return NextResponse.json({ success: false, message: "Invalid busId." }, { status: 400 });
-        }
-        busQuery._id = new mongoose.Types.ObjectId(busIdParam);
-      }
-      buses = await Bus.find(busQuery)
-        .select("travelCompanyId busName busNumber busImages operatorContactPeriods")
-        .lean<BusDoc[]>();
-    } else if (role === "admin") {
+    if (role === "admin") {
       const busQuery: Record<string, unknown> = {};
       if (user.travelCompanyId) {
         busQuery.travelCompanyId = user.travelCompanyId;
@@ -470,9 +459,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const mappedOrders = rawOrders.map((order) =>
-      buildOrderItem(order, role === "superadmin" ? "superadmin" : role),
-    );
+    const mappedOrders = rawOrders.map((order) => buildOrderItem(order, role));
 
     const groupedMap = new Map<string, { busId: string; busName: string; busNumber: string; busImage: string; orders: typeof mappedOrders }>();
     mappedOrders.forEach((order) => {
@@ -541,24 +528,22 @@ export async function PATCH(request: NextRequest) {
     }
 
     const user = await User.findById(userId)
-      .select("role isSuperAdmin travelCompanyId buses phone")
+      .select("role travelCompanyId buses phone")
       .lean<UserDoc | null>();
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const role = user.isSuperAdmin
-      ? "superadmin"
-      : (toStringValue(user.role) as "admin" | "operator" | "user");
-    if (role !== "operator" && role !== "admin" && role !== "superadmin") {
+    const role = toStringValue(user.role) as "admin" | "operator" | "user";
+    if (role !== "operator" && role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Access denied for this operation." },
         { status: 403 },
       );
     }
-    if (!toStringValue((user as { phone?: unknown }).phone).trim()) {
+    if (!normalizeIndiaPhone((user as { phone?: unknown }).phone)) {
       return NextResponse.json(
-        { success: false, message: "Add your contact number before continuing." },
+        { success: false, message: "Add your valid Indian contact number before continuing." },
         { status: 400 },
       );
     }
@@ -675,7 +660,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Bus not found." }, { status: 404 });
     }
 
-    if (role === "admin" && !user.isSuperAdmin) {
+    if (role === "admin") {
       const adminCompanyId = toStringValue(user.travelCompanyId);
       const adminBusIds = Array.isArray(user.buses) ? user.buses.map((id) => toStringValue(id)) : [];
       const canManageOrder =

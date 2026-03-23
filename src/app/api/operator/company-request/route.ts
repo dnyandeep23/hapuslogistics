@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
-import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { sendEmail } from "@/app/api/lib/mailer";
 import { createNotification } from "@/app/api/lib/notifications";
+import { resolveOperatorCompany } from "@/app/api/lib/companyResolver";
+import { isValidIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
-const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
 
 const getTokenUserId = (request: NextRequest): string | null => {
   const token = request.cookies.get("token")?.value;
@@ -36,42 +35,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Operator access required." }, { status: 403 });
     }
 
-    const operatorPhone = String(operator.phone ?? "").trim().replace(/[\s()-]/g, "");
-    if (!operatorPhone || !PHONE_PATTERN.test(operatorPhone)) {
+    const operatorPhone = String(operator.phone ?? "").trim();
+    if (!operatorPhone || !isValidIndiaPhone(operatorPhone)) {
       return NextResponse.json(
         {
           success: false,
           code: "OPERATOR_PHONE_REQUIRED",
-          message: "Add a valid contact number in Profile before requesting a company.",
+          message: "Add a valid Indian contact number in Profile before requesting a company.",
         },
         { status: 400 },
       );
     }
 
-    const body = await request.json();
-    const companyId = typeof body?.companyId === "string" ? body.companyId.trim() : "";
+    const body = (await request.json().catch(() => ({}))) as { companyId?: unknown; companyName?: unknown };
+    const requestedCompanyId =
+      typeof body?.companyId === "string" ? body.companyId.trim() : "";
+    const requestedCompanyName =
+      typeof body?.companyName === "string" ? body.companyName.trim() : "";
 
-    if (!mongoose.Types.ObjectId.isValid(companyId)) {
-      return NextResponse.json(
-        { success: false, message: "Valid company selection is required." },
-        { status: 400 },
-      );
-    }
-
-    const company = await TravelCompany.findById(companyId)
-      .select("_id name ownerUserId ownerEmail contact")
-      .lean();
+    const { company, reason } = await resolveOperatorCompany({
+      companyId: requestedCompanyId,
+      companyName: requestedCompanyName,
+    });
 
     if (!company) {
+      const message =
+        reason === "INVALID_ID"
+          ? "Valid company selection is required."
+          : reason === "MULTIPLE_COMPANIES"
+            ? "Multiple travel companies are configured. A company selection is required."
+            : reason === "NO_COMPANY"
+              ? "No travel company is configured yet."
+              : "Selected travel company was not found.";
+
       return NextResponse.json(
-        { success: false, message: "Selected travel company was not found." },
-        { status: 404 },
+        { success: false, message },
+        {
+          status:
+            reason === "NO_COMPANY"
+              ? 404
+              : reason === "NOT_FOUND"
+                ? 404
+                : 400,
+        },
       );
     }
 
     if (
       operator.operatorApprovalStatus === "approved" &&
-      String(operator.travelCompanyId ?? "") === companyId
+      String(operator.travelCompanyId ?? "") === company._id.toString()
     ) {
       return NextResponse.json(
         { success: false, message: "You are already approved for this company." },

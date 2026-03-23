@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/lib/redux/hooks";
 import Skeleton from "@/components/Skeleton";
+import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 
 type AdminLocation = {
   _id: string;
@@ -53,6 +54,8 @@ export default function AdminLocationsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingLocationId, setDeletingLocationId] = useState("");
+  const [deleteLocationTarget, setDeleteLocationTarget] = useState<AdminLocation | null>(null);
   const [locations, setLocations] = useState<AdminLocation[]>([]);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(makeEmptyForm());
@@ -61,7 +64,7 @@ export default function AdminLocationsPage() {
   const [message, setMessage] = useState("");
   const [locating, setLocating] = useState(false);
 
-  const isAdmin = user?.role === "admin" || user?.isSuperAdmin;
+  const isAdmin = user?.role === "admin";
   const mapSearchQuery = useMemo(
     () =>
       [form.name, form.address, form.city, form.state, form.zip]
@@ -249,6 +252,37 @@ export default function AdminLocationsPage() {
     }
   };
 
+  const handleDeleteLocation = async (location: AdminLocation) => {
+    setDeleteLocationTarget(location);
+  };
+
+  const confirmDeleteLocation = async () => {
+    if (!deleteLocationTarget) return;
+    const location = deleteLocationTarget;
+    setDeleteLocationTarget(null);
+    setError("");
+    setMessage("");
+    try {
+      setDeletingLocationId(location._id);
+      const response = await fetch(`/api/locations/${location._id}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload?.message || "Failed to delete location.");
+        return;
+      }
+
+      setMessage(payload?.message || "Location deleted successfully.");
+      setLocations((previous) => previous.filter((item) => item._id !== location._id));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete location.");
+    } finally {
+      setDeletingLocationId("");
+    }
+  };
+
   const useCurrentLocation = () => {
     setError("");
     if (!navigator.geolocation) {
@@ -285,8 +319,30 @@ export default function AdminLocationsPage() {
         </p>
       </div>
 
+      <ConfirmationModal
+        isOpen={Boolean(deleteLocationTarget)}
+        title="Delete Location"
+        description={
+          deleteLocationTarget
+            ? `Delete ${deleteLocationTarget.name} from locations?`
+            : undefined
+        }
+        confirmLabel="Delete Location"
+        confirmVariant="danger"
+        isLoading={Boolean(deleteLocationTarget && deletingLocationId === deleteLocationTarget._id)}
+        onClose={() => {
+          if (deleteLocationTarget && deletingLocationId === deleteLocationTarget._id) return;
+          setDeleteLocationTarget(null);
+        }}
+        onConfirm={confirmDeleteLocation}
+      >
+        <p className="text-sm text-white/70">
+          This cannot be undone. If the location is still used by a bus route, deletion will be blocked.
+        </p>
+      </ConfirmationModal>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#243227] p-4 sm:p-5">
+        <div className="dashboard-surface rounded-2xl p-4 sm:p-5">
           <h2 className="text-lg font-semibold text-[#E4E67A]">Add New Location</h2>
           <form onSubmit={handleCreateLocation} className="mt-4 space-y-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -296,7 +352,7 @@ export default function AdminLocationsPage() {
                   value={form.name}
                   onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                   placeholder="e.g. Dadar TT"
-                  className={`mt-2 w-full rounded-lg border bg-black px-3 py-2.5 text-base text-white/90 outline-none transition ${
+                  className={`mt-2 w-full dashboard-input rounded-lg px-3 py-2.5 text-base transition ${
                     fieldErrors.name ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                   }`}
                 />
@@ -309,7 +365,7 @@ export default function AdminLocationsPage() {
                   value={form.city}
                   onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
                   placeholder="e.g. Mumbai"
-                  className={`mt-2 w-full rounded-lg border bg-black px-3 py-2.5 text-base text-white/90 outline-none transition ${
+                  className={`mt-2 w-full dashboard-input rounded-lg px-3 py-2.5 text-base transition ${
                     fieldErrors.city ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                   }`}
                 />
@@ -322,7 +378,7 @@ export default function AdminLocationsPage() {
                   value={form.state}
                   onChange={(event) => setForm((prev) => ({ ...prev, state: event.target.value }))}
                   placeholder="e.g. Maharashtra"
-                  className={`mt-2 w-full rounded-lg border bg-black px-3 py-2.5 text-base text-white/90 outline-none transition ${
+                  className={`mt-2 w-full dashboard-input rounded-lg px-3 py-2.5 text-base transition ${
                     fieldErrors.state ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                   }`}
                 />
@@ -335,7 +391,7 @@ export default function AdminLocationsPage() {
                   value={form.zip}
                   onChange={(event) => setForm((prev) => ({ ...prev, zip: event.target.value }))}
                   placeholder="e.g. 400014"
-                  className={`mt-2 w-full rounded-lg border bg-black px-3 py-2.5 text-base text-white/90 outline-none transition ${
+                  className={`mt-2 w-full dashboard-input rounded-lg px-3 py-2.5 text-base transition ${
                     fieldErrors.zip ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                   }`}
                 />
@@ -349,14 +405,14 @@ export default function AdminLocationsPage() {
                 value={form.address}
                 onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
                 placeholder="Street / landmark"
-                className={`mt-2 w-full rounded-lg border bg-black px-3 py-2.5 text-base text-white/90 outline-none transition ${
+                className={`mt-2 w-full dashboard-input rounded-lg px-3 py-2.5 text-base transition ${
                   fieldErrors.address ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                 }`}
               />
               {fieldErrors.address && <p className="mt-1 text-xs text-red-400">{fieldErrors.address}</p>}
             </label>
 
-            <div className="rounded-xl border border-white/15 bg-black/25 p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium text-white/90">Map Coordinates</p>
                 <button
@@ -394,7 +450,7 @@ export default function AdminLocationsPage() {
                     value={form.latitude}
                     onChange={(event) => setForm((prev) => ({ ...prev, latitude: event.target.value }))}
                     placeholder="19.076090"
-                    className={`mt-1 w-full rounded-lg border bg-black px-3 py-2 text-sm text-white/90 outline-none transition ${
+                    className={`mt-1 w-full dashboard-input rounded-lg px-3 py-2 text-sm transition ${
                       fieldErrors.latitude ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                     }`}
                   />
@@ -406,7 +462,7 @@ export default function AdminLocationsPage() {
                     value={form.longitude}
                     onChange={(event) => setForm((prev) => ({ ...prev, longitude: event.target.value }))}
                     placeholder="72.877426"
-                    className={`mt-1 w-full rounded-lg border bg-black px-3 py-2 text-sm text-white/90 outline-none transition ${
+                    className={`mt-1 w-full dashboard-input rounded-lg px-3 py-2 text-sm transition ${
                       fieldErrors.longitude ? "border-red-500" : "border-white/20 focus:border-[#D5E400]/70"
                     }`}
                   />
@@ -431,7 +487,7 @@ export default function AdminLocationsPage() {
           {message && <div className="mt-4 rounded-xl border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-300">{message}</div>}
         </div>
 
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#243227] p-4 sm:p-5">
+        <div className="dashboard-surface rounded-2xl p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-[#E4E67A]">Existing Locations</h2>
             <input
@@ -447,7 +503,7 @@ export default function AdminLocationsPage() {
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={`location-skeleton-${index}`}
-                  className="rounded-xl border border-white/15 bg-black/25 p-4"
+                  className="dashboard-surface-soft rounded-xl p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <Skeleton className="h-4 w-32" />
@@ -469,14 +525,25 @@ export default function AdminLocationsPage() {
                 const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
 
                 return (
-                  <div key={location._id} className="rounded-xl border border-white/15 bg-black/25 p-4">
+                  <div key={location._id} className="dashboard-surface-soft rounded-xl p-4">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold text-[#E4E67A]">{location.name}</p>
-                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${
-                        hasCoordinates ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-400/15 text-amber-200"
-                      }`}>
-                        {hasCoordinates ? "Mapped" : "No Map"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                          hasCoordinates ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-400/15 text-amber-200"
+                        }`}>
+                          {hasCoordinates ? "Mapped" : "No Map"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLocation(location)}
+                          disabled={deletingLocationId === location._id}
+                          className="inline-flex items-center gap-1 rounded-md border border-rose-400/35 bg-rose-400/10 px-2.5 py-1 text-[10px] font-semibold text-rose-200 transition hover:bg-rose-400/20 disabled:opacity-50"
+                        >
+                          <Icon icon="solar:trash-bin-trash-outline" className="text-sm" />
+                          {deletingLocationId === location._id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
                     <p className="mt-1 text-xs text-white/80">{location.address}</p>
                     <p className="mt-2 text-xs text-white/70">

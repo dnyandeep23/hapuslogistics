@@ -199,7 +199,7 @@ const notifications: DashboardNotification[] = [
   },
   {
     id: "notif_3",
-    role: "superadmin",
+    role: "admin",
     title: "Company Approval",
     message: "Beta Movers is awaiting onboarding approval.",
     createdAt: new Date().toISOString(),

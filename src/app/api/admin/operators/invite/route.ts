@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import bcryptjs from "bcryptjs";
+import { randomBytes } from "crypto";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
 import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { sendEmail, wasEmailAccepted } from "@/app/api/lib/mailer";
 import { createNotification } from "@/app/api/lib/notifications";
+import {
+  normalizeAuthProviders,
+  serializeAuthProvidersForSchema,
+} from "@/app/api/lib/authHelpers";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -20,6 +26,11 @@ const getTokenUserId = (request: NextRequest): string | null => {
   }
 };
 
+const createTemporaryPassword = () => {
+  const raw = randomBytes(9).toString("base64url").replace(/[^a-zA-Z0-9]/g, "");
+  return `${raw.slice(0, 4)}${Math.floor(1000 + Math.random() * 9000)}Aa`;
+};
+
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
@@ -30,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = await User.findById(adminId);
-    if (!admin || (admin.role !== "admin" && !admin.isSuperAdmin)) {
+    if (!admin || admin.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -54,7 +65,8 @@ export async function POST(request: NextRequest) {
     const company = await TravelCompany.findById(admin.travelCompanyId);
     const companyName = company?.name ?? "Hapus Logistics";
 
-    const operator = await User.findOne({ email });
+    const authProviderSchemaInstance = User.schema.path("authProvider")?.instance;
+    const operator = await User.findOne({ email }).select("+password");
 
     if (operator && operator.role !== "operator") {
       return NextResponse.json(
@@ -63,37 +75,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!operator) {
-      return NextResponse.json(
-        { success: false, message: "No operator found with this email." },
-        { status: 404 },
-      );
-    }
-
     if (
+      operator &&
       operator.operatorApprovalStatus === "approved" &&
       String(operator.travelCompanyId ?? "") === String(admin.travelCompanyId ?? "")
     ) {
       return NextResponse.json(
-        { success: false, message: "This operator is already approved for your company." },
+        { success: false, message: "This operator already exists in your company." },
         { status: 400 },
       );
     }
 
-    operator.name = operator.name || email.split("@")[0] || "Operator";
-    operator.pendingTravelCompanyId = admin.travelCompanyId;
-    operator.travelCompanyId = undefined;
-    operator.invitedByAdminId = admin._id;
-    operator.operatorApprovalStatus = "company_requested";
-    await operator.save();
+    if (
+      operator &&
+      operator.operatorApprovalStatus === "approved" &&
+      String(operator.travelCompanyId ?? "") !== String(admin.travelCompanyId ?? "")
+    ) {
+      return NextResponse.json(
+        { success: false, message: "This operator is already linked to another company." },
+        { status: 400 },
+      );
+    }
+
+    const temporaryPassword = createTemporaryPassword();
+    const hashedPassword = await bcryptjs.hash(temporaryPassword, 10);
+
+    let savedOperator = operator;
+
+    if (!savedOperator) {
+      savedOperator = await User.create({
+        name: email.split("@")[0] || "Operator",
+        email,
+        password: hashedPassword,
+        role: "operator",
+        isVerified: true,
+        authProvider: serializeAuthProvidersForSchema(["local"], authProviderSchemaInstance),
+        travelCompanyId: admin.travelCompanyId,
+        pendingTravelCompanyId: undefined,
+        invitedByAdminId: admin._id,
+        operatorApprovalStatus: "approved",
+        mustChangePassword: true,
+      });
+    } else {
+      const providers = normalizeAuthProviders(savedOperator.authProvider);
+      const nextProviders = providers.includes("local") ? providers : [...providers, "local"];
+
+      savedOperator.name = savedOperator.name || email.split("@")[0] || "Operator";
+      savedOperator.password = hashedPassword;
+      savedOperator.role = "operator";
+      savedOperator.isVerified = true;
+      savedOperator.authProvider = serializeAuthProvidersForSchema(
+        nextProviders,
+        authProviderSchemaInstance,
+      );
+      savedOperator.travelCompanyId = admin.travelCompanyId;
+      savedOperator.pendingTravelCompanyId = undefined;
+      savedOperator.invitedByAdminId = admin._id;
+      savedOperator.operatorApprovalStatus = "approved";
+      savedOperator.mustChangePassword = true;
+      savedOperator.accountDeletionRequestedAt = undefined;
+      savedOperator.accountDeletionExpiresAt = undefined;
+      await savedOperator.save();
+    }
 
     let emailSent = false;
     try {
       const result = await sendEmail({
-        email: operator.email,
-        emailType: "COMPANY_OFFER_TO_OPERATOR",
-        operatorName: operator.name,
+        email,
+        emailType: "OPERATOR_ACCOUNT_CREATED",
+        operatorName: savedOperator.name,
         companyName,
+        temporaryPassword,
       });
       emailSent = wasEmailAccepted(result);
     } catch {
@@ -101,9 +153,9 @@ export async function POST(request: NextRequest) {
     }
 
     await createNotification({
-      recipientUserId: operator._id.toString(),
-      title: "New Company Offer",
-      message: `${companyName} invited you to join as an operator.`,
+      recipientUserId: savedOperator._id.toString(),
+      title: "Operator Account Created",
+      message: `${companyName} created your operator account. Sign in with the temporary password and update it immediately.`,
       type: "info",
       metadata: {
         companyId: admin.travelCompanyId?.toString(),
@@ -113,9 +165,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: emailSent
-        ? "Company offer sent to operator successfully."
-        : "Offer created but email could not be delivered.",
-      operatorId: operator._id.toString(),
+        ? "Operator account created and temporary credentials sent."
+        : "Operator account created, but credential email could not be delivered.",
+      operatorId: savedOperator._id.toString(),
     });
   } catch (error: unknown) {
     return NextResponse.json(

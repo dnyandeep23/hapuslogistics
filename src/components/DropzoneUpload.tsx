@@ -50,14 +50,14 @@ export default function DropzoneUpload({
         <>
             <div
                 {...getRootProps()}
-                className={`border-2 border-dashed rounded-xl h-full flex items-center justify-center cursor-pointer 
-        ${isDragActive ? "border-[#CDD645] bg-[#1e241b]/60" : "border-white/40"}
+                className={`package-panel-soft min-h-[220px] rounded-[1.5rem] border-2 border-dashed p-3 transition
+        ${isDragActive ? "border-[#CDD645] bg-[#d5e400]/10" : "border-white/18"}
         `}
             >
                 <input {...getInputProps()} />
 
                 {previewUrl ? (
-                    <div className="relative w-full h-full">
+                    <div className="relative h-[220px] w-full overflow-hidden rounded-[1.1rem] sm:h-[260px]">
                         <Image
                             src={previewUrl}
                             alt="Package Preview"
@@ -76,16 +76,26 @@ export default function DropzoneUpload({
                                     packageImage: "",
                                 });
                             }}
-                            className="absolute top-2 right-2 bg-black/60 p-1 border rounded-full hover:bg-red-500"
+                            className="absolute right-3 top-3 rounded-full border border-white/20 bg-black/55 p-2 transition hover:bg-red-500"
                             disabled={isUploading}
                         >
                             <Icon icon="mdi:delete" className="text-white text-lg" />
                         </button>
                     </div>
                 ) : (
-                    <span className="text-white/60">
-                        {isDragActive ? "Drop image here..." : "Click or drag image here"}
-                    </span>
+                    <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d5e400]/14 text-[#F6FF6A]">
+                            <Icon icon="solar:gallery-add-bold-duotone" className="text-[1.8rem]" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-[#F6FF6A]">
+                                {isDragActive ? "Drop image here" : "Upload package image"}
+                            </p>
+                            <p className="mt-1 text-sm text-white/60">
+                                Tap to browse or drag and drop on desktop.
+                            </p>
+                        </div>
+                    </div>
                 )}
 
             </div>

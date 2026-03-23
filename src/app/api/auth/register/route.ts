@@ -3,9 +3,9 @@ import User from "@/app/api/models/userModel";
 import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from "bcryptjs";
-import mongoose from "mongoose";
 import { sendEmail, wasEmailAccepted } from "@/app/api/lib/mailer";
 import { createNotification } from "@/app/api/lib/notifications";
+import { resolveOperatorCompany } from "@/app/api/lib/companyResolver";
 import {
   ADMIN_OTP_COOKIE,
   ADMIN_OTP_EXPIRY_MS,
@@ -58,13 +58,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (role === "admin" && !companyName) {
+    if (role === "admin") {
       return NextResponse.json(
         {
           success: false,
-          message: "Company name is required for admin registration.",
+          message: "Admin registration is disabled.",
         },
-        { status: 400 },
+        { status: 403 },
       );
     }
 
@@ -72,11 +72,6 @@ export async function POST(request: NextRequest) {
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
-      if (existingUser.isSuperAdmin && existingUser.role !== "admin") {
-        existingUser.role = "admin";
-        await existingUser.save();
-      }
-
       return NextResponse.json(
         { success: false, message: "User already exists" },
         { status: 400 }
@@ -98,13 +93,12 @@ export async function POST(request: NextRequest) {
         const currentAdminCount = await User.countDocuments({
           travelCompanyId: existingCompany._id,
           role: "admin",
-          isSuperAdmin: { $ne: true },
         });
-        if (currentAdminCount >= 4) {
+        if (currentAdminCount >= 1) {
           return NextResponse.json(
             {
               success: false,
-              message: "This logistics company already has 4 admins (excluding super admins).",
+              message: "This logistics company already has an admin account.",
             },
             { status: 400 },
           );
@@ -127,57 +121,45 @@ export async function POST(request: NextRequest) {
     let operatorCompanyOwnerEmail: string | undefined;
     let operatorCompanyResolvedName: string | undefined;
 
-    if (role === "operator" && (companyId || companyName)) {
-      let requestedCompany:
-        | {
-            _id: mongoose.Types.ObjectId;
-            name: string;
-            ownerUserId?: mongoose.Types.ObjectId;
-            ownerEmail?: string;
-            contact?: { email?: string };
-          }
-        | null = null;
+    if (role === "operator") {
+      const { company: requestedCompany, reason } = await resolveOperatorCompany({
+        companyId,
+        companyName,
+      });
 
-      if (companyId) {
-        if (!mongoose.Types.ObjectId.isValid(companyId)) {
-          return NextResponse.json(
-            { success: false, message: "Invalid travel company selected." },
-            { status: 400 },
-          );
-        }
-        requestedCompany = await TravelCompany.findById(companyId)
-          .select("_id name ownerUserId ownerEmail contact")
-          .lean();
-      }
-
-      if (!requestedCompany && companyName) {
-        requestedCompany = await TravelCompany.findOne({
-          name: {
-            $regex: `^${companyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-            $options: "i",
-          },
-        })
-          .select("_id name ownerUserId ownerEmail contact")
-          .lean();
-      }
-
-      if (!requestedCompany) {
+      if (!requestedCompany && (companyId || companyName)) {
         return NextResponse.json(
           {
             success: false,
-            message: "Travel company not found. Please select a valid company.",
+            message:
+              reason === "INVALID_ID"
+                ? "Invalid travel company selected."
+                : "Travel company not found. Please select a valid company.",
           },
-          { status: 404 },
+          { status: reason === "INVALID_ID" ? 400 : 404 },
         );
       }
 
-      pendingTravelCompanyId = requestedCompany._id.toString();
-      operatorCompanyResolvedName = requestedCompany.name;
-      if (requestedCompany.ownerUserId) {
-        operatorCompanyOwnerUserId = requestedCompany.ownerUserId.toString();
+      if (!requestedCompany && reason === "MULTIPLE_COMPANIES") {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Multiple travel companies are configured. Operator registration requires a company selection.",
+          },
+          { status: 400 },
+        );
       }
-      operatorCompanyOwnerEmail =
-        requestedCompany.ownerEmail || requestedCompany.contact?.email || undefined;
+
+      if (requestedCompany) {
+        pendingTravelCompanyId = requestedCompany._id.toString();
+        operatorCompanyResolvedName = requestedCompany.name;
+        if (requestedCompany.ownerUserId) {
+          operatorCompanyOwnerUserId = requestedCompany.ownerUserId.toString();
+        }
+        operatorCompanyOwnerEmail =
+          requestedCompany.ownerEmail || requestedCompany.contact?.email || undefined;
+      }
     }
 
     // Create a new user
@@ -197,11 +179,6 @@ export async function POST(request: NextRequest) {
 
     // Save the user to the database
     const savedUser = await newUser.save();
-
-    if (savedUser.isSuperAdmin && savedUser.role !== "admin") {
-      savedUser.role = "admin";
-      await savedUser.save();
-    }
 
     if (role === "admin" && savedUser.travelCompanyId) {
       const company = await TravelCompany.findById(savedUser.travelCompanyId).select("ownerUserId ownerEmail");
@@ -311,7 +288,10 @@ export async function POST(request: NextRequest) {
 
     // Send response
     return NextResponse.json({
-      message: "User created successfully",
+      message:
+        role === "operator" && operatorCompanyResolvedName
+          ? `User created successfully. Your operator request was sent to ${operatorCompanyResolvedName}.`
+          : "User created successfully",
       success: true,
       emailsent: res.accepted.length > 0 && res.rejected.length === 0,
     });

@@ -33,6 +33,8 @@ function LoginPageContent() {
   useEffect(() => {
     const registered = searchParams.get("registered");
     const error = searchParams.get("error");
+    const deletionScheduled = searchParams.get("deletionScheduled");
+    const accountDeleted = searchParams.get("accountDeleted");
 
     if (registered === "true") {
       addToast(
@@ -45,6 +47,24 @@ function LoginPageContent() {
       setNotification({
         message: normalizeAuthQueryError(error),
         type: "error",
+        showResend: false,
+      });
+      return;
+    }
+
+    if (deletionScheduled === "true") {
+      setNotification({
+        message: "Account deletion scheduled. Log in within 3 days to cancel it.",
+        type: "warning",
+        showResend: false,
+      });
+      return;
+    }
+
+    if (accountDeleted === "true") {
+      setNotification({
+        message: "Your operator account was deleted after leaving the company.",
+        type: "success",
         showResend: false,
       });
     }
@@ -88,7 +108,18 @@ function LoginPageContent() {
     setNotification({ message: "", type: "", showResend: false });
 
     try {
-      await loginUser({ email, password, role });
+      const response = (await loginUser({ email, password, role })) as {
+        accountDeletionCancelled?: boolean;
+        requirePasswordChange?: boolean;
+      };
+      if (response.accountDeletionCancelled) {
+        addToast("Your scheduled account deletion has been cancelled.", "success");
+      }
+      if (response.requirePasswordChange) {
+        addToast("Update your temporary password before continuing.", "warning");
+        router.push("/dashboard/profile?forcePasswordChange=true");
+        return;
+      }
       router.push("/dashboard");
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error, "Login failed. Please try again.");

@@ -10,6 +10,8 @@ import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
 import CustomDatePicker from "@/components/CustomDatePicker";
+import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
+import { formatIndiaPhoneInput, getIndiaPhoneDigits, normalizeIndiaPhone } from "@/lib/phone";
 
 interface OrderPackage extends Record<string, unknown> {
   id: string;
@@ -397,10 +399,12 @@ export default function OrderDetailPage() {
   const [operatorNoteDraft, setOperatorNoteDraft] = useState("");
   const [customerNoteDraft, setCustomerNoteDraft] = useState("");
   const [customerEmailDraft, setCustomerEmailDraft] = useState("");
+  const [orderDateDraft, setOrderDateDraft] = useState("");
   const [savingContacts, setSavingContacts] = useState(false);
   const [savingAdminNotes, setSavingAdminNotes] = useState(false);
   const [cancellingOrder, setCancellingOrder] = useState(false);
   const [isProofModalOpen, setIsProofModalOpen] = useState(false);
+  const [cancelOrderConfirmOpen, setCancelOrderConfirmOpen] = useState(false);
   const [requiredPhoneDraft, setRequiredPhoneDraft] = useState("");
   const [requiredPhoneError, setRequiredPhoneError] = useState("");
   const [savingRequiredPhone, setSavingRequiredPhone] = useState(false);
@@ -414,17 +418,44 @@ export default function OrderDetailPage() {
     const id = params?.orderId;
     return typeof id === "string" ? id : "";
   }, [params]);
+  const isOrderOwner = user?.role === "user";
+  const requiresStaffPhone = !isOrderOwner && !normalizeIndiaPhone(user?.phone);
+
+  useEffect(() => {
+    if (!requiresStaffPhone) return;
+    setRequiredPhoneDraft(formatIndiaPhoneInput(""));
+    setRequiredPhoneError("");
+  }, [requiresStaffPhone]);
 
   const applyOrderToState = (mappedOrder: OrderDetail) => {
     setOrder(mappedOrder);
-    setSenderDraft(mappedOrder.senderInfo || {});
-    setReceiverDraft(mappedOrder.receiverInfo || {});
+    const senderInfo = mappedOrder.senderInfo || {};
+    const receiverInfo = mappedOrder.receiverInfo || {};
+    const senderContact = formatIndiaPhoneInput(
+      toStringValue(senderInfo.contact) || toStringValue(senderInfo.senderContact) || toStringValue(senderInfo.phone),
+    );
+    const receiverContact = formatIndiaPhoneInput(
+      toStringValue(receiverInfo.contact) || toStringValue(receiverInfo.receiverContact) || toStringValue(receiverInfo.phone),
+    );
+    setSenderDraft({
+      ...senderInfo,
+      contact: senderContact,
+      senderContact: senderContact,
+      phone: senderContact,
+    });
+    setReceiverDraft({
+      ...receiverInfo,
+      contact: receiverContact,
+      receiverContact: receiverContact,
+      phone: receiverContact,
+    });
     setPackageDrafts(mappedOrder.packages || []);
     setPickupDraft(mappedOrder.pickupLocation);
     setDropDraft(mappedOrder.dropLocation);
     setOperatorNoteDraft(mappedOrder.operatorNote || "");
     setCustomerNoteDraft(mappedOrder.customerNote || "");
     setCustomerEmailDraft(mappedOrder.customerEmail || "");
+    setOrderDateDraft(mappedOrder.orderDate ? String(mappedOrder.orderDate).slice(0, 10) : "");
     setTransferBusIdDraft((current) => {
       const available = mappedOrder.transferCandidates ?? [];
       if (available.some((candidate) => candidate.id === current)) {
@@ -489,7 +520,7 @@ export default function OrderDetailPage() {
   }, [orderId]);
 
   useEffect(() => {
-    if (!(user?.role === "admin" || user?.isSuperAdmin)) {
+    if (user?.role !== "admin") {
       setLocationOptions([]);
       return;
     }
@@ -525,7 +556,7 @@ export default function OrderDetailPage() {
     return () => {
       active = false;
     };
-  }, [user?.role, user?.isSuperAdmin]);
+  }, [user?.role]);
 
   if (loading) {
     return (
@@ -534,7 +565,7 @@ export default function OrderDetailPage() {
           <Skeleton className="h-9 w-36" />
           <Skeleton className="h-6 w-24 rounded-full" />
         </div>
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5 space-y-4">
+        <div className="dashboard-surface rounded-2xl p-5 space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
               <Skeleton className="h-3 w-24" />
@@ -551,7 +582,7 @@ export default function OrderDetailPage() {
             <Skeleton className="h-24 w-full rounded-xl" />
           </div>
         </div>
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5 space-y-3">
+        <div className="dashboard-surface rounded-2xl p-5 space-y-3">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-14 w-full rounded-xl" />
           <Skeleton className="h-14 w-full rounded-xl" />
@@ -592,11 +623,9 @@ export default function OrderDetailPage() {
     }
   };
 
-  const isAdminView = Boolean(user?.role === "admin" || user?.isSuperAdmin);
+  const isAdminView = user?.role === "admin";
   const isOperatorView = Boolean(user?.role === "operator");
   const canCallPartyContacts = isAdminView || isOperatorView;
-  const isOrderOwner = Boolean(user?.role === "user" && !user?.isSuperAdmin);
-  const requiresStaffPhone = !isOrderOwner && !String(user?.phone ?? "").trim();
   const canEditAsAdmin = isAdminView && Boolean(order.canAdminEditOrder);
   const canEditAsAdminNow = canEditAsAdmin && adminEditMode;
   const canEditAsOwner = isOrderOwner && Boolean(order.canUserEditContacts);
@@ -606,9 +635,13 @@ export default function OrderDetailPage() {
   const displayedPackages = isAdminView ? packageDrafts : order.packages;
 
   const saveRequiredPhone = async () => {
-    const phone = requiredPhoneDraft.trim();
-    if (!phone) {
+    const phone = normalizeIndiaPhone(requiredPhoneDraft);
+    if (phone === "") {
       setRequiredPhoneError("Contact number is required.");
+      return;
+    }
+    if (phone === null) {
+      setRequiredPhoneError("Enter a valid Indian mobile number.");
       return;
     }
 
@@ -636,14 +669,63 @@ export default function OrderDetailPage() {
 
   const saveContactChanges = async () => {
     if (!order) return;
+
+    const senderContactValue = toStringValue(senderDraft.contact ?? senderDraft.senderContact ?? senderDraft.phone);
+    const receiverContactValue = toStringValue(receiverDraft.contact ?? receiverDraft.receiverContact ?? receiverDraft.phone);
+    const normalizedSenderContact = senderContactValue ? normalizeIndiaPhone(senderContactValue) : "";
+    const normalizedReceiverContact = receiverContactValue ? normalizeIndiaPhone(receiverContactValue) : "";
+
+    if (senderContactValue && normalizedSenderContact === null) {
+      addToast("Enter a valid Indian mobile number for the sender.", "warning");
+      return;
+    }
+
+    if (receiverContactValue && normalizedReceiverContact === null) {
+      addToast("Enter a valid Indian mobile number for the receiver.", "warning");
+      return;
+    }
+
+    if (canEditAsAdminNow && !normalizedSenderContact) {
+      addToast("Sender contact number is required.", "warning");
+      return;
+    }
+
+    if (!normalizedReceiverContact) {
+      addToast("Receiver contact number is required.", "warning");
+      return;
+    }
+
+    if (
+      normalizedSenderContact &&
+      normalizedReceiverContact &&
+      getIndiaPhoneDigits(normalizedSenderContact) === getIndiaPhoneDigits(normalizedReceiverContact)
+    ) {
+      addToast("Sender and receiver contact numbers cannot be the same.", "warning");
+      return;
+    }
+
+    const nextSenderDraft = {
+      ...senderDraft,
+      contact: normalizedSenderContact,
+      senderContact: normalizedSenderContact,
+      phone: normalizedSenderContact,
+    };
+    const nextReceiverDraft = {
+      ...receiverDraft,
+      contact: normalizedReceiverContact,
+      receiverContact: normalizedReceiverContact,
+      phone: normalizedReceiverContact,
+    };
+
     try {
       setSavingContacts(true);
       const response = await fetch(`/api/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          senderInfo: senderDraft,
-          receiverInfo: receiverDraft,
+          senderInfo: nextSenderDraft,
+          receiverInfo: nextReceiverDraft,
+          orderDate: isAdminView ? orderDateDraft : undefined,
           pickupLocation: isAdminView ? pickupDraft : undefined,
           dropLocation: isAdminView ? dropDraft : undefined,
           packages: isAdminView ? packageDrafts : undefined,
@@ -675,6 +757,16 @@ export default function OrderDetailPage() {
     );
   };
 
+  const syncOrderAndPackageDates = (nextDate: string) => {
+    setOrderDateDraft(nextDate);
+    setPackageDrafts((prev) =>
+      prev.map((pkg) => ({
+        ...pkg,
+        pickUpDate: nextDate,
+      })),
+    );
+  };
+
   const addPackageDraft = () => {
     setPackageDrafts((prev) => [
       ...prev,
@@ -685,7 +777,7 @@ export default function OrderDetailPage() {
         packageSize: "",
         packageWeight: 0,
         packageQuantities: 1,
-        pickUpDate: "",
+        pickUpDate: orderDateDraft,
         packageImage: "",
         description: "",
       },
@@ -877,8 +969,6 @@ export default function OrderDetailPage() {
 
   const cancelOrderAsAdmin = async () => {
     if (!order || !isAdminView) return;
-    const shouldCancel = window.confirm("Cancel this order? This action is for admin authority only.");
-    if (!shouldCancel) return;
 
     try {
       setCancellingOrder(true);
@@ -980,11 +1070,22 @@ export default function OrderDetailPage() {
           {isAdminView && adminEditMode ? (
             <button
               type="button"
+              onClick={saveContactChanges}
+              disabled={savingContacts}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] disabled:opacity-60"
+            >
+              <Icon icon={savingContacts ? "line-md:loading-loop" : "mdi:content-save-outline"} className="text-base" />
+              {savingContacts ? "Saving..." : "Save Details"}
+            </button>
+          ) : null}
+          {isAdminView && adminEditMode ? (
+            <button
+              type="button"
               onClick={() => {
                 setAdminEditMode(false);
                 applyOrderToState(order);
               }}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/25 bg-black/25 px-3 py-2 text-sm font-medium text-white/85 hover:bg-black/40"
+              className="dashboard-surface-soft inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/85 hover:bg-white/10"
             >
               <Icon icon="mdi:close-circle-outline" className="text-base" />
               Cancel Update
@@ -993,7 +1094,7 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <div className="mb-5 rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5">
+      <div className="mb-5 dashboard-surface rounded-2xl p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wider text-white/50">Tracking ID</p>
@@ -1009,19 +1110,19 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg bg-[#1F271A] p-3">
+          <div className="dashboard-surface-soft rounded-lg p-3">
             <p className="text-xs text-white/50">Order Date</p>
             <p className="text-sm text-white">{formatDate(order.orderDate)}</p>
           </div>
-          <div className="rounded-lg bg-[#1F271A] p-3">
+          <div className="dashboard-surface-soft rounded-lg p-3">
             <p className="text-xs text-white/50">Total Value</p>
             <p className="text-sm text-white">{formatMoney(order.totalAmount)}</p>
           </div>
-          <div className="rounded-lg bg-[#1F271A] p-3">
+          <div className="dashboard-surface-soft rounded-lg p-3">
             <p className="text-xs text-white/50">Total Weight</p>
             <p className="text-sm text-white">{order.totalWeightKg} kg</p>
           </div>
-          <div className="rounded-lg bg-[#1F271A] p-3">
+          <div className="dashboard-surface-soft rounded-lg p-3">
             <p className="text-xs text-white/50">Packages</p>
             <p className="text-sm text-white">{order.packageCount}</p>
           </div>
@@ -1029,7 +1130,7 @@ export default function OrderDetailPage() {
       </div>
 
       {(toNumberValue(order.adjustmentPendingAmount) > 0 || toNumberValue(order.adjustmentRefundAmount) > 0) && (
-        <div className="mb-5 rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="mb-5 dashboard-surface rounded-2xl p-4">
           <p className="text-xs uppercase tracking-wide text-white/50">Order Amount Adjustment</p>
           {toNumberValue(order.adjustmentPendingAmount) > 0 ? (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/35 bg-amber-500/10 p-3">
@@ -1070,7 +1171,7 @@ export default function OrderDetailPage() {
       )}
 
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="dashboard-surface rounded-2xl p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wide text-white/50">Assigned Bus</p>
             {isAdminView ? (
@@ -1090,7 +1191,7 @@ export default function OrderDetailPage() {
                   className="h-16 w-16 rounded-lg border border-white/15 object-cover"
                 />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-white/15 bg-[#1F271A] text-[#F6FF6A]">
+                <div className="dashboard-subsurface flex h-16 w-16 items-center justify-center rounded-lg text-[#F6FF6A]">
                   <Icon icon="mdi:bus" className="text-2xl" />
                 </div>
               )}
@@ -1116,7 +1217,7 @@ export default function OrderDetailPage() {
                   <select
                     value={transferBusIdDraft}
                     onChange={(event) => setTransferBusIdDraft(event.target.value)}
-                    className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                    className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                   >
                     {transferCandidates.map((candidate) => (
                       <option key={candidate.id} value={candidate.id} className="bg-[#121811] text-white">
@@ -1141,7 +1242,7 @@ export default function OrderDetailPage() {
                   </button>
                 </div>
               ) : (
-                <p className="mt-2 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm text-white/65">
+                <p className="dashboard-surface-soft mt-2 rounded-lg px-3 py-2 text-sm text-white/65">
                   No compatible bus with enough capacity is available right now.
                 </p>
               )}
@@ -1151,7 +1252,7 @@ export default function OrderDetailPage() {
           ) : null}
         </div>
 
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="dashboard-surface rounded-2xl p-4">
           <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Operator Contact</p>
           {canShowContact ? (
             <div className="space-y-1 text-sm text-white">
@@ -1159,7 +1260,7 @@ export default function OrderDetailPage() {
               <p className="font-mono text-[#F6FF6A]">{order.busContact?.contactPersonNumber}</p>
             </div>
           ) : hideContactByTime && order.busContact ? (
-            <div className="relative overflow-hidden rounded-lg border border-white/15 bg-black/25 p-2">
+            <div className="dashboard-subsurface relative overflow-hidden rounded-lg p-2">
               <div className="select-none blur-sm">
                 <p className="text-sm text-white">Assigned Operator</p>
                 <p className="font-mono text-sm text-[#F6FF6A]">XXXXXXXXXX</p>
@@ -1176,7 +1277,7 @@ export default function OrderDetailPage() {
       </div>
 
       {(order.pickupProofImage || order.dropProofImage) && (
-        <div className="mb-5 rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="mb-5 dashboard-surface rounded-2xl p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wide text-white/50">Verification Proofs</p>
             <button
@@ -1206,7 +1307,7 @@ export default function OrderDetailPage() {
                   />
                 </button>
               ) : (
-                <div className="flex h-40 items-center justify-center rounded-lg border border-white/15 bg-black/20 text-sm text-white/50">
+                <div className="dashboard-surface-soft flex h-40 items-center justify-center rounded-lg text-sm text-white/50">
                   Not uploaded
                 </div>
               )}
@@ -1228,7 +1329,7 @@ export default function OrderDetailPage() {
                   />
                 </button>
               ) : (
-                <div className="flex h-40 items-center justify-center rounded-lg border border-white/15 bg-black/20 text-sm text-white/50">
+                <div className="dashboard-surface-soft flex h-40 items-center justify-center rounded-lg text-sm text-white/50">
                   Not uploaded
                 </div>
               )}
@@ -1238,7 +1339,7 @@ export default function OrderDetailPage() {
       )}
 
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="dashboard-surface rounded-2xl p-4">
           <p className="mb-1 text-xs uppercase tracking-wide text-white/50">Pickup</p>
           {canEditAsAdminNow ? (
             <div className="space-y-2">
@@ -1259,7 +1360,7 @@ export default function OrderDetailPage() {
                       zip: selected.zip,
                     });
                   }}
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 >
                   <option value="" className="bg-[#121811] text-white">
                     Select pickup point
@@ -1275,26 +1376,26 @@ export default function OrderDetailPage() {
                 value={pickupDraft.name}
                 onChange={(event) => setPickupDraft((prev) => ({ ...prev, name: event.target.value }))}
                 placeholder="Pickup name"
-                className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
               />
               <input
                 value={pickupDraft.address}
                 onChange={(event) => setPickupDraft((prev) => ({ ...prev, address: event.target.value }))}
                 placeholder="Pickup address"
-                className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
               />
               <div className="grid gap-2 sm:grid-cols-2">
                 <input
                   value={pickupDraft.city}
                   onChange={(event) => setPickupDraft((prev) => ({ ...prev, city: event.target.value }))}
                   placeholder="City"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
                 <input
                   value={pickupDraft.state}
                   onChange={(event) => setPickupDraft((prev) => ({ ...prev, state: event.target.value }))}
                   placeholder="State"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
               </div>
             </div>
@@ -1309,7 +1410,7 @@ export default function OrderDetailPage() {
             </>
           )}
         </div>
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="dashboard-surface rounded-2xl p-4">
           <p className="mb-1 text-xs uppercase tracking-wide text-white/50">Drop</p>
           {canEditAsAdminNow ? (
             <div className="space-y-2">
@@ -1330,7 +1431,7 @@ export default function OrderDetailPage() {
                       zip: selected.zip,
                     });
                   }}
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 >
                   <option value="" className="bg-[#121811] text-white">
                     Select drop point
@@ -1346,26 +1447,26 @@ export default function OrderDetailPage() {
                 value={dropDraft.name}
                 onChange={(event) => setDropDraft((prev) => ({ ...prev, name: event.target.value }))}
                 placeholder="Drop name"
-                className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
               />
               <input
                 value={dropDraft.address}
                 onChange={(event) => setDropDraft((prev) => ({ ...prev, address: event.target.value }))}
                 placeholder="Drop address"
-                className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
               />
               <div className="grid gap-2 sm:grid-cols-2">
                 <input
                   value={dropDraft.city}
                   onChange={(event) => setDropDraft((prev) => ({ ...prev, city: event.target.value }))}
                   placeholder="City"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
                 <input
                   value={dropDraft.state}
                   onChange={(event) => setDropDraft((prev) => ({ ...prev, state: event.target.value }))}
                   placeholder="State"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
               </div>
             </div>
@@ -1382,20 +1483,9 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <div className="mb-5 rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+      <div className="mb-5 dashboard-surface rounded-2xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs uppercase tracking-wide text-white/50">Sender / Receiver Info</p>
-          {canEditContacts && (
-            <button
-              type="button"
-              onClick={saveContactChanges}
-              disabled={savingContacts}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] disabled:opacity-60"
-            >
-              <Icon icon={savingContacts ? "line-md:loading-loop" : "mdi:content-save-outline"} className="text-sm" />
-              {savingContacts ? "Saving..." : "Save Order Updates"}
-            </button>
-          )}
         </div>
 
         {isAdminView && !order.canAdminEditOrder && (
@@ -1404,7 +1494,7 @@ export default function OrderDetailPage() {
           </p>
         )}
         {isAdminView && order.canAdminEditOrder && !adminEditMode ? (
-          <p className="mb-3 rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-xs text-white/70">
+          <p className="dashboard-surface-soft mb-3 rounded-lg px-3 py-2 text-xs text-white/70">
             Enable update mode from top-right to edit sender/receiver, pickup/drop, packages and transfer bus.
           </p>
         ) : null}
@@ -1415,7 +1505,7 @@ export default function OrderDetailPage() {
         )}
 
         {isAdminView ? (
-          <div className="mb-4 rounded-2xl border border-[#4E5A45] bg-[#23301e] p-4">
+          <div className="dashboard-surface-soft mb-4 rounded-2xl p-4">
             <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Customer Email</p>
             {canEditAsAdminNow ? (
               <input
@@ -1423,7 +1513,7 @@ export default function OrderDetailPage() {
                 value={customerEmailDraft}
                 onChange={(event) => setCustomerEmailDraft(event.target.value)}
                 placeholder="customer@example.com"
-                className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
               />
             ) : (
               <p className="text-sm text-white">{order.customerEmail || "--"}</p>
@@ -1432,7 +1522,7 @@ export default function OrderDetailPage() {
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-[#4E5A45] bg-[#23301e] p-4">
+          <div className="dashboard-surface-soft rounded-2xl p-4">
             <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Sender Info</p>
             {canEditContacts ? (
               <div className="space-y-2">
@@ -1442,15 +1532,18 @@ export default function OrderDetailPage() {
                     setSenderDraft((prev) => ({ ...prev, name: event.target.value, senderName: event.target.value }))
                   }
                   placeholder="Sender name"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
                 <input
                   value={toStringValue(senderDraft.contact ?? senderDraft.senderContact)}
                   onChange={(event) =>
-                    setSenderDraft((prev) => ({ ...prev, contact: event.target.value, senderContact: event.target.value }))
+                    setSenderDraft((prev) => {
+                      const nextContact = formatIndiaPhoneInput(event.target.value);
+                      return { ...prev, contact: nextContact, senderContact: nextContact, phone: nextContact };
+                    })
                   }
-                  placeholder="Sender contact"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  placeholder="+91 9876543210"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
               </div>
             ) : (
@@ -1469,7 +1562,7 @@ export default function OrderDetailPage() {
               </a>
             ) : null}
           </div>
-          <div className="rounded-2xl border border-[#4E5A45] bg-[#23301e] p-4">
+          <div className="dashboard-surface-soft rounded-2xl p-4">
             <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Receiver Info</p>
             {canEditAsAdminNow ? (
               <div className="space-y-2">
@@ -1479,29 +1572,35 @@ export default function OrderDetailPage() {
                     setReceiverDraft((prev) => ({ ...prev, name: event.target.value, receiverName: event.target.value }))
                   }
                   placeholder="Receiver name"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
                 <input
                   value={toStringValue(receiverDraft.contact ?? receiverDraft.receiverContact)}
                   onChange={(event) =>
-                    setReceiverDraft((prev) => ({ ...prev, contact: event.target.value, receiverContact: event.target.value }))
+                    setReceiverDraft((prev) => {
+                      const nextContact = formatIndiaPhoneInput(event.target.value);
+                      return { ...prev, contact: nextContact, receiverContact: nextContact, phone: nextContact };
+                    })
                   }
-                  placeholder="Receiver contact"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  placeholder="+91 9876543210"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
               </div>
             ) : canEditAsOwner ? (
               <div className="space-y-2">
-                <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/80">
+                <p className="dashboard-surface-soft rounded-lg px-3 py-2 text-sm text-white/80">
                   {personInfoName(order.receiverInfo, "--")}
                 </p>
                 <input
                   value={toStringValue(receiverDraft.contact ?? receiverDraft.receiverContact)}
                   onChange={(event) =>
-                    setReceiverDraft((prev) => ({ ...prev, contact: event.target.value, receiverContact: event.target.value }))
+                    setReceiverDraft((prev) => {
+                      const nextContact = formatIndiaPhoneInput(event.target.value);
+                      return { ...prev, contact: nextContact, receiverContact: nextContact, phone: nextContact };
+                    })
                   }
-                  placeholder="Receiver contact"
-                  className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                  placeholder="+91 9876543210"
+                  className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                 />
               </div>
             ) : (
@@ -1524,7 +1623,7 @@ export default function OrderDetailPage() {
       </div>
 
       {(isAdminView || order.operatorNote || order.customerNote) && (
-        <div className="mb-5 rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+        <div className="mb-5 dashboard-surface rounded-2xl p-4">
           <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Order Notes</p>
           {isAdminView && adminEditMode ? (
             <>
@@ -1536,7 +1635,7 @@ export default function OrderDetailPage() {
                     value={operatorNoteDraft}
                     onChange={(event) => setOperatorNoteDraft(event.target.value)}
                     placeholder="Visible to operator and admin"
-                    className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                    className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                   />
                 </div>
                 <div>
@@ -1546,7 +1645,7 @@ export default function OrderDetailPage() {
                     value={customerNoteDraft}
                     onChange={(event) => setCustomerNoteDraft(event.target.value)}
                     placeholder="Visible to customer and admin only"
-                    className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                    className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                   />
                 </div>
               </div>
@@ -1563,7 +1662,7 @@ export default function OrderDetailPage() {
                 {statusLower !== "cancelled" && statusLower !== "delivered" && (
                   <button
                     type="button"
-                    onClick={cancelOrderAsAdmin}
+                    onClick={() => setCancelOrderConfirmOpen(true)}
                     disabled={cancellingOrder}
                     className="inline-flex items-center gap-2 rounded-lg border border-rose-400/45 bg-rose-500/15 px-3 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/25 disabled:opacity-60"
                   >
@@ -1575,19 +1674,19 @@ export default function OrderDetailPage() {
             </>
           ) : isAdminView ? (
             <div className="grid gap-3 md:grid-cols-2">
-              <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/85">
+              <p className="dashboard-surface-soft rounded-lg px-3 py-2 text-sm text-white/85">
                 {order.operatorNote || "No note for operator."}
               </p>
-              <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/85">
+              <p className="dashboard-surface-soft rounded-lg px-3 py-2 text-sm text-white/85">
                 {order.customerNote || "No note for customer."}
               </p>
             </div>
           ) : user?.role === "operator" ? (
-            <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/85">
+            <p className="dashboard-surface-soft rounded-lg px-3 py-2 text-sm text-white/85">
               {order.operatorNote || "No note for operator."}
             </p>
           ) : (
-            <p className="rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/85">
+            <p className="dashboard-surface-soft rounded-lg px-3 py-2 text-sm text-white/85">
               {order.customerNote || "No note for customer."}
             </p>
           )}
@@ -1597,20 +1696,41 @@ export default function OrderDetailPage() {
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-xl font-semibold text-[#F6FF6A]">Complete Package Information</h2>
-          {isAdminView && adminEditMode ? (
-            <button
-              type="button"
-              onClick={addPackageDraft}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-1.5 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
-            >
-              <Icon icon="mdi:plus" className="text-sm" />
-              Add Package
-            </button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {isAdminView && adminEditMode ? (
+              <button
+                type="button"
+                onClick={addPackageDraft}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-1.5 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
+              >
+                <Icon icon="mdi:plus" className="text-sm" />
+                Add Package
+              </button>
+            ) : null}
+          </div>
         </div>
 
+        {isAdminView && adminEditMode ? (
+          <div className="mb-4 dashboard-surface rounded-2xl p-4">
+            <div className="max-w-sm">
+              <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Order Date</p>
+              <CustomDatePicker
+                value={orderDateDraft}
+                onChange={(value) => syncOrderAndPackageDates(value)}
+                placeholder="Select order date"
+                restrictToAvailableDates={false}
+                syncWithCartDate={false}
+                disablePastDates={false}
+              />
+            </div>
+            <p className="mt-2 text-xs text-white/55">
+              This updates the shipment date used for route validation and capacity allocation.
+            </p>
+          </div>
+        ) : null}
+
         {displayedPackages.length === 0 ? (
-          <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5 text-white/70">
+          <div className="dashboard-surface rounded-2xl p-5 text-white/70">
             No package details available.
           </div>
         ) : (
@@ -1620,10 +1740,10 @@ export default function OrderDetailPage() {
               return (
                 <article
                   key={pkg.id || String(index)}
-                  className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4"
+                  className="dashboard-surface rounded-2xl p-4"
                 >
                   <div className="grid gap-4 md:grid-cols-[170px_1fr]">
-                    <div className="relative h-44 overflow-hidden rounded-xl bg-[#1F271A]">
+                    <div className="dashboard-subsurface relative h-44 overflow-hidden rounded-xl">
                       {pkg.packageImage ? (
                         <Image
                           src={pkg.packageImage}
@@ -1645,7 +1765,7 @@ export default function OrderDetailPage() {
                             value={pkg.packageName}
                             onChange={(event) => updatePackageDraft(index, { packageName: event.target.value })}
                             placeholder="Package name"
-                            className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-[#CDD645]/65"
+                            className="dashboard-input w-full rounded-lg px-3 py-2 text-sm font-semibold focus:border-[#CDD645]/65"
                           />
                         ) : (
                           <h3 className="text-lg font-semibold text-white">{pkg.packageName}</h3>
@@ -1661,13 +1781,13 @@ export default function OrderDetailPage() {
                             value={pkg.packageType}
                             onChange={(event) => updatePackageDraft(index, { packageType: event.target.value })}
                             placeholder="Package type"
-                            className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
+                            className="dashboard-input rounded-lg px-3 py-2 text-white focus:border-[#CDD645]/65"
                           />
                           <input
                             value={pkg.packageSize}
                             onChange={(event) => updatePackageDraft(index, { packageSize: event.target.value })}
                             placeholder="Package size"
-                            className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
+                            className="dashboard-input rounded-lg px-3 py-2 text-white focus:border-[#CDD645]/65"
                           />
                           <input
                             type="number"
@@ -1678,7 +1798,7 @@ export default function OrderDetailPage() {
                               updatePackageDraft(index, { packageWeight: toNumberValue(event.target.value) })
                             }
                             placeholder="Weight (kg)"
-                            className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
+                            className="dashboard-input rounded-lg px-3 py-2 text-white focus:border-[#CDD645]/65"
                           />
                           <input
                             type="number"
@@ -1690,11 +1810,11 @@ export default function OrderDetailPage() {
                               })
                             }
                             placeholder="Quantity"
-                            className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
+                            className="dashboard-input rounded-lg px-3 py-2 text-white focus:border-[#CDD645]/65"
                           />
                           <CustomDatePicker
                             value={pkg.pickUpDate ? String(pkg.pickUpDate).slice(0, 10) : ""}
-                            onChange={(value) => updatePackageDraft(index, { pickUpDate: value })}
+                            onChange={(value) => syncOrderAndPackageDates(value)}
                             placeholder="Pickup date"
                             restrictToAvailableDates={false}
                             syncWithCartDate={false}
@@ -1709,7 +1829,7 @@ export default function OrderDetailPage() {
                               updatePackageDraft(index, { price: Math.max(0, toNumberValue(event.target.value)) })
                             }
                             placeholder="Price (optional)"
-                            className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-white outline-none focus:border-[#CDD645]/65"
+                            className="dashboard-input rounded-lg px-3 py-2 text-white focus:border-[#CDD645]/65"
                           />
                         </div>
                       ) : (
@@ -1736,7 +1856,7 @@ export default function OrderDetailPage() {
                           value={pkg.description}
                           onChange={(event) => updatePackageDraft(index, { description: event.target.value })}
                           placeholder="Description"
-                          className="mt-3 w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/65"
+                          className="dashboard-input mt-3 w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/65"
                         />
                       ) : pkg.description ? (
                         <p className="mt-3 text-sm text-white/80">
@@ -1782,7 +1902,7 @@ export default function OrderDetailPage() {
           role="presentation"
         >
           <div
-            className="w-full max-w-6xl rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4 shadow-2xl"
+            className="w-full max-w-6xl dashboard-surface rounded-2xl p-4 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -1809,10 +1929,10 @@ export default function OrderDetailPage() {
                     alt="Pickup proof full"
                     width={1600}
                     height={1000}
-                    className="max-h-[72vh] w-full rounded-xl border border-white/15 bg-black/20 object-contain"
+                    className="max-h-[72vh] w-full rounded-xl border border-white/10 bg-white/5 object-contain"
                   />
                 ) : (
-                  <div className="flex h-72 items-center justify-center rounded-xl border border-white/15 bg-black/20 text-sm text-white/55">
+                  <div className="dashboard-surface-soft flex h-72 items-center justify-center rounded-xl text-sm text-white/55">
                     Pickup proof not uploaded
                   </div>
                 )}
@@ -1826,10 +1946,10 @@ export default function OrderDetailPage() {
                     alt="Drop proof full"
                     width={1600}
                     height={1000}
-                    className="max-h-[72vh] w-full rounded-xl border border-white/15 bg-black/20 object-contain"
+                    className="max-h-[72vh] w-full rounded-xl border border-white/10 bg-white/5 object-contain"
                   />
                 ) : (
-                  <div className="flex h-72 items-center justify-center rounded-xl border border-white/15 bg-black/20 text-sm text-white/55">
+                  <div className="dashboard-surface-soft flex h-72 items-center justify-center rounded-xl text-sm text-white/55">
                     Drop proof not uploaded
                   </div>
                 )}
@@ -1839,10 +1959,31 @@ export default function OrderDetailPage() {
         </div>
       ) : null}
 
+      <ConfirmationModal
+        isOpen={cancelOrderConfirmOpen}
+        title="Cancel Order"
+        description="Cancel this order? This action is for admin authority only."
+        confirmLabel={cancellingOrder ? "Cancelling..." : "Cancel Order"}
+        confirmVariant="danger"
+        isLoading={cancellingOrder}
+        onClose={() => {
+          if (cancellingOrder) return;
+          setCancelOrderConfirmOpen(false);
+        }}
+        onConfirm={async () => {
+          setCancelOrderConfirmOpen(false);
+          await cancelOrderAsAdmin();
+        }}
+      >
+        <p className="text-sm text-white/70">
+          This will update the order status to cancelled and keep the current notes.
+        </p>
+      </ConfirmationModal>
+
       {requiresStaffPhone ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70" />
-          <div className="relative w-full max-w-md rounded-2xl border border-[#5E6A4F] bg-[#1F271A] p-5 shadow-2xl">
+          <div className="dashboard-surface relative w-full max-w-md rounded-2xl p-5 shadow-2xl">
             <h2 className="text-lg font-semibold text-[#F6FF6A]">Add Contact Number</h2>
             <p className="mt-2 text-sm text-white/75">
               Add your contact number first. This is required for admin/operator workflows.
@@ -1850,9 +1991,9 @@ export default function OrderDetailPage() {
             <input
               type="tel"
               value={requiredPhoneDraft}
-              onChange={(event) => setRequiredPhoneDraft(event.target.value)}
-              placeholder="Enter contact number"
-              className="mt-4 w-full rounded-lg border border-[#5E6A4F] bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]"
+              onChange={(event) => setRequiredPhoneDraft(formatIndiaPhoneInput(event.target.value))}
+              placeholder="+91 9876543210"
+              className="mt-4 w-full dashboard-input rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]"
             />
             {requiredPhoneError ? (
               <p className="mt-2 text-xs text-red-300">{requiredPhoneError}</p>

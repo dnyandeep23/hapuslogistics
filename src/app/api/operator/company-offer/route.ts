@@ -5,9 +5,9 @@ import User from "@/app/api/models/userModel";
 import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { sendEmail } from "@/app/api/lib/mailer";
 import { createNotification } from "@/app/api/lib/notifications";
+import { isValidIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
-const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
 
 const getTokenUserId = (request: NextRequest): string | null => {
   const token = request.cookies.get("token")?.value;
@@ -125,13 +125,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "accept") {
-      const operatorPhone = String(operator.phone ?? "").trim().replace(/[\s()-]/g, "");
-      if (!operatorPhone || !PHONE_PATTERN.test(operatorPhone)) {
+      const operatorPhone = String(operator.phone ?? "").trim();
+      if (!operatorPhone || !isValidIndiaPhone(operatorPhone)) {
         return NextResponse.json(
           {
             success: false,
             code: "OPERATOR_PHONE_REQUIRED",
-            message: "Add a valid contact number in Profile before accepting company request.",
+            message: "Add a valid Indian contact number in Profile before accepting company request.",
           },
           { status: 400 },
         );

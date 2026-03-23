@@ -5,7 +5,6 @@ export interface User {
     email: string;
     phone?: string;
     role: string;
-    isSuperAdmin?: boolean;
     hasRegisteredBus?: boolean;
     travelCompanyId?: string;
     pendingTravelCompanyId?: string;
@@ -17,6 +16,11 @@ export interface User {
       | 'company_requested'
       | 'approved'
       | 'rejected';
+    accountDeletionRequestedAt?: string | null;
+    accountDeletionExpiresAt?: string | null;
+    mustChangePassword?: boolean;
+    assignedBusCount?: number;
+    adminContactPhone?: string;
 }
 
 export interface RegisterCredentials {
@@ -24,7 +28,7 @@ export interface RegisterCredentials {
     name: string;
     email: string;
     password: string;
-    role?: 'user' | 'operator' | 'admin';
+    role?: 'user' | 'operator';
     companyName?: string;
     companyId?: string;
 }

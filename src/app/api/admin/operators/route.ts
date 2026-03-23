@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     }
 
     const admin = await User.findById(adminId);
-    if (!admin || (admin.role !== "admin" && !admin.isSuperAdmin)) {
+    if (!admin || admin.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         { pendingTravelCompanyId: admin.travelCompanyId },
       ],
     })
-      .select("name email phone operatorApprovalStatus travelCompanyId pendingTravelCompanyId createdAt")
+      .select("name email phone mustChangePassword operatorApprovalStatus travelCompanyId pendingTravelCompanyId accountDeletionRequestedAt accountDeletionExpiresAt createdAt")
       .sort({ createdAt: -1 })
       .lean();
 

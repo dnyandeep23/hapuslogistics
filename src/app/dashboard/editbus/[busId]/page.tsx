@@ -10,7 +10,7 @@ export default function EditBusPage() {
   const router = useRouter();
   const params = useParams<{ busId: string }>();
   const busId = String(params?.busId ?? "");
-  const isAdmin = user?.role === "admin" || user?.isSuperAdmin;
+  const isAdmin = user?.role === "admin";
 
   if (!isAdmin) {
     router.replace("/dashboard");

@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from "bcryptjs";
 import { sendEmail, wasEmailAccepted } from "@/app/api/lib/mailer";
 import {
+  clearScheduledAccountDeletion,
+  isAccountDeletionExpired,
+  permanentlyDeleteUserAccount,
+} from "@/app/api/lib/accountDeletion";
+import {
   ADMIN_OTP_COOKIE,
   ADMIN_OTP_EXPIRY_MS,
   generateAdminOtp,
@@ -56,7 +61,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (isAdminLogin && user.role !== "admin" && !user.isSuperAdmin) {
+    if (isAccountDeletionExpired(user)) {
+      await permanentlyDeleteUserAccount(user);
+      return NextResponse.json(
+        {
+          success: false,
+          message: "This account has been deleted. Please register again.",
+        },
+        { status: 410 },
+      );
+    }
+
+    if (isAdminLogin && user.role !== "admin") {
       return NextResponse.json(
         {
           success: false,
@@ -125,6 +141,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const cancelledScheduledDeletion = isAdminLogin
+      ? false
+      : await clearScheduledAccountDeletion(user);
+
     if (isAdminLogin) {
       user.role = "admin";
       const adminOtp = generateAdminOtp();
@@ -157,6 +177,7 @@ export async function POST(request: NextRequest) {
         success: true,
         requiresOtp: true,
         deliveryStatus: adminOtpSent ? "sent" : "failed",
+        accountDeletionCancelled: cancelledScheduledDeletion,
       });
 
       response.cookies.set(ADMIN_OTP_COOKIE, pendingToken, {
@@ -178,10 +199,15 @@ export async function POST(request: NextRequest) {
       authProvider: providers,
       role: user.role,
     });
+    const requirePasswordChange = Boolean(user.mustChangePassword);
 
     const response = NextResponse.json({
-      message: "Login successful",
+      message: requirePasswordChange
+        ? "Login successful. Please update your password to continue."
+        : "Login successful",
       success: true,
+      accountDeletionCancelled: cancelledScheduledDeletion,
+      requirePasswordChange,
     });
 
     response.cookies.set("token", token, {

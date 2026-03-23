@@ -8,6 +8,7 @@ import { downloadOrderInvoice } from "@/lib/orderInvoice";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
+import { formatIndiaPhoneInput, normalizeIndiaPhone } from "@/lib/phone";
 
 interface BusContact {
   _id: string;
@@ -190,7 +191,7 @@ function getStatusBadge(status: string): string {
   return "bg-amber-500/20 text-amber-300 border-amber-500/50";
 }
 
-type RoleKey = "user" | "operator" | "admin" | "superadmin";
+type RoleKey = "user" | "operator" | "admin";
 type OperatorOrderTab = "active" | "upcoming" | "past";
 const OPERATOR_TAB_ORDER: OperatorOrderTab[] = ["active", "upcoming", "past"];
 
@@ -245,17 +246,16 @@ export default function OrderPage() {
   const router = useRouter();
 
   const role: RoleKey = useMemo(() => {
-    if (user?.isSuperAdmin) return "superadmin";
     if (user?.role === "admin") return "admin";
     if (user?.role === "operator") return "operator";
     return "user";
-  }, [user?.isSuperAdmin, user?.role]);
+  }, [user?.role]);
   const normalizedSearch = toSearchText(searchTerm);
   const operatorTab = useMemo<OperatorOrderTab>(
     () => normalizeOperatorOrderTab(searchParams.get("tab")),
     [searchParams],
   );
-  const requiresStaffPhone = role !== "user" && !toSearchText(user?.phone).length;
+  const requiresStaffPhone = role !== "user" && !normalizeIndiaPhone(user?.phone);
 
   const fetchOrders = async () => {
     try {
@@ -311,14 +311,18 @@ export default function OrderPage() {
 
   useEffect(() => {
     if (!requiresStaffPhone) return;
-    setRequiredPhoneDraft("");
+    setRequiredPhoneDraft(formatIndiaPhoneInput(""));
     setRequiredPhoneError("");
   }, [requiresStaffPhone]);
 
   const saveRequiredPhone = async () => {
-    const phone = requiredPhoneDraft.trim();
-    if (!phone) {
+    const phone = normalizeIndiaPhone(requiredPhoneDraft);
+    if (phone === "") {
       setRequiredPhoneError("Contact number is required.");
+      return;
+    }
+    if (phone === null) {
+      setRequiredPhoneError("Enter a valid Indian mobile number.");
       return;
     }
 
@@ -500,7 +504,7 @@ export default function OrderPage() {
 
   const renderOperatorOrderCard = (order: RoleDashboardOrder) => {
     return (
-      <article key={order.id} className="rounded-xl border border-[#4E5A45]/80 bg-[#222d1e] p-4">
+      <article key={order.id} className="dashboard-surface-soft rounded-xl p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
@@ -575,7 +579,7 @@ export default function OrderPage() {
   const requiredPhoneModal = requiresStaffPhone ? (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" />
-      <div className="relative w-full max-w-md rounded-2xl border border-[#5E6A4F] bg-[#1F271A] p-5 shadow-2xl">
+      <div className="dashboard-surface relative w-full max-w-md rounded-2xl p-5 shadow-2xl">
         <h2 className="text-lg font-semibold text-[#F6FF6A]">Add Contact Number</h2>
         <p className="mt-2 text-sm text-white/75">
           Add your contact number first. This is required for admin/operator workflows.
@@ -583,9 +587,9 @@ export default function OrderPage() {
         <input
           type="tel"
           value={requiredPhoneDraft}
-          onChange={(event) => setRequiredPhoneDraft(event.target.value)}
-          placeholder="Enter contact number"
-          className="mt-4 w-full rounded-lg border border-[#5E6A4F] bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]"
+          onChange={(event) => setRequiredPhoneDraft(formatIndiaPhoneInput(event.target.value))}
+          placeholder="+91 9876543210"
+          className="mt-4 w-full dashboard-input rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]"
         />
         {requiredPhoneError ? (
           <p className="mt-2 text-xs text-red-300">{requiredPhoneError}</p>
@@ -614,7 +618,7 @@ export default function OrderPage() {
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={`orders-page-skeleton-${index}`}
-              className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5"
+              className="dashboard-surface rounded-2xl p-5"
             >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-2">
@@ -624,12 +628,12 @@ export default function OrderPage() {
                 <Skeleton className="h-5 w-20 rounded-full" />
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl bg-[#1F271A] p-3 space-y-2">
+                <div className="dashboard-surface-soft rounded-xl p-3 space-y-2">
                   <Skeleton className="h-3 w-12" />
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-4 w-1/2" />
                 </div>
-                <div className="rounded-xl bg-[#1F271A] p-3 space-y-2">
+                <div className="dashboard-surface-soft rounded-xl p-3 space-y-2">
                   <Skeleton className="h-3 w-12" />
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-4 w-1/2" />
@@ -665,11 +669,11 @@ export default function OrderPage() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search tracking ID, route or support contact"
-                className="w-full rounded-lg border border-[#5E6A4F] bg-[#1F271A] py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/45 outline-none focus:border-[#CDD645]"
+                className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
               />
             </div>
           </div>
-          <div className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-8 text-center text-white/75">
+          <div className="dashboard-surface rounded-2xl p-8 text-center text-white/75">
             No orders found yet.
           </div>
         </div>
@@ -694,7 +698,7 @@ export default function OrderPage() {
       return (
         <article
           key={order.id}
-          className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-5 shadow-lg"
+          className="dashboard-surface rounded-2xl p-5 shadow-lg"
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -715,14 +719,14 @@ export default function OrderPage() {
           </div>
 
           <div className="mb-5 grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl bg-[#1F271A] p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="mb-1 text-xs uppercase tracking-wide text-white/50">From</p>
               <p className="font-semibold text-white">{order.pickupLocation.name}</p>
               <p className="text-sm text-white/70">
                 {order.pickupLocation.city}, {order.pickupLocation.state}
               </p>
             </div>
-            <div className="rounded-xl bg-[#1F271A] p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="mb-1 text-xs uppercase tracking-wide text-white/50">To</p>
               <p className="font-semibold text-white">{order.dropLocation.name}</p>
               <p className="text-sm text-white/70">
@@ -731,7 +735,7 @@ export default function OrderPage() {
             </div>
           </div>
 
-          <div className="mb-5 rounded-xl bg-[#1F271A] p-3">
+          <div className="mb-5 dashboard-surface-soft rounded-xl p-3">
             <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Tracking Progress</p>
             <div className="grid grid-cols-4 gap-2">
               {steps.map((step, idx) => {
@@ -751,7 +755,7 @@ export default function OrderPage() {
           </div>
 
           {(order.pickupProofImage || order.dropProofImage) && (
-            <div className="mb-5 rounded-xl bg-[#1F271A] p-3">
+            <div className="mb-5 dashboard-surface-soft rounded-xl p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-xs uppercase tracking-wide text-white/50">Verification Proofs</p>
                 <button
@@ -794,7 +798,7 @@ export default function OrderPage() {
                       />
                     </button>
                   ) : (
-                    <div className="flex h-28 items-center justify-center rounded-lg border border-white/15 bg-black/20 text-xs text-white/50">
+                    <div className="dashboard-surface-soft flex h-28 items-center justify-center rounded-lg text-xs text-white/50">
                       Not uploaded
                     </div>
                   )}
@@ -822,7 +826,7 @@ export default function OrderPage() {
                       />
                     </button>
                   ) : (
-                    <div className="flex h-28 items-center justify-center rounded-lg border border-white/15 bg-black/20 text-xs text-white/50">
+                    <div className="dashboard-surface-soft flex h-28 items-center justify-center rounded-lg text-xs text-white/50">
                       Not uploaded
                     </div>
                   )}
@@ -835,7 +839,7 @@ export default function OrderPage() {
             <button
               type="button"
               onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-              className="rounded-xl bg-[#1F271A] p-3 text-left transition hover:bg-[#252f1f]"
+              className="dashboard-surface-soft rounded-xl p-3 text-left transition hover:bg-[#252f1f]"
             >
               <p className="text-xs uppercase tracking-wide text-white/50">Packages</p>
               <p className="mt-1 text-sm text-white">{order.packageCount} item(s)</p>
@@ -845,13 +849,13 @@ export default function OrderPage() {
               <p className="mt-2 text-xs font-medium text-[#CDD645]">View full package details</p>
             </button>
 
-            <div className="rounded-xl bg-[#1F271A] p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="text-xs uppercase tracking-wide text-white/50">Order Value</p>
               <p className="mt-1 text-sm text-white">{formatMoney(order.totalAmount)}</p>
               <p className="mt-1 text-xs text-white/65">{order.totalWeightKg} kg total</p>
             </div>
 
-            <div className="rounded-xl bg-[#1F271A] p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="text-xs uppercase tracking-wide text-white/50">Assigned Bus</p>
               {order.busContact ? (
                 <div className="mt-2 flex items-center gap-3">
@@ -881,7 +885,7 @@ export default function OrderPage() {
               )}
             </div>
 
-            <div className="rounded-xl bg-[#1F271A] p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="text-xs uppercase tracking-wide text-white/50">Operator Contact</p>
 
               {canShowBusContact && order.busContact ? (
@@ -891,7 +895,7 @@ export default function OrderPage() {
                 </div>
               ) : shouldHideUpcomingContact ? (
                 <div className="mt-2 space-y-2">
-                  <div className="relative overflow-hidden rounded-lg border border-white/15 bg-black/25 p-2">
+                  <div className="dashboard-subsurface relative overflow-hidden rounded-lg p-2">
                     <div className="select-none blur-sm">
                       <p className="text-sm text-white">Assigned Operator</p>
                       <p className="font-mono text-sm text-[#F6FF6A]">XXXXXXXXXX</p>
@@ -959,7 +963,7 @@ export default function OrderPage() {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search tracking ID, route or support contact"
-              className="w-full rounded-lg border border-[#5E6A4F] bg-[#1F271A] py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/45 outline-none focus:border-[#CDD645]"
+              className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
             />
           </div>
         </div>
@@ -976,7 +980,7 @@ export default function OrderPage() {
             {sortedUserOrders.ongoing.length > 0 ? (
               sortedUserOrders.ongoing.map((order) => renderUserOrderCard(order))
             ) : (
-              <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-4 text-white/65">
+              <div className="dashboard-surface rounded-xl p-4 text-white/65">
                 {normalizedSearch ? "No ongoing orders match your search." : "No ongoing orders."}
               </div>
             )}
@@ -995,7 +999,7 @@ export default function OrderPage() {
             {sortedUserOrders.past.length > 0 ? (
               sortedUserOrders.past.map((order) => renderUserOrderCard(order))
             ) : (
-              <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-4 text-white/65">
+              <div className="dashboard-surface rounded-xl p-4 text-white/65">
                 {normalizedSearch ? "No past orders match your search." : "No past orders."}
               </div>
             )}
@@ -1009,7 +1013,7 @@ export default function OrderPage() {
             role="presentation"
           >
             <div
-              className="w-full max-w-6xl rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4 shadow-2xl"
+              className="w-full max-w-6xl dashboard-surface rounded-2xl p-4 shadow-2xl"
               onClick={(event) => event.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -1038,10 +1042,10 @@ export default function OrderPage() {
                     <img
                       src={proofModalOrder.pickupProofImage}
                       alt="Pickup proof full"
-                      className="max-h-[72vh] w-full rounded-xl border border-white/15 bg-black/20 object-contain"
+                      className="max-h-[72vh] w-full rounded-xl border border-white/10 bg-white/5 object-contain"
                     />
                   ) : (
-                    <div className="flex h-72 items-center justify-center rounded-xl border border-white/15 bg-black/20 text-sm text-white/55">
+                    <div className="dashboard-surface-soft flex h-72 items-center justify-center rounded-xl text-sm text-white/55">
                       Pickup proof not uploaded
                     </div>
                   )}
@@ -1054,10 +1058,10 @@ export default function OrderPage() {
                     <img
                       src={proofModalOrder.dropProofImage}
                       alt="Drop proof full"
-                      className="max-h-[72vh] w-full rounded-xl border border-white/15 bg-black/20 object-contain"
+                      className="max-h-[72vh] w-full rounded-xl border border-white/10 bg-white/5 object-contain"
                     />
                   ) : (
-                    <div className="flex h-72 items-center justify-center rounded-xl border border-white/15 bg-black/20 text-sm text-white/55">
+                    <div className="dashboard-surface-soft flex h-72 items-center justify-center rounded-xl text-sm text-white/55">
                       Drop proof not uploaded
                     </div>
                   )}
@@ -1070,7 +1074,7 @@ export default function OrderPage() {
     );
   }
 
-  if (role === "admin" || role === "superadmin") {
+  if (role === "admin") {
     return (
       <>
         <div className="p-4 sm:p-6 lg:p-8">
@@ -1083,12 +1087,12 @@ export default function OrderPage() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search bus, tracking ID or customer"
-                className="w-full rounded-lg border border-[#5E6A4F] bg-[#1F271A] py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/45 outline-none focus:border-[#CDD645]"
+                className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
               />
             </div>
           </div>
           {sortedGroupedByBus.length === 0 ? (
-            <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-6 text-white/65">
+            <div className="dashboard-surface rounded-xl p-6 text-white/65">
               {normalizedSearch
                 ? "No orders match your search."
                 : "No orders found for your buses."}
@@ -1096,7 +1100,7 @@ export default function OrderPage() {
           ) : (
             <div className="space-y-5">
               {sortedGroupedByBus.map((busGroup) => (
-                <section key={busGroup.busId} className="rounded-2xl border border-[#4E5A45] bg-[#2A3324] p-4">
+                <section key={busGroup.busId} className="dashboard-surface rounded-2xl p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {busGroup.busImage ? (
@@ -1107,7 +1111,7 @@ export default function OrderPage() {
                           className="h-12 w-12 rounded-lg border border-white/15 object-cover"
                         />
                       ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/15 bg-[#1F271A]">
+                        <div className="dashboard-subsurface flex h-12 w-12 items-center justify-center rounded-lg">
                           <Icon icon="mdi:bus" className="text-xl text-[#E4E67A]" />
                         </div>
                       )}
@@ -1123,7 +1127,7 @@ export default function OrderPage() {
 
                   <div className="space-y-3">
                     {busGroup.orders.map((order) => (
-                      <article key={order.id} className="rounded-xl bg-[#1F271A] p-3">
+                      <article key={order.id} className="dashboard-surface-soft rounded-xl p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
@@ -1183,7 +1187,7 @@ export default function OrderPage() {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search tracking ID, customer or bus"
-              className="w-full rounded-lg border border-[#5E6A4F] bg-[#1F271A] py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/45 outline-none focus:border-[#CDD645]"
+              className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
             />
           </div>
         </div>
@@ -1209,11 +1213,11 @@ export default function OrderPage() {
         </div>
 
         {!hasAnyOperatorOrders ? (
-          <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-6 text-white/65">
+          <div className="dashboard-surface rounded-xl p-6 text-white/65">
             {normalizedSearch ? "No orders match your search." : "No orders found for your assigned buses."}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-[#4E5A45]/80 bg-[#1d2619]">
+          <div className="dashboard-surface overflow-hidden rounded-2xl">
             <div
               className="flex transition-transform duration-300 ease-in-out"
               style={{
@@ -1234,7 +1238,7 @@ export default function OrderPage() {
                     </span>
                   </div>
                   {operatorOrdersByTab[tab].length === 0 ? (
-                    <div className="rounded-xl border border-[#4E5A45] bg-[#2A3324] p-5 text-sm text-white/65">
+                    <div className="dashboard-surface rounded-xl p-5 text-sm text-white/65">
                       {normalizedSearch
                         ? `No ${tab} orders match your search.`
                         : `No ${tab} orders found.`}

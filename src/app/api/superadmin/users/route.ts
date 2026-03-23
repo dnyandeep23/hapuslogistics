@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
+import { normalizeIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
 type QueryRole = "admin" | "operator" | "customer";
-
-const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
 
 const getTokenUserId = (request: NextRequest): string | null => {
   const token = request.cookies.get("token")?.value;
@@ -39,9 +38,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const actor = await User.findById(userId).select("isSuperAdmin role").lean<{ isSuperAdmin?: boolean } | null>();
-    if (!actor?.isSuperAdmin) {
-      return NextResponse.json({ success: false, message: "Super admin access required." }, { status: 403 });
+    const actor = await User.findById(userId).select("role").lean<{ role?: string } | null>();
+    if (actor?.role !== "admin") {
+      return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -55,7 +54,6 @@ export async function GET(request: NextRequest) {
     const roleFilter = category === "customer" ? "user" : category;
     const query: Record<string, unknown> = {
       role: roleFilter,
-      ...(category === "admin" ? { isSuperAdmin: { $ne: true } } : {}),
     };
     if (searchTerm) {
       const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -67,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     const users = await User.find(query)
       .populate("travelCompanyId", "name")
-      .select("name email role phone isSuperAdmin authProvider travelCompanyId createdAt operatorApprovalStatus")
+      .select("name email role phone authProvider travelCompanyId createdAt operatorApprovalStatus")
       .sort({ createdAt: -1 })
       .lean<
         Array<{
@@ -76,7 +74,6 @@ export async function GET(request: NextRequest) {
           email?: string;
           role?: string;
           phone?: string;
-          isSuperAdmin?: boolean;
           authProvider?: unknown[];
           createdAt?: Date;
           operatorApprovalStatus?: string;
@@ -94,7 +91,6 @@ export async function GET(request: NextRequest) {
           email: String(user.email ?? ""),
           role: String(user.role ?? ""),
           phone: String(user.phone ?? ""),
-          isSuperAdmin: Boolean(user.isSuperAdmin),
           authProvider: Array.isArray(user.authProvider)
             ? user.authProvider.map((provider) => String(provider))
             : [],
@@ -126,9 +122,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const actor = await User.findById(userId).select("isSuperAdmin role").lean<{ isSuperAdmin?: boolean } | null>();
-    if (!actor?.isSuperAdmin) {
-      return NextResponse.json({ success: false, message: "Super admin access required." }, { status: 403 });
+    const actor = await User.findById(userId).select("role").lean<{ role?: string } | null>();
+    if (actor?.role !== "admin") {
+      return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -145,18 +141,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     const targetUser = await User.findById(targetUserId).select(
-      "_id name email phone role isSuperAdmin authProvider",
+      "_id name email phone role authProvider",
     );
     if (!targetUser) {
       return NextResponse.json({ success: false, message: "User not found." }, { status: 404 });
     }
-    if (targetUser.isSuperAdmin) {
-      return NextResponse.json({ success: false, message: "Super admin accounts cannot be edited here." }, { status: 403 });
-    }
-
     const nextName = String(body.name ?? "").trim();
     const nextEmail = String(body.email ?? "").trim().toLowerCase();
     const nextPhone = String(body.phone ?? "").trim();
+    const normalizedPhone = nextPhone === "" ? "" : normalizeIndiaPhone(nextPhone);
     const nextRoleRaw = String(body.role ?? "").trim().toLowerCase();
 
     const isGoogleOnly = hasProvider(targetUser.authProvider, "google") && !hasProvider(targetUser.authProvider, "local");
@@ -172,9 +165,9 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (nextPhone && !PHONE_PATTERN.test(nextPhone.replace(/[\s()-]/g, ""))) {
+    if (normalizedPhone === null) {
       return NextResponse.json(
-        { success: false, message: "Phone must be 10-15 digits (optional leading +)." },
+        { success: false, message: "Phone must be a valid Indian mobile number." },
         { status: 400 },
       );
     }
@@ -190,7 +183,7 @@ export async function PATCH(request: NextRequest) {
       targetUser.name = nextName;
     }
     if (nextPhone || nextPhone === "") {
-      targetUser.phone = nextPhone;
+      targetUser.phone = normalizedPhone || "";
     }
 
     if (!isGoogleOnly && nextEmail) {
@@ -202,6 +195,12 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json(
           { success: false, message: "Role must be user, operator, or admin." },
           { status: 400 },
+        );
+      }
+      if (nextRoleRaw === "admin" && String(targetUser.role ?? "") !== "admin") {
+        return NextResponse.json(
+          { success: false, message: "Admin role changes are disabled." },
+          { status: 403 },
         );
       }
       targetUser.role = nextRoleRaw;

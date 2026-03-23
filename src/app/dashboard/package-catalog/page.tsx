@@ -92,7 +92,7 @@ export default function PackageCatalogDashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (!user.isSuperAdmin) {
+    if (user.role !== "admin") {
       router.replace("/dashboard");
       return;
     }
@@ -228,12 +228,12 @@ export default function PackageCatalogDashboardPage() {
     }
   };
 
-  if (!user || !user.isSuperAdmin) {
+  if (!user || user.role !== "admin") {
     return (
       <div className="rounded-2xl border border-red-500/35 bg-red-500/10 p-4 text-sm text-red-200">
         <div className="flex items-center gap-2">
           <Icon icon="mdi:shield-alert-outline" className="text-lg" />
-          Access restricted to super admin.
+          Access restricted to admin.
         </div>
       </div>
     );
@@ -276,10 +276,10 @@ export default function PackageCatalogDashboardPage() {
       ) : null}
 
       {loading ? (
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-6 text-sm text-white/70">Loading package master...</div>
+        <div className="dashboard-surface-soft rounded-2xl p-6 text-sm text-white/70">Loading package master...</div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
-          <section className="rounded-2xl border border-white/10 bg-[#1b2418] p-5">
+          <section className="dashboard-surface rounded-2xl p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[#E4E67A]">Categories</h2>
@@ -296,7 +296,7 @@ export default function PackageCatalogDashboardPage() {
 
             <div className="space-y-3">
               {categories.map((category, index) => (
-                <div key={`category-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div key={`category-${index}`} className="dashboard-surface-soft rounded-xl p-4">
                   <div className="grid gap-2 sm:grid-cols-2">
                     <label className="text-[11px] text-white/75">
                       Name
@@ -305,14 +305,14 @@ export default function PackageCatalogDashboardPage() {
                         onChange={(event) =>
                           updateCategory(index, (current) => ({ ...current, name: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
                     <label className="text-[11px] text-white/75">
                       Icon (Iconify)
-                      <div className="mt-1 flex items-center gap-2">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-black/70 text-base text-white">
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <div className="dashboard-subsurface flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-base text-white">
                           <Icon icon={category.icon || "mdi:shape-outline"} />
                         </div>
                         <input
@@ -320,7 +320,7 @@ export default function PackageCatalogDashboardPage() {
                           onChange={(event) =>
                             updateCategory(index, (current) => ({ ...current, icon: event.target.value }))
                           }
-                          className="w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                          className="dashboard-input min-w-[180px] flex-1 rounded-md px-2 py-1.5 text-xs"
                           placeholder="mdi:package-variant"
                         />
                         <button
@@ -345,7 +345,7 @@ export default function PackageCatalogDashboardPage() {
                             defaultFare: Math.max(0, Number(event.target.value) || 0),
                           }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
@@ -361,7 +361,7 @@ export default function PackageCatalogDashboardPage() {
                             sortOrder: Math.max(0, Number(event.target.value) || 0),
                           }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
                   </div>
@@ -392,7 +392,7 @@ export default function PackageCatalogDashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-[#1b2418] p-5">
+          <section className="dashboard-surface rounded-2xl p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[#E4E67A]">Sizes</h2>
@@ -409,7 +409,7 @@ export default function PackageCatalogDashboardPage() {
 
             <div className="space-y-3">
               {sizes.map((size, index) => (
-                <div key={`size-${index}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div key={`size-${index}`} className="dashboard-surface-soft rounded-xl p-4">
                   <div className="grid gap-2 sm:grid-cols-2">
                     <label className="text-[11px] text-white/75">
                       Name
@@ -418,7 +418,7 @@ export default function PackageCatalogDashboardPage() {
                         onChange={(event) =>
                           updateSize(index, (current) => ({ ...current, name: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
@@ -429,7 +429,7 @@ export default function PackageCatalogDashboardPage() {
                         onChange={(event) =>
                           updateSize(index, (current) => ({ ...current, description: event.target.value }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
@@ -446,7 +446,7 @@ export default function PackageCatalogDashboardPage() {
                             maxWeightKg: Math.max(0.1, Number(event.target.value) || 0.1),
                           }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
@@ -463,7 +463,7 @@ export default function PackageCatalogDashboardPage() {
                             priceMultiplier: Math.max(0.1, Number(event.target.value) || 0.1),
                           }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
@@ -480,7 +480,7 @@ export default function PackageCatalogDashboardPage() {
                             visualScale: Math.max(0.5, Number(event.target.value) || 0.5),
                           }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
 
@@ -496,7 +496,7 @@ export default function PackageCatalogDashboardPage() {
                             sortOrder: Math.max(0, Number(event.target.value) || 0),
                           }))
                         }
-                        className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </label>
                   </div>
@@ -531,7 +531,7 @@ export default function PackageCatalogDashboardPage() {
 
       {iconPickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#11170f] p-4 shadow-2xl">
+          <div className="dashboard-surface w-full max-w-4xl rounded-2xl p-4 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-[#E4E67A]">Pick Icon</h3>
@@ -553,7 +553,7 @@ export default function PackageCatalogDashboardPage() {
                 value={iconSearchQuery}
                 onChange={(event) => setIconSearchQuery(event.target.value)}
                 placeholder="Search icon... e.g. truck, box, package, flash"
-                className="min-w-[240px] flex-1 rounded-lg border border-white/20 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#D5E400]/60"
+                className="dashboard-input min-w-[240px] flex-1 rounded-lg px-3 py-2 text-sm focus:border-[#D5E400]/60"
               />
               <button
                 type="button"
@@ -571,7 +571,7 @@ export default function PackageCatalogDashboardPage() {
             </div>
 
             {iconSearchLoading ? (
-              <div className="mt-4 rounded-lg border border-white/10 bg-black/25 p-3 text-xs text-white/70">
+              <div className="dashboard-surface-soft mt-4 rounded-lg p-3 text-xs text-white/70">
                 Searching icons...
               </div>
             ) : null}
@@ -587,10 +587,10 @@ export default function PackageCatalogDashboardPage() {
                   key={iconName}
                   type="button"
                   onClick={() => applyCategoryIcon(iconName)}
-                  className="rounded-lg border border-white/10 bg-black/30 p-2 text-left text-white/90 hover:border-[#D5E400]/35 hover:bg-[#D5E400]/10"
+                  className="dashboard-surface-soft rounded-lg p-2 text-left text-white/90 hover:border-[#D5E400]/35 hover:bg-[#D5E400]/10"
                   title={iconName}
                 >
-                  <div className="mb-1 flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-black/60 text-lg">
+                  <div className="dashboard-subsurface mb-1 flex h-8 w-8 items-center justify-center rounded-md text-lg">
                     <Icon icon={iconName} />
                   </div>
                   <p className="truncate text-[11px] leading-tight">{iconName}</p>

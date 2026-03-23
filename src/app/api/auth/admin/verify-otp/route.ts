@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
 import {
+  clearScheduledAccountDeletion,
+  isAccountDeletionExpired,
+  permanentlyDeleteUserAccount,
+} from "@/app/api/lib/accountDeletion";
+import {
   ADMIN_OTP_COOKIE,
   normalizeAuthProviders,
   signAuthToken,
@@ -39,11 +44,32 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await User.findById(pendingPayload.id);
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Admin account not found." },
         { status: 404 },
       );
+    }
+
+    if (isAccountDeletionExpired(user)) {
+      await permanentlyDeleteUserAccount(user);
+      const response = NextResponse.json(
+        {
+          success: false,
+          message: "This account has been deleted. Please register again.",
+        },
+        { status: 410 },
+      );
+
+      response.cookies.set(ADMIN_OTP_COOKIE, "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 0,
+      });
+
+      return response;
     }
 
     if (
@@ -62,6 +88,7 @@ export async function POST(request: NextRequest) {
     user.isVerified = true;
     user.adminAccessCode = undefined;
     user.adminAccessCodeExpiry = undefined;
+    const cancelledScheduledDeletion = await clearScheduledAccountDeletion(user);
     await user.save();
 
     const token = signAuthToken({
@@ -75,6 +102,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       message: "Admin login verified successfully.",
+      accountDeletionCancelled: cancelledScheduledDeletion,
     });
 
     response.cookies.set("token", token, {

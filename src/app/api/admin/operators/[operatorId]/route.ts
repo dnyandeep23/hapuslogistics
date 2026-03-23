@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { dbConnect } from "@/app/api/lib/db";
+import { permanentlyDeleteUserAccount } from "@/app/api/lib/accountDeletion";
 import User from "@/app/api/models/userModel";
 import Bus from "@/app/api/models/busModel";
 import TravelCompany from "@/app/api/models/travelCompanyModel";
@@ -34,7 +35,7 @@ export async function PATCH(
     }
 
     const admin = await User.findById(adminId);
-    if (!admin || (admin.role !== "admin" && !admin.isSuperAdmin)) {
+    if (!admin || admin.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -42,7 +43,12 @@ export async function PATCH(
     const reqBody = await request.json();
     const action = reqBody?.action;
 
-    if (action !== "approve" && action !== "reject" && action !== "remove") {
+    if (
+      action !== "approve" &&
+      action !== "reject" &&
+      action !== "remove" &&
+      action !== "delete"
+    ) {
       return NextResponse.json(
         { success: false, message: "Invalid action." },
         { status: 400 },
@@ -64,11 +70,26 @@ export async function PATCH(
     const previousCompanyId = operator.travelCompanyId;
     const wasApproved = operator.operatorApprovalStatus === "approved";
 
-    if (!admin.isSuperAdmin && !isCompanyOperator && !isPendingForCompany) {
+    if (!isCompanyOperator && !isPendingForCompany) {
       return NextResponse.json(
         { success: false, message: "You can manage only your company operators." },
         { status: 403 },
       );
+    }
+
+    if (action === "delete") {
+      const companyIdForMessage =
+        operator.travelCompanyId || operator.pendingTravelCompanyId || admin.travelCompanyId;
+      const company = companyIdForMessage
+        ? await TravelCompany.findById(companyIdForMessage).select("name")
+        : null;
+
+      await permanentlyDeleteUserAccount(operator);
+
+      return NextResponse.json({
+        success: true,
+        message: `Operator account deleted${company?.name ? ` from ${company.name}` : ""}.`,
+      });
     }
 
     const isPendingState =
@@ -84,7 +105,7 @@ export async function PATCH(
     }
 
     if (action === "approve") {
-      if (!admin.isSuperAdmin && !isPendingForCompany && !isCompanyOperator) {
+      if (!isPendingForCompany && !isCompanyOperator) {
         return NextResponse.json(
           { success: false, message: "This request is not linked to your company." },
           { status: 403 },
@@ -106,7 +127,7 @@ export async function PATCH(
           { status: 400 },
         );
       }
-      if (!admin.isSuperAdmin && !isCompanyOperator) {
+      if (!isCompanyOperator) {
         return NextResponse.json(
           { success: false, message: "Only approved operators from your company can be removed." },
           { status: 400 },
@@ -121,7 +142,7 @@ export async function PATCH(
 
     const companyIdForNotification =
       action === "remove"
-        ? (admin.isSuperAdmin ? previousCompanyId : admin.travelCompanyId || previousCompanyId)
+        ? admin.travelCompanyId || previousCompanyId
         : operator.travelCompanyId;
     const company = companyIdForNotification
       ? await TravelCompany.findById(companyIdForNotification)

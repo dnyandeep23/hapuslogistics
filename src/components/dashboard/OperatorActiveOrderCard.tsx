@@ -333,7 +333,7 @@ export default function OperatorActiveOrderCard({
     const isUploadingProof = uploadingProofOrderId === order.id;
 
     return (
-      <article key={order.id} className="rounded-xl border border-white/15 bg-[#1b2418] p-4">
+      <article key={order.id} className="dashboard-surface-soft rounded-xl p-4 transition-all duration-300">
         <button
           type="button"
           onClick={() => setExpandedOrderId((prev) => (prev === order.id ? null : order.id))}
@@ -369,32 +369,39 @@ export default function OperatorActiveOrderCard({
           </div>
         </button>
 
-        {isExpanded ? (
-          <div className="mt-3 border-t border-white/10 pt-3">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <p className="text-xs text-white/70">
-                <span className="text-white/45">Sender:</span> {order.sender?.name || "--"} ({order.sender?.phone || "N/A"})
-              </p>
-              <p className="text-xs text-white/70">
-                <span className="text-white/45">Receiver:</span> {order.receiver?.name || "--"} ({order.receiver?.phone || "N/A"})
-              </p>
-              <p className="text-xs text-white/70">
-                <span className="text-white/45">Bus:</span> {order.bus?.busName || "--"} {order.bus?.busNumber ? `(${order.bus.busNumber})` : ""}
-              </p>
-              <p className="text-xs text-white/70">
-                <span className="text-white/45">Date:</span> {formatOrderDate(order.orderDate)}
-              </p>
+        {isExpanded && (
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-white/50 mb-1">Sender</p>
+                <p className="text-sm text-white">{order.sender?.name || "--"}</p>
+                <p className="text-sm text-white/70">{order.sender?.phone || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/50 mb-1">Receiver</p>
+                <p className="text-sm text-white">{order.receiver?.name || "--"}</p>
+                <p className="text-sm text-white/70">{order.receiver?.phone || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/50 mb-1">Bus Details</p>
+                <p className="text-sm text-white">{order.bus?.busName || "--"}</p>
+                <p className="text-sm text-white/70">{order.bus?.busNumber ? `(${order.bus.busNumber})` : ""}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/50 mb-1">Order Date</p>
+                <p className="text-sm text-white">{formatOrderDate(order.orderDate)}</p>
+              </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {showOnlyActive && stageLabel === "Active" && nextProofType ? (
                 <button
                   type="button"
                   disabled={isUploadingProof || isMobileOrTabletDevice === false}
                   onClick={() => openProofCamera(order.id, nextProofType)}
-                  className="inline-flex items-center gap-1 rounded-md border border-cyan-400/55 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-md bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-60"
                 >
-                  <Icon icon={isUploadingProof ? "line-md:loading-loop" : "mdi:camera-outline"} className="text-sm" />
+                  <Icon icon={isUploadingProof ? "line-md:loading-loop" : "mdi:camera-outline"} className="text-base" />
                   {isUploadingProof
                     ? "Uploading..."
                     : nextProofType === "pickup"
@@ -405,19 +412,19 @@ export default function OperatorActiveOrderCard({
               {senderPhoneLink ? (
                 <a
                   href={`tel:${senderPhoneLink}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-green-500/55 px-2.5 py-1.5 text-xs font-medium text-green-300 hover:bg-green-500/15"
+                  className="inline-flex items-center gap-2 rounded-md bg-green-500/10 px-3 py-2 text-sm font-medium text-green-300 hover:bg-green-500/20"
                 >
-                  <Icon icon="mdi:phone" className="text-sm" />
-                  Sender
+                  <Icon icon="mdi:phone" className="text-base" />
+                  Call Sender
                 </a>
               ) : null}
               {receiverPhoneLink ? (
                 <a
                   href={`tel:${receiverPhoneLink}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-red-500/55 px-2.5 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/15"
+                  className="inline-flex items-center gap-2 rounded-md bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20"
                 >
-                  <Icon icon="mdi:phone" className="text-sm" />
-                  Receiver
+                  <Icon icon="mdi:phone" className="text-base" />
+                  Call Receiver
                 </a>
               ) : null}
               {order.pickupProofImage ? (
@@ -425,10 +432,10 @@ export default function OperatorActiveOrderCard({
                   href={order.pickupProofImage}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border border-cyan-500/55 px-2.5 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-500/15"
+                  className="inline-flex items-center gap-2 rounded-md bg-blue-500/10 px-3 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20"
                 >
-                  <Icon icon="mdi:camera" className="text-sm" />
-                  Pickup Proof
+                  <Icon icon="mdi:camera" className="text-base" />
+                  View Pickup Proof
                 </a>
               ) : null}
               {order.dropProofImage ? (
@@ -436,26 +443,26 @@ export default function OperatorActiveOrderCard({
                   href={order.dropProofImage}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border border-violet-500/55 px-2.5 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-500/15"
+                  className="inline-flex items-center gap-2 rounded-md bg-violet-500/10 px-3 py-2 text-sm font-medium text-violet-300 hover:bg-violet-500/20"
                 >
-                  <Icon icon="mdi:camera" className="text-sm" />
-                  Drop Proof
+                  <Icon icon="mdi:camera" className="text-base" />
+                  View Drop Proof
                 </a>
               ) : null}
             </div>
 
             {order.operatorNote ? (
-              <p className="mt-3 border-l-2 border-amber-300/50 pl-3 text-xs text-amber-100/90">
+              <p className="mt-4 border-l-4 border-amber-400/50 pl-4 text-sm text-amber-200/90">
                 {order.operatorNote}
               </p>
             ) : null}
             {showOnlyActive && stageLabel === "Active" && nextProofType && isMobileOrTabletDevice === false ? (
-              <div className="mt-3 rounded-lg border border-amber-400/60 bg-amber-500/15 px-3 py-2 text-xs text-amber-100">
-                Capture is disabled on desktop. Login from a mobile/tablet with rear camera.
+              <div className="mt-4 rounded-lg border border-amber-400/60 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                Capture is disabled on desktop. Please log in from a mobile or tablet device with a rear camera to proceed.
               </div>
             ) : null}
           </div>
-        ) : null}
+        )}
       </article>
     );
   };
@@ -487,7 +494,7 @@ export default function OperatorActiveOrderCard({
       </div>
 
       {orders.length === 0 ? (
-        <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/60">
+        <div className="dashboard-surface-soft rounded-lg p-3 text-xs text-white/60">
           {emptyMessage}
         </div>
       ) : (
@@ -503,100 +510,109 @@ export default function OperatorActiveOrderCard({
       ordersByStage.pastOrders.length === 0;
 
   return (
-    <section className="space-y-4" ref={rootRef}>
-      <div className="rounded-2xl border border-[#4e573f]/70 bg-[#1a2117] p-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
+    <section className="space-y-6" ref={rootRef}>
+      <div className="dashboard-surface rounded-2xl p-5">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-[#E4E67A]">Operator Orders</h2>
-            <p className="text-xs text-white/55">
+            <h2 className="text-2xl font-bold text-[#E4E67A]">Operator Dashboard</h2>
+            <p className="text-sm text-white/60 mt-1">
               {showOnlyActive
-                ? "Showing active orders for today's trip. Expand a tile using the arrow for full details."
-                : "Active shows today's trip only. Expand a tile using the arrow for full details."}
+                ? "Showing active orders for today's trip."
+                : "A summary of your active, upcoming, and past orders."}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="rounded-full border border-[#e4e67a]/40 bg-[#e4e67a]/10 px-2 py-0.5 text-[#f1f4aa]">
-                Active Today: {ordersByStage.activeOrders.length}
-              </span>
-              {!showOnlyActive ? (
-                <>
-                  <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-sky-200">
-                    Upcoming: {ordersByStage.upcomingOrders.length}
-                  </span>
-                  <span className="rounded-full border border-white/30 bg-white/10 px-2 py-0.5 text-white/75">
-                    Past: {ordersByStage.pastOrders.length}
-                  </span>
-                  <span className="rounded-full border border-emerald-400/45 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
-                    Processed: {ordersByStage.processedCount}
-                  </span>
-                </>
-              ) : null}
-            </div>
           </div>
           <button
             type="button"
             onClick={handleRefresh}
             disabled={refreshing || loading}
-            className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="dashboard-surface-soft inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Icon icon="mdi:refresh" className={refreshing ? "animate-spin" : ""} />
-            {refreshing ? "Refreshing" : "Refresh"}
+            {refreshing ? "Refreshing..." : "Refresh Orders"}
           </button>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-center">
+          <div className="dashboard-surface-soft rounded-lg p-4">
+            <p className="text-sm text-white/70">Active Today</p>
+            <p className="text-2xl font-bold text-[#E4E67A]">{ordersByStage.activeOrders.length}</p>
+          </div>
+          {!showOnlyActive && (
+            <>
+              <div className="dashboard-surface-soft rounded-lg p-4">
+                <p className="text-sm text-white/70">Upcoming</p>
+                <p className="text-2xl font-bold text-sky-300">{ordersByStage.upcomingOrders.length}</p>
+              </div>
+              <div className="dashboard-surface-soft rounded-lg p-4">
+                <p className="text-sm text-white/70">Past</p>
+                <p className="text-2xl font-bold text-white/80">{ordersByStage.pastOrders.length}</p>
+              </div>
+              <div className="dashboard-surface-soft rounded-lg p-4">
+                <p className="text-sm text-white/70">Total Processed</p>
+                <p className="text-2xl font-bold text-emerald-300">{ordersByStage.processedCount}</p>
+              </div>
+            </>
+          )}
+        </div>
+
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, index) => (
               <div
                 key={`operator-active-order-skeleton-${index}`}
-                className="rounded-xl border border-white/15 bg-black/25 p-3"
+                className="dashboard-surface-soft rounded-xl p-4"
               >
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-52" />
-                  <div className="flex gap-2 pt-1">
-                    <Skeleton className="h-8 w-28" />
-                    <Skeleton className="h-8 w-28" />
+                <div className="space-y-3">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-64" />
+                  <div className="flex gap-3 pt-2">
+                    <Skeleton className="h-9 w-32" />
+                    <Skeleton className="h-9 w-32" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
             {error}
           </div>
         ) : noOrdersAvailable ? (
-          <div className="rounded-xl border border-white/15 bg-black/25 p-4 text-sm text-white/70">
-            No orders are assigned in your current operator period.
+          <div className="dashboard-surface-soft rounded-xl p-6 text-center text-white/70">
+            <p className="text-lg font-semibold">No Orders Found</p>
+            <p className="text-sm mt-1">There are no orders assigned to you for the current period.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-              <label className="mb-2 block text-xs uppercase tracking-wide text-white/50">Search Orders</label>
-              <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-black/25 px-3 py-2">
-                <Icon icon="mdi:magnify" className="text-lg text-white/60" />
+          <div className="space-y-6">
+            <div className="dashboard-surface-soft rounded-xl p-4">
+              <label className="mb-2 block text-sm font-semibold text-white/80">Search Your Orders</label>
+              <div className="dashboard-subsurface flex items-center gap-3 rounded-lg px-4 py-2">
+                <Icon icon="mdi:magnify" className="text-xl text-white/60" />
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search tracking ID, sender name, receiver name..."
-                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/45"
+                  placeholder="Search by Tracking ID, Name, Location..."
+                  className="w-full bg-transparent text-base text-white outline-none placeholder:text-white/45"
                 />
               </div>
             </div>
 
             {totalVisibleOrders === 0 ? (
-              <div className="rounded-xl border border-white/15 bg-black/25 p-4 text-sm text-white/70">
-                No {showOnlyActive ? "active " : ""}orders matched <span className="font-medium text-white">{searchQuery}</span>.
+              <div className="dashboard-surface-soft rounded-xl p-6 text-center text-white/70">
+                <p className="text-lg font-semibold">No Matches</p>
+                <p className="mt-1 text-sm">
+                  No orders matched your search for <span className="font-medium text-white">&quot;{searchQuery}&quot;</span>.
+                </p>
               </div>
             ) : (
               showOnlyActive ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {filteredOrders.activeOrders.map((order) =>
                     renderOrderCard(order, "Active", "border-[#e4e67a]/45 bg-[#e4e67a]/10 text-[#f1f4aa]"),
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {renderSection({
                     title: "Active Orders",
                     subtitle: "Today's trip assignments",
@@ -634,7 +650,7 @@ export default function OperatorActiveOrderCard({
           role="presentation"
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#1a2117] p-4"
+            className="dashboard-surface w-full max-w-sm rounded-2xl p-4"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -645,7 +661,7 @@ export default function OperatorActiveOrderCard({
             </h3>
             <p className="mt-1 text-xs text-white/65">Rear camera only. File upload is disabled.</p>
 
-            <div className="mt-3 overflow-hidden rounded-xl border border-white/15 bg-black">
+            <div className="dashboard-subsurface mt-3 overflow-hidden rounded-xl">
               <video
                 ref={cameraPreviewRef}
                 autoPlay

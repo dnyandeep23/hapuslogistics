@@ -7,6 +7,7 @@ type EmailType =
   | "RESET"
   | "ADMIN_OTP"
   | "OPERATOR_INVITE"
+  | "OPERATOR_ACCOUNT_CREATED"
   | "OPERATOR_APPROVED"
   | "OPERATOR_REJECTED"
   | "OPERATOR_REMOVED_FROM_COMPANY"
@@ -25,6 +26,7 @@ type SendEmailPayload = {
   emailType: EmailType;
   userId?: string;
   securityCode?: string;
+  temporaryPassword?: string;
   operatorName?: string;
   companyName?: string;
   adminName?: string;
@@ -54,6 +56,7 @@ export const sendEmail = async ({
   emailType,
   userId,
   securityCode,
+  temporaryPassword,
   operatorName,
   companyName,
   adminName,
@@ -121,6 +124,19 @@ export const sendEmail = async ({
             <p>You have been invited to join <strong>${companyName ?? "Hapus Logistics"}</strong> as an operator.</p>
             <p>Your request is currently pending admin confirmation.</p>
             <p>Once approved, you will receive a confirmation email and can continue your operator login flow.</p>
+        `;
+    } else if (emailType === "OPERATOR_ACCOUNT_CREATED") {
+        if (!temporaryPassword) {
+          throw new Error("Temporary password is required for operator account emails.");
+        }
+        subject = "Your Operator Account Is Ready";
+        mainContent = `
+            <p>Hello ${operatorName ?? "Operator"},</p>
+            <p>Your operator account for <strong>${companyName ?? "Hapus Logistics"}</strong> has been created by admin.</p>
+            <p><strong>Login Email:</strong> ${email}</p>
+            <p><strong>Temporary Password:</strong> ${temporaryPassword}</p>
+            <p>Please sign in from the operator portal and update your password immediately after login.</p>
+            <p>You can also configure Google login later using the same email address.</p>
         `;
     } else if (emailType === "OPERATOR_APPROVED") {
         subject = "Operator Request Approved";

@@ -1,7 +1,7 @@
 # Hapus Logistics
 
 Hapus Logistics is a full-stack logistics booking and operations platform built on Next.js.  
-It supports multi-role workflows for customers, operators, admins, and super admins, including package booking, route-based bus assignment, order tracking, operator coordination, coupon/banner management, and payment handling.
+It supports multi-role workflows for customers, operators, and admins, including package booking, route-based bus assignment, order tracking, operator coordination, coupon/banner management, and payment handling.
 
 ## Highlights
 
@@ -10,10 +10,10 @@ It supports multi-role workflows for customers, operators, admins, and super adm
 - Razorpay-based payment flow for booking and order adjustments
 - Admin manual booking flow (book on behalf of customer by email)
 - Order tracking with OTP verification and tracking ID normalization (`HAP-XXXXXXXX`)
-- Role-based dashboards (`user`, `operator`, `admin`, `superadmin`)
+- Role-based dashboards (`user`, `operator`, `admin`)
 - Operator/company workflow (invites, approvals, company requests/offers)
 - Bus transfer for orders (same route + capacity checks)
-- Banner and coupon management for super admin
+- Banner and coupon management for admin
 - Cloudinary image upload support for packages, buses, proofs, and banners
 
 ## Tech Stack
@@ -41,14 +41,13 @@ It supports multi-role workflows for customers, operators, admins, and super adm
 | `user` | Book package, view/track own orders, OTP-based tracking, download invoice |
 | `operator` | View assigned/active orders, update order status (`in-transit`, `delivered`), upload pickup/drop proof |
 | `admin` | Manage buses/locations/operators, view all company orders, edit orders, transfer orders, cancel/update notes |
-| `superadmin` | All admin-level controls plus global coupons, banners, and user management (with auth-provider-aware edit rules) |
 
 ## Business Rules Implemented
 
 - Tracking input auto-normalizes `HAP` prefix and inserts hyphen automatically in UI.
-- Admin and super admin can update order details until **1 hour before bus start time**.
+- Admin can update order details until **1 hour before bus start time**.
 - Customer can edit sender/receiver contact details until **3 hours before bus start time**.
-- Order transfer is available (admin/superadmin) only within allowed time window and only when:
+- Order transfer is available (admin) only within allowed time window and only when:
   - target bus supports the route
   - target bus has enough capacity
 - Order amount changes after admin edits are tracked as:
@@ -67,7 +66,6 @@ src/
       dashboard/                  # Dashboard APIs (orders, coupons, banners)
       orders/                     # Booking session, payment callback, order CRUD/update/transfer
       operator/                   # Operator-specific APIs (active order, proof uploads, company flow)
-      superadmin/                 # Super admin APIs (global user management)
     dashboard/                    # Role-aware dashboard pages
     package/                      # Multi-step package booking UI
     Home/                         # Landing page sections
@@ -99,10 +97,9 @@ src/
   - `/api/admin/buses`
   - `/api/admin/operators`
   - `/api/operator/*`
-- Super admin management:
+- Admin management:
   - `/api/dashboard/coupons`
   - `/api/dashboard/banners`
-  - `/api/superadmin/users`
 - Maps/location:
   - `/api/locations/*`
   - `/api/locations/road-route`

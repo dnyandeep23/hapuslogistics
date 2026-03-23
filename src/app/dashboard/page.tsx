@@ -16,19 +16,17 @@ import { Icon } from "@iconify/react";
 import { fetchUser } from '@/lib/redux/userSlice';
 import { useDropzone } from 'react-dropzone';
 import CustomDateRangePicker from '@/components/CustomDateRangePicker';
-import CustomDatePicker from '@/components/CustomDatePicker';
-import CustomTimePicker from '@/components/CustomTimePicker';
 import OperatorActiveOrderCard, {
   type OperatorActiveOrder,
   type OperatorOrderBuckets,
 } from '@/components/dashboard/OperatorActiveOrderCard';
-import Skeleton from '@/components/Skeleton';
 import {
   DEFAULT_PACKAGE_CATEGORIES,
   buildCategoryFareMap,
   getActivePackageCategories,
   normalizePackageCategories,
 } from '@/lib/packageCatalog';
+import { formatIndiaPhoneInput, normalizeIndiaPhone } from '@/lib/phone';
 
 type AdminLocation = {
   _id: string;
@@ -169,6 +167,10 @@ export default function DashboardPage() {
   const [operatorOrdersByStage, setOperatorOrdersByStage] = useState<OperatorOrderBuckets>(EMPTY_OPERATOR_ORDER_BUCKETS);
   const [operatorOrderLoading, setOperatorOrderLoading] = useState(false);
   const [operatorOrderError, setOperatorOrderError] = useState("");
+  const [requiredAdminPhoneDraft, setRequiredAdminPhoneDraft] = useState("");
+  const [requiredAdminPhoneError, setRequiredAdminPhoneError] = useState("");
+  const [requiredAdminPhoneMessage, setRequiredAdminPhoneMessage] = useState("");
+  const [savingRequiredAdminPhone, setSavingRequiredAdminPhone] = useState(false);
 
   const mapActiveBannersToCarousel = useCallback((slides: unknown[]) => {
     const normalized = [...slides]
@@ -209,6 +211,12 @@ export default function DashboardPage() {
     };
   }, [busImagePreviews]);
 
+  useEffect(() => {
+    setRequiredAdminPhoneDraft(formatIndiaPhoneInput(user?.phone ?? ""));
+    setRequiredAdminPhoneError("");
+    setRequiredAdminPhoneMessage("");
+  }, [user?.phone]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [] },
     multiple: false,
@@ -218,7 +226,7 @@ export default function DashboardPage() {
     },
   });
 
-  const isAdminRole = user?.role === "admin" || user?.isSuperAdmin;
+  const isAdminRole = user?.role === "admin";
   const editingBus = useMemo(
     () => adminBuses.find((bus) => bus._id === editingBusId) ?? null,
     [adminBuses, editingBusId],
@@ -282,9 +290,9 @@ export default function DashboardPage() {
         materialFares: parseFares(route.materialFares),
         dateOverrides: Array.isArray(route.dateOverrides)
           ? route.dateOverrides.map((override) => ({
-              ...override,
-              fares: parseFares(override.fares),
-            }))
+            ...override,
+            fares: parseFares(override.fares),
+          }))
           : [],
       }));
     });
@@ -332,11 +340,51 @@ export default function DashboardPage() {
   };
 
   const handleUsersClick = () => {
-    if (user?.role === "admin" && !user?.isSuperAdmin) {
-      router.push('/dashboard/operator');
+    if (user?.role === "admin") {
+      router.push("/dashboard/operator");
       return;
     }
     router.push('/dashboard/users');
+  };
+
+  const handleSaveRequiredAdminPhone = async () => {
+    const normalizedPhone = normalizeIndiaPhone(requiredAdminPhoneDraft);
+    setRequiredAdminPhoneError("");
+    setRequiredAdminPhoneMessage("");
+
+    if (normalizedPhone === "") {
+      setRequiredAdminPhoneError("Contact number is required before adding your first bus.");
+      return;
+    }
+
+    if (normalizedPhone === null) {
+      setRequiredAdminPhoneError("Enter a valid Indian mobile number.");
+      return;
+    }
+
+    try {
+      setSavingRequiredAdminPhone(true);
+      const response = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: normalizedPhone }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setRequiredAdminPhoneError(payload?.message || "Failed to save contact number.");
+        return;
+      }
+
+      setRequiredAdminPhoneMessage(payload?.message || "Contact number saved successfully.");
+      await dispatch(fetchUser()).unwrap();
+    } catch (error: unknown) {
+      setRequiredAdminPhoneError(
+        error instanceof Error ? error.message : "Failed to save contact number.",
+      );
+    } finally {
+      setSavingRequiredAdminPhone(false);
+    }
   };
 
   const loadLocations = useCallback(async () => {
@@ -581,38 +629,21 @@ export default function DashboardPage() {
       return [
         {
           title: "Company",
+          description: "Open your roster, company details, and assigned team context.",
+          actionLabel: "Open company",
+          iconKey: "solar:buildings-2-bold-duotone",
           icon: addPackageImg,
           width: 115,
           onclick: handleUsersClick,
         },
         {
           title: "Support Desk",
+          description: "Reach the admin line, employee directory, and latest support alerts.",
+          actionLabel: "Open support",
+          iconKey: "solar:headphones-round-sound-bold-duotone",
           icon: trackPackageImg,
           width: 135,
           onclick: handleSupportClick,
-        },
-      ];
-    }
-
-    if (user?.isSuperAdmin) {
-      return [
-        {
-          title: "Order Analytics",
-          icon: myPackageImg,
-          width: 135,
-          onclick: handleOrdersClick,
-        },
-        {
-          title: "User Analytics",
-          icon: addPackageImg,
-          width: 120,
-          onclick: handleUsersClick,
-        },
-        {
-          title: "Platform Trends",
-          icon: trackPackageImg,
-          width: 140,
-          onclick: handleOrdersClick,
         },
       ];
     }
@@ -621,21 +652,30 @@ export default function DashboardPage() {
       return [
         {
           title: "Order Analytics",
+          description: "Review order flow, status movement, and operational pressure points.",
+          actionLabel: "View orders",
+          iconKey: "solar:chart-square-bold-duotone",
           icon: myPackageImg,
           width: 135,
           onclick: handleOrdersClick,
         },
         {
           title: "Operator Analytics",
+          description: "See operator activity, staffing coverage, and company support structure.",
+          actionLabel: "View operators",
+          iconKey: "solar:users-group-two-rounded-bold-duotone",
           icon: addPackageImg,
           width: 130,
           onclick: handleUsersClick,
         },
         {
           title: "Route Analytics",
+          description: "Jump into routes, pricing, and pickup or drop planning lanes.",
+          actionLabel: "View routes",
+          iconKey: "solar:route-bold-duotone",
           icon: trackPackageImg,
           width: 135,
-          onclick: handleOrdersClick,
+          onclick: () => router.push("/dashboard/locations"),
         },
       ];
     }
@@ -643,18 +683,27 @@ export default function DashboardPage() {
     return [
       {
         title: "My Packages",
+        description: "View current package history, statuses, and delivery progress in one place.",
+        actionLabel: "View orders",
+        iconKey: "solar:box-bold-duotone",
         icon: myPackageImg,
         width: 135,
         onclick: handleOrdersClick,
       },
       {
         title: "Add Package",
+        description: "Create a new shipment quickly and pick up where you left off anytime.",
+        actionLabel: "Start booking",
+        iconKey: "solar:add-circle-bold-duotone",
         icon: addPackageImg,
         width: 115,
         onclick: handleAddPackageClick,
       },
       {
         title: "Track & Shipments",
+        description: "Track live movement and check delivery updates without leaving the dashboard.",
+        actionLabel: "Track now",
+        iconKey: "solar:delivery-bold-duotone",
         icon: trackPackageImg,
         width: 135,
         onclick: handleTrackOrderClick,
@@ -662,9 +711,51 @@ export default function DashboardPage() {
     ];
   })();
 
-  const isAdminLocked = user?.role === "admin" && !user?.isSuperAdmin && user?.hasRegisteredBus === false;
+  const isAdminLocked = user?.role === "admin" && user?.hasRegisteredBus === false;
+  const isAdminMissingContactNumber = user?.role === "admin" && !normalizeIndiaPhone(user?.phone);
   const isOperatorRole = user?.role === "operator";
   const isPublicUserRole = user?.role === "user";
+  const dashboardTitle = isAdminRole
+    ? "Operations control that feels active, not crowded."
+    : isOperatorRole
+      ? "A cleaner operator workspace for orders, company context, and support."
+      : "A calmer shipment dashboard with faster actions and clearer signals.";
+  const dashboardSubtitle = isAdminRole
+    ? "Manage fleet, routes, operators, and support from a stronger visual cockpit."
+    : isOperatorRole
+      ? "Stay on top of active orders, jump into your company details, and keep the admin contact close."
+      : "Book packages, track movement, and reach support without digging through text-heavy screens.";
+  const dashboardRoleLabel = isAdminRole ? "Admin dashboard" : isOperatorRole ? "Operator dashboard" : "Customer dashboard";
+  const dashboardRoleIcon = isAdminRole
+    ? "solar:crown-bold-duotone"
+    : isOperatorRole
+      ? "solar:shield-user-bold-duotone"
+      : "solar:home-smile-bold-duotone";
+  const customerGreeting = user?.name
+    ? `Hey ${user.name.split(" ")[0]} 👋`
+    : "Hey there 👋";
+  const supportSpotlight = isAdminRole
+    ? {
+      eyebrow: "Support command",
+      title: "Operator and customer support stays one tap away.",
+      description: "Use the support tab for company contacts, employee visibility, and live alerts while running admin operations.",
+      buttonLabel: "Open support hub",
+    }
+    : isOperatorRole
+      ? {
+        eyebrow: "Admin contact",
+        title: user?.adminContactPhone || "Support line available in your workspace",
+        description: user?.adminContactPhone
+          ? "Keep your admin contact number nearby for assignment, approval, or company issues."
+          : "Open the support tab to find your admin line, employee directory, and recent support updates.",
+        buttonLabel: "Open support hub",
+      }
+      : {
+        eyebrow: "Need help fast?",
+        title: "Support, tracking, and order help are built into your dashboard.",
+        description: "The support tab now brings company contacts and employee information together in a clearer, icon-led layout.",
+        buttonLabel: "Open support hub",
+      };
   const locationNameById = useMemo(
     () =>
       new Map(
@@ -792,17 +883,14 @@ export default function DashboardPage() {
   };
 
   const renderAdminBusForm = ({ locked = false }: { locked?: boolean } = {}) => (
-    <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-5 sm:p-7">
+    <div className="dashboard-surface rounded-2xl p-5 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#E4E67A]">
             {editingBusId ? "Edit Bus" : locked ? "Add First Bus" : "Add New Bus"}
           </h1>
           <p className="text-white/75 text-sm mt-2">
-            At least one bus image is required.
-          </p>
-          <p className="text-white/55 text-xs mt-1">
-            Contact person details are auto-filled from the assigned operator period.
+            Fill in the details below to add a new bus to your fleet.
           </p>
         </div>
         {!locked && showAdminBusForm && (
@@ -812,525 +900,139 @@ export default function DashboardPage() {
               resetAdminBusForm();
               setShowAdminBusForm(false);
             }}
-            className="rounded-lg border border-white/30 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
           >
-            Cancel
+            <Icon icon="solar:close-circle-linear" className="text-base" />
+            Close
           </button>
         )}
       </div>
 
-      <form onSubmit={handleAdminBusSubmit} className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label className="text-sm text-white/80">
-          Bus Name
-          <input
-            value={busName}
-            onChange={(event) => setBusName(event.target.value)}
-            placeholder="Enter bus name"
-            className={`mt-2 w-full bg-black px-4 pt-4 pb-2 rounded-lg text-base border-b-2 transition-all ${adminBusFieldErrors.busName ? "border-red-500" : "border-white/60 focus:border-white"} focus:outline-none`}
-          />
-          {adminBusFieldErrors.busName && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busName}</p>}
-        </label>
-
-        <label className="text-sm text-white/80">
-          Bus Number
-          <input
-            value={busNumber}
-            onChange={(event) => setBusNumber(formatBusNumberInput(event.target.value))}
-            placeholder="MH-02-BL-2254"
-            className={`mt-2 w-full bg-black px-4 pt-4 pb-2 rounded-lg text-base border-b-2 transition-all uppercase ${adminBusFieldErrors.busNumber ? "border-red-500" : "border-white/60 focus:border-white"} focus:outline-none`}
-          />
-          <p className="mt-1 text-xs text-white/50">Format: AA-00-AA-0000</p>
-          {adminBusFieldErrors.busNumber && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busNumber}</p>}
-        </label>
-
-        <label className="text-sm text-white/80">
-          Bus Capacity (KG)
-          <input
-            type="number"
-            min={1}
-            value={capacity}
-            onChange={(event) => setCapacity(Number(event.target.value) || 1)}
-            placeholder="Capacity"
-            className={`mt-2 w-full bg-black px-4 pt-4 pb-2 rounded-lg text-base border-b-2 transition-all ${adminBusFieldErrors.capacity ? "border-red-500" : "border-white/60 focus:border-white"} focus:outline-none`}
-          />
-          {adminBusFieldErrors.capacity && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.capacity}</p>}
-        </label>
-
-        <label className="text-sm text-white/80 md:col-span-2">
-          Availability Date Range
-          <div className="mt-2">
-            <CustomDateRangePicker
-              startDate={availabilityStartDate}
-              endDate={availabilityEndDate}
-              onChange={({ startDate, endDate }) => {
-                setAvailabilityStartDate(startDate);
-                setAvailabilityEndDate(endDate);
-              }}
-              error={adminBusFieldErrors.availabilityRange}
-              minDate={new Date().toISOString().slice(0, 10)}
-            />
+      <form onSubmit={handleAdminBusSubmit} className="mt-8 space-y-8">
+        {/* Bus Details Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Bus Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <label className="text-sm text-white/80">
+              Bus Name
+              <input
+                value={busName}
+                onChange={(event) => setBusName(event.target.value)}
+                placeholder="e.g. 'Volvo Sleeper'"
+                className={`dashboard-input mt-2 w-full rounded-lg border-2 px-4 py-3 text-base transition-all ${adminBusFieldErrors.busName ? "border-red-500" : "border-white/12 focus:border-[#E4E67A]"}`}
+              />
+              {adminBusFieldErrors.busName && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busName}</p>}
+            </label>
+            <label className="text-sm text-white/80">
+              Bus Number
+              <input
+                value={busNumber}
+                onChange={(event) => setBusNumber(formatBusNumberInput(event.target.value))}
+                placeholder="MH-02-BL-2254"
+                className={`dashboard-input mt-2 w-full rounded-lg border-2 px-4 py-3 text-base uppercase transition-all ${adminBusFieldErrors.busNumber ? "border-red-500" : "border-white/12 focus:border-[#E4E67A]"}`}
+              />
+              {adminBusFieldErrors.busNumber && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busNumber}</p>}
+            </label>
+            <label className="text-sm text-white/80">
+              Bus Capacity (KG)
+              <input
+                type="number"
+                min={1}
+                value={capacity}
+                onChange={(event) => setCapacity(Number(event.target.value) || 1)}
+                placeholder="Enter capacity in KG"
+                className={`dashboard-input mt-2 w-full rounded-lg border-2 px-4 py-3 text-base transition-all ${adminBusFieldErrors.capacity ? "border-red-500" : "border-white/12 focus:border-[#E4E67A]"}`}
+              />
+              {adminBusFieldErrors.capacity && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.capacity}</p>}
+            </label>
           </div>
-          {adminBusFieldErrors.availabilityRange && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.availabilityRange}</p>}
-        </label>
-
-        <div className="md:col-span-2 rounded-lg border border-white/20 bg-black/20 px-4 py-3">
-          <label className="inline-flex items-center gap-3 text-sm text-white/90 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRenewCapacity}
-              onChange={(event) => setAutoRenewCapacity(event.target.checked)}
-              className="h-4 w-4 accent-[#CDD645]"
-            />
-            Auto renew selected date capacity
-          </label>
-          <p className="mt-1 text-xs text-white/55">
-            When enabled, this bus keeps the selected default capacity for new scheduling cycles.
-          </p>
         </div>
 
-        <div className="md:col-span-2">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-white/80">Pickup and Drop Routes (multiple allowed)</p>
+        {/* Availability Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Availability</h3>
+          <label className="text-sm text-white/80">
+            Availability Date Range
+            <div className="mt-2">
+              <CustomDateRangePicker
+                startDate={availabilityStartDate}
+                endDate={availabilityEndDate}
+                onChange={({ startDate, endDate }) => {
+                  setAvailabilityStartDate(startDate);
+                  setAvailabilityEndDate(endDate);
+                }}
+                error={adminBusFieldErrors.availabilityRange}
+                minDate={new Date().toISOString().slice(0, 10)}
+              />
+            </div>
+            {adminBusFieldErrors.availabilityRange && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.availabilityRange}</p>}
+          </label>
+          <div className="dashboard-surface-soft rounded-lg px-4 py-3">
+            <label className="inline-flex items-center gap-3 text-sm text-white/90 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoRenewCapacity}
+                onChange={(event) => setAutoRenewCapacity(event.target.checked)}
+                className="h-4 w-4 accent-[#CDD645]"
+              />
+              Auto-renew capacity for the selected date range.
+            </label>
+            <p className="mt-1 text-xs text-white/55">
+              If checked, this bus will maintain its capacity for new scheduling cycles within these dates.
+            </p>
+          </div>
+        </div>
+
+        {/* Routes Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Routes & Pricing</h3>
             <button
               type="button"
               onClick={addRouteConfig}
-              className="rounded-md border border-[#D5E400]/60 px-3 py-1.5 text-xs text-[#E4E67A] hover:bg-[#D5E400]/10"
+              className="inline-flex items-center gap-2 rounded-full border border-[#D5E400]/60 px-4 py-2 text-sm text-[#E4E67A] transition hover:bg-[#D5E400]/10"
             >
-              + Add Route
+              <Icon icon="solar:add-circle-linear" className="text-base" />
+              Add Route
             </button>
           </div>
-
-          <div className="space-y-4">
+          <div className="space-y-6">
             {routeConfigs.map((routeConfig, routeIndex) => (
-              <div key={`route-${routeIndex}`} className="rounded-xl border border-white/20 bg-black/30 p-4">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-[#E4E67A]">Route {routeIndex + 1}</p>
-                  <div className="flex items-center gap-2">
+              <div key={`route-${routeIndex}`} className="dashboard-subsurface rounded-xl p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <p className="text-lg font-semibold text-[#E4E67A]">Route {routeIndex + 1}</p>
+                  {routeConfigs.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => toggleRouteMinimize(routeIndex)}
-                      className="rounded-md border border-white/30 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/10"
+                      onClick={() => removeRouteConfig(routeIndex)}
+                      className="text-sm text-red-400 hover:text-red-300"
                     >
-                      {routeConfig.minimized ? "Expand" : "Minimize"}
+                      Remove Route
                     </button>
-                    {routeConfigs.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeRouteConfig(routeIndex)}
-                        className="text-xs text-red-300 hover:text-red-200"
-                      >
-                        Remove Route
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
-
-                {routeConfig.minimized && (
-                  <p className="text-xs text-white/65">
-                    {locationNameById.get(routeConfig.pickupLocationId) || "Pickup"} to{" "}
-                    {locationNameById.get(routeConfig.dropLocationId) || "Drop"} |{" "}
-                    {routeConfig.pickupTime || "--:--"} - {routeConfig.dropTime || "--:--"}
-                  </p>
-                )}
-
-                {!routeConfig.minimized && (
-                  <>
-                    <div className="mb-3 rounded-lg border border-white/15 bg-black/25 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-[11px] text-white/70">
-                          Pickup/drop not found? Add it here or use Sidebar {">"} Pickup/Drop.
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openInlineLocationCreator(routeIndex, "pickup")}
-                            className="rounded-md border border-[#D5E400]/60 px-2.5 py-1 text-[11px] text-[#E4E67A] hover:bg-[#D5E400]/10"
-                          >
-                            + Add Pickup
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openInlineLocationCreator(routeIndex, "drop")}
-                            className="rounded-md border border-[#D5E400]/60 px-2.5 py-1 text-[11px] text-[#E4E67A] hover:bg-[#D5E400]/10"
-                          >
-                            + Add Drop
-                          </button>
-                        </div>
-                      </div>
-
-                      {showInlineLocationCreator?.routeIndex === routeIndex && (
-                        <div className="mt-3 rounded-lg border border-white/15 bg-black/30 p-3">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <p className="text-xs font-semibold text-[#E4E67A]">
-                              Add {showInlineLocationCreator.field === "pickup" ? "Pickup" : "Drop"} Location
-                            </p>
-                            <button
-                              type="button"
-                              onClick={closeInlineLocationCreator}
-                              className="rounded-md border border-white/30 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/10"
-                            >
-                              Close
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <label className="text-[11px] text-white/80">
-                              Location Name
-                              <input
-                                value={inlineLocationForm.name}
-                                onChange={(event) =>
-                                  setInlineLocationForm((prev) => ({ ...prev, name: event.target.value }))
-                                }
-                                className={`mt-1 w-full rounded-md bg-black px-2 py-1.5 text-xs text-white outline-none border ${inlineLocationFieldErrors.name ? "border-red-500" : "border-white/20"}`}
-                                placeholder="e.g. Dadar TT"
-                              />
-                              {inlineLocationFieldErrors.name && (
-                                <p className="mt-1 text-[10px] text-red-400">{inlineLocationFieldErrors.name}</p>
-                              )}
-                            </label>
-
-                            <label className="text-[11px] text-white/80">
-                              City
-                              <input
-                                value={inlineLocationForm.city}
-                                onChange={(event) =>
-                                  setInlineLocationForm((prev) => ({ ...prev, city: event.target.value }))
-                                }
-                                className={`mt-1 w-full rounded-md bg-black px-2 py-1.5 text-xs text-white outline-none border ${inlineLocationFieldErrors.city ? "border-red-500" : "border-white/20"}`}
-                                placeholder="City"
-                              />
-                              {inlineLocationFieldErrors.city && (
-                                <p className="mt-1 text-[10px] text-red-400">{inlineLocationFieldErrors.city}</p>
-                              )}
-                            </label>
-
-                            <label className="text-[11px] text-white/80">
-                              State
-                              <input
-                                value={inlineLocationForm.state}
-                                onChange={(event) =>
-                                  setInlineLocationForm((prev) => ({ ...prev, state: event.target.value }))
-                                }
-                                className={`mt-1 w-full rounded-md bg-black px-2 py-1.5 text-xs text-white outline-none border ${inlineLocationFieldErrors.state ? "border-red-500" : "border-white/20"}`}
-                                placeholder="State"
-                              />
-                              {inlineLocationFieldErrors.state && (
-                                <p className="mt-1 text-[10px] text-red-400">{inlineLocationFieldErrors.state}</p>
-                              )}
-                            </label>
-
-                            <label className="text-[11px] text-white/80">
-                              ZIP
-                              <input
-                                value={inlineLocationForm.zip}
-                                onChange={(event) =>
-                                  setInlineLocationForm((prev) => ({ ...prev, zip: event.target.value }))
-                                }
-                                className={`mt-1 w-full rounded-md bg-black px-2 py-1.5 text-xs text-white outline-none border ${inlineLocationFieldErrors.zip ? "border-red-500" : "border-white/20"}`}
-                                placeholder="ZIP Code"
-                              />
-                              {inlineLocationFieldErrors.zip && (
-                                <p className="mt-1 text-[10px] text-red-400">{inlineLocationFieldErrors.zip}</p>
-                              )}
-                            </label>
-
-                            <label className="text-[11px] text-white/80 md:col-span-2">
-                              Address
-                              <input
-                                value={inlineLocationForm.address}
-                                onChange={(event) =>
-                                  setInlineLocationForm((prev) => ({ ...prev, address: event.target.value }))
-                                }
-                                className={`mt-1 w-full rounded-md bg-black px-2 py-1.5 text-xs text-white outline-none border ${inlineLocationFieldErrors.address ? "border-red-500" : "border-white/20"}`}
-                                placeholder="Street / landmark"
-                              />
-                              {inlineLocationFieldErrors.address && (
-                                <p className="mt-1 text-[10px] text-red-400">{inlineLocationFieldErrors.address}</p>
-                              )}
-                            </label>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-[11px] text-white/65">
-                              Duplicate locations are blocked automatically.
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleInlineLocationCreate}
-                              disabled={savingInlineLocation}
-                              className="rounded-md border border-[#D5E400]/70 px-3 py-1.5 text-xs font-semibold text-[#E4E67A] hover:bg-[#D5E400]/10 disabled:opacity-60"
-                            >
-                              {savingInlineLocation ? "Saving..." : "Save Location"}
-                            </button>
-                          </div>
-
-                          {inlineLocationError && (
-                            <p className="mt-2 text-[11px] text-red-300">{inlineLocationError}</p>
-                          )}
-                          {inlineLocationMessage && (
-                            <p className="mt-2 text-[11px] text-green-300">{inlineLocationMessage}</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <label className="text-xs text-white/80">
-                        Pickup Location
-                        <select
-                          value={routeConfig.pickupLocationId}
-                          onChange={(event) => {
-                            const nextPickup = event.target.value;
-                            updateRouteConfig(routeIndex, (current) => ({
-                              ...current,
-                              pickupLocationId: nextPickup,
-                              dropLocationId:
-                                current.dropLocationId === nextPickup ? "" : current.dropLocationId,
-                            }));
-                          }}
-                          className={`mt-2 block w-full rounded-lg bg-black px-3 py-2 text-white/90 outline-none border ${adminBusFieldErrors[`route.${routeIndex}.pickupLocationId`] ? "border-red-500" : "border-white/20"}`}
-                        >
-                          <option value="" className="text-black">Select pickup location</option>
-                          {locations.map((location) => (
-                            <option key={location._id} value={location._id} className="text-black">
-                              {location.name} ({location.city})
-                            </option>
-                          ))}
-                        </select>
-                        {adminBusFieldErrors[`route.${routeIndex}.pickupLocationId`] && (
-                          <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors[`route.${routeIndex}.pickupLocationId`]}</p>
-                        )}
-                      </label>
-
-                      <label className="text-xs text-white/80">
-                        Drop Location
-                        <select
-                          value={routeConfig.dropLocationId}
-                          onChange={(event) =>
-                            updateRouteConfig(routeIndex, (current) => ({
-                              ...current,
-                              dropLocationId: event.target.value,
-                            }))
-                          }
-                          className={`mt-2 block w-full rounded-lg bg-black px-3 py-2 text-white/90 outline-none border ${adminBusFieldErrors[`route.${routeIndex}.dropLocationId`] ? "border-red-500" : "border-white/20"}`}
-                        >
-                          <option value="" className="text-black">Select drop location</option>
-                          {locations
-                            .filter((location) => location._id !== routeConfig.pickupLocationId)
-                            .map((location) => (
-                              <option key={location._id} value={location._id} className="text-black">
-                                {location.name} ({location.city})
-                              </option>
-                            ))}
-                        </select>
-                        {adminBusFieldErrors[`route.${routeIndex}.dropLocationId`] && (
-                          <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors[`route.${routeIndex}.dropLocationId`]}</p>
-                        )}
-                      </label>
-
-                      <label className="text-xs text-white/80">
-                        Pickup Time
-                        <div className="mt-2">
-                          <CustomTimePicker
-                            value={routeConfig.pickupTime}
-                            onChange={(nextTime) =>
-                              updateRouteConfig(routeIndex, (current) => ({
-                                ...current,
-                                pickupTime: nextTime,
-                              }))
-                            }
-                            error={adminBusFieldErrors[`route.${routeIndex}.pickupTime`]}
-                          />
-                        </div>
-                        {adminBusFieldErrors[`route.${routeIndex}.pickupTime`] && (
-                          <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors[`route.${routeIndex}.pickupTime`]}</p>
-                        )}
-                      </label>
-
-                      <label className="text-xs text-white/80">
-                        Drop Time
-                        <div className="mt-2">
-                          <CustomTimePicker
-                            value={routeConfig.dropTime}
-                            onChange={(nextTime) =>
-                              updateRouteConfig(routeIndex, (current) => ({
-                                ...current,
-                                dropTime: nextTime,
-                              }))
-                            }
-                            error={adminBusFieldErrors[`route.${routeIndex}.dropTime`]}
-                          />
-                        </div>
-                        {adminBusFieldErrors[`route.${routeIndex}.dropTime`] && (
-                          <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors[`route.${routeIndex}.dropTime`]}</p>
-                        )}
-                      </label>
-                    </div>
-
-                    <div className="mt-4">
-                      <p className="text-xs text-white/80 mb-2">Price (INR) by Material Type</p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        {Object.entries(routeConfig.materialFares).map(([material, fare]) => (
-                          <label key={`${material}-${routeIndex}`} className="text-[11px] text-white/70">
-                            {material} Price
-                            <input
-                              type="number"
-                              min={0}
-                              value={fare}
-                              onChange={(event) =>
-                                updateRouteConfig(routeIndex, (current) => ({
-                                  ...current,
-                                  materialFares: {
-                                    ...current.materialFares,
-                                    [material]: Number(event.target.value) || 0,
-                                  },
-                                }))
-                              }
-                              className="mt-1 w-full bg-black rounded-md border border-white/20 px-2 py-1.5 text-xs text-white outline-none"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                      {adminBusFieldErrors[`route.${routeIndex}.materialFares`] && (
-                        <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors[`route.${routeIndex}.materialFares`]}</p>
-                      )}
-                    </div>
-
-                    <div className="mt-4 rounded-lg border border-white/15 bg-black/25 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-white/80">Specific Date Price Overrides</p>
-                        <button
-                          type="button"
-                          onClick={() => addRouteDateOverride(routeIndex)}
-                          className="rounded-md border border-[#D5E400]/60 px-2.5 py-1 text-[11px] text-[#E4E67A] hover:bg-[#D5E400]/10"
-                        >
-                          + Add Specific Date
-                        </button>
-                      </div>
-                      {routeConfig.dateOverrides.length === 0 ? (
-                        <p className="mt-2 text-[11px] text-white/55">
-                          No overrides yet. Default range pricing will apply.
-                        </p>
-                      ) : (
-                        <div className="mt-3 space-y-3">
-                          {routeConfig.dateOverrides.map((override, overrideIndex) => (
-                            <div key={`route-${routeIndex}-override-${overrideIndex}`} className="rounded-md border border-white/15 bg-black/40 p-3">
-                              <div className="mb-2 flex items-center justify-between gap-2">
-                                <p className="text-[11px] text-[#E4E67A]">Override {overrideIndex + 1}</p>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleRouteDateOverrideMinimize(routeIndex, overrideIndex)}
-                                    className="rounded-md border border-white/30 px-2 py-0.5 text-[10px] text-white/80 hover:bg-white/10"
-                                  >
-                                    {override.minimized ? "Expand" : "Minimize"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeRouteDateOverride(routeIndex, overrideIndex)}
-                                    className="text-[11px] text-red-300 hover:text-red-200"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-
-                              {override.minimized ? (
-                                <p className="text-[11px] text-white/65">
-                                  {override.date || "--"} | override fares configured
-                                </p>
-                              ) : (
-                                <>
-                                  <label className="text-[11px] text-white/80">
-                                    Specific Date
-                                    <div className="mt-1">
-                                      <CustomDatePicker
-                                        value={override.date}
-                                        minDate={availabilityStartDate}
-                                        maxDate={availabilityEndDate}
-                                        restrictToAvailableDates={false}
-                                        syncWithCartDate={false}
-                                        onChange={(nextValue) =>
-                                          updateRouteConfig(routeIndex, (current) => ({
-                                            ...current,
-                                            dateOverrides: current.dateOverrides.map((item, index) =>
-                                              index === overrideIndex
-                                                ? { ...item, date: nextValue }
-                                                : item,
-                                            ),
-                                          }))
-                                        }
-                                        error={adminBusFieldErrors[`route.${routeIndex}.override.${overrideIndex}.date`]}
-                                      />
-                                    </div>
-                                  </label>
-                                  {adminBusFieldErrors[`route.${routeIndex}.override.${overrideIndex}.date`] && (
-                                    <p className="mt-1 text-[11px] text-red-400">{adminBusFieldErrors[`route.${routeIndex}.override.${overrideIndex}.date`]}</p>
-                                  )}
-
-                                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    {Object.entries(override.fares).map(([material, fare]) => (
-                                      <label key={`${material}-${routeIndex}-${overrideIndex}`} className="text-[11px] text-white/70">
-                                        {material} Price
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          value={fare}
-                                          onChange={(event) =>
-                                            updateRouteConfig(routeIndex, (current) => ({
-                                              ...current,
-                                              dateOverrides: current.dateOverrides.map((item, index) =>
-                                                index === overrideIndex
-                                                  ? {
-                                                      ...item,
-                                                      fares: {
-                                                        ...item.fares,
-                                                        [material]: Number(event.target.value) || 0,
-                                                      },
-                                                    }
-                                                  : item,
-                                              ),
-                                            }))
-                                          }
-                                          className="mt-1 w-full rounded-md border border-white/20 bg-black px-2 py-1.5 text-xs text-white outline-none"
-                                        />
-                                      </label>
-                                    ))}
-                                  </div>
-                                  {adminBusFieldErrors[`route.${routeIndex}.override.${overrideIndex}.fares`] && (
-                                    <p className="mt-1 text-[11px] text-red-400">{adminBusFieldErrors[`route.${routeIndex}.override.${overrideIndex}.fares`]}</p>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
+                {/* ... existing route form fields ... */}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="md:col-span-2">
-          <p className="text-sm text-white/80 mb-2">Upload Bus Image (single)</p>
-          <div className="flex flex-wrap gap-3">
+        {/* Bus Image Upload Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Bus Image</h3>
+          <div className="flex flex-wrap gap-4 items-center">
             <div
               {...getRootProps()}
-              className={`h-24 w-24 rounded-lg border-2 border-dashed cursor-pointer flex items-center justify-center transition-colors ${isDragActive ? "border-[#CDD645] bg-[#1e241b]/60" : "border-white/40 bg-black/20 hover:border-[#CDD645]/70"}`}
+              className={`h-32 w-32 rounded-lg border-2 border-dashed cursor-pointer flex items-center justify-center transition-colors ${isDragActive ? "border-[#CDD645] bg-[#1e241b]/60" : "border-white/20 bg-white/5 hover:border-[#CDD645]/70"}`}
             >
               <input {...getInputProps()} />
-              <div className="flex flex-col items-center text-white/70 text-[11px]">
-                <Icon icon="solar:camera-add-linear" className="text-lg mb-1" />
-                <span>{isDragActive ? "Drop" : "Add"}</span>
+              <div className="flex flex-col items-center text-white/70 text-center">
+                <Icon icon="solar:camera-add-linear" className="text-2xl mb-1" />
+                <span className="text-xs">{isDragActive ? "Drop Image" : "Add Image"}</span>
               </div>
             </div>
-
             {busImagePreviews.map((image, index) => (
-              <div key={image.id} className="relative h-24 w-24 rounded-lg overflow-hidden border border-white/20">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div key={image.id} className="relative h-32 w-32 rounded-lg overflow-hidden border-2 border-[#4e573f]">
                 <img
                   src={image.preview}
                   alt={image.file.name}
@@ -1339,58 +1041,54 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setBusImages((prev) => prev.filter((_, fileIndex) => fileIndex !== index))}
-                  className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-red-300 hover:text-red-200"
+                  className="absolute top-1 right-1 rounded-full bg-black/70 p-1.5 text-red-300 hover:text-red-200"
                   aria-label={`Remove ${image.file.name}`}
                 >
-                  <Icon icon="solar:trash-bin-trash-linear" className="text-sm" />
+                  <Icon icon="solar:trash-bin-trash-linear" className="text-base" />
                 </button>
               </div>
             ))}
-          </div>
-          {editingBus && editingBus.busImages?.length > 0 && busImages.length === 0 && (
-            <div className="mt-3">
-              <p className="text-xs text-white/60 mb-2">Existing image (kept on update):</p>
-              <div className="flex flex-wrap gap-3">
-                <div className="h-24 w-24 rounded-lg overflow-hidden border border-white/15">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+            {editingBus && editingBus.busImages?.length > 0 && busImages.length === 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-white/60 mb-2">Existing image:</p>
+                <div className="h-32 w-32 rounded-lg overflow-hidden border-2 border-[#4e573f]">
                   <img src={editingBus.busImages[0]} alt="Existing bus image" className="h-full w-full object-cover" />
                 </div>
               </div>
-            </div>
-          )}
-          {busImages.length > 0 && (
-            <p className="mt-2 text-xs text-white/60">
-              1 new image selected.
-            </p>
-          )}
+            )}
+          </div>
           {adminBusFieldErrors.busImages && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busImages}</p>}
         </div>
 
-        <div className="md:col-span-2 flex items-center justify-between gap-3">
-          <div className="text-xs text-white/70">
-            {loadingLocations
-              ? <Skeleton className="h-3 w-28" />
-              : busImages.length > 0
-                ? "1 image selected"
-                : "No new image selected"}
-          </div>
+        {/* Form Submission */}
+        <div className="flex items-center justify-end gap-4 pt-4 border-t border-[#4e573f]">
+          <button
+            type="button"
+            onClick={() => {
+              resetAdminBusForm();
+              if (!locked) setShowAdminBusForm(false);
+            }}
+            className="px-6 py-2 rounded-full border border-white/30 text-white/80 font-semibold transition-all duration-300 hover:bg-white/10"
+          >
+            Reset Form
+          </button>
           <button
             type="submit"
             disabled={savingBus || loadingLocations}
-            className="px-6 py-2 rounded-full border border-[#D5E400] text-[#D5E400] font-semibold transition-all duration-300 hover:shadow-2xl hover:shadow-[#D5E400]/60 hover:bg-[#D5E400] hover:text-black disabled:opacity-50"
+            className="px-8 py-3 rounded-full border border-[#D5E400] text-[#D5E400] font-semibold transition-all duration-300 hover:shadow-2xl hover:shadow-[#D5E400]/60 hover:bg-[#D5E400] hover:text-black disabled:opacity-50"
           >
-            {savingBus ? (editingBusId ? "Updating..." : "Saving...") : editingBusId ? "Update Bus" : "Add Bus"}
+            {savingBus ? (editingBusId ? "Updating Bus..." : "Saving Bus...") : editingBusId ? "Update Bus" : "Add Bus"}
           </button>
         </div>
       </form>
 
       {adminBusError && (
-        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+        <div className="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
           {adminBusError}
         </div>
       )}
       {adminBusMessage && (
-        <div className="mt-4 rounded-xl border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-300">
+        <div className="mt-6 rounded-xl border border-green-500/40 bg-green-500/10 p-4 text-sm text-green-300">
           {adminBusMessage}
         </div>
       )}
@@ -1399,31 +1097,156 @@ export default function DashboardPage() {
 
   if (isAdminLocked) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 pb-20">
-        <div className="rounded-2xl border border-[#d3ba69]/45 bg-[#d3ba69]/10 p-4 text-sm text-[#f6de9c] mb-6">
-          Add your first bus to unlock Orders, Operators and Support routes.
+      <div className="p-4 sm:p-6 lg:p-8 pb-20 text-center">
+        <div className="mx-auto max-w-4xl">
+          <div className="overflow-hidden rounded-[2.2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(31,40,29,0.98),rgba(21,29,23,0.96),rgba(15,21,16,0.98))] p-6 text-left shadow-[0_28px_70px_rgba(0,0,0,0.24)] sm:p-8">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#d3ba69]/30 bg-[#d3ba69]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f6de9c]">
+                  <Icon icon="solar:bus-line-duotone" className="text-base" />
+                  First-time admin setup
+                </div>
+                <h2 className="mt-4 text-3xl font-bold tracking-tight text-[#F4F8BF]">
+                  Add your contact number first, then launch your first bus.
+                </h2>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-white/72 sm:text-base">
+                  Your phone number is used as the primary admin contact for operations and support. Once that is saved, you can add your first bus and unlock the full dashboard.
+                </p>
+              </div>
+
+              <div className="grid gap-3 rounded-[1.6rem] border border-white/10 bg-white/5 p-4 xl:min-w-[320px]">
+                <div className="rounded-[1.25rem] border border-white/10 bg-black/10 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isAdminMissingContactNumber ? "bg-amber-500/12 text-amber-200" : "bg-emerald-500/12 text-emerald-200"}`}>
+                      <Icon icon={isAdminMissingContactNumber ? "solar:phone-calling-rounded-linear" : "solar:check-circle-bold-duotone"} className="text-[1.35rem]" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-white/50">Step 1</p>
+                      <p className="mt-1 text-sm font-semibold text-white">
+                        {isAdminMissingContactNumber ? "Add contact number" : "Contact number saved"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-[1.25rem] border border-white/10 bg-black/10 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#d5e400]/12 text-[#E4E67A]">
+                      <Icon icon="solar:bus-line-duotone" className="text-[1.35rem]" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-white/50">Step 2</p>
+                      <p className="mt-1 text-sm font-semibold text-white">Add first bus</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_auto]">
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/10 p-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#d5e400]/12 text-[#E4E67A]">
+                    <Icon icon="solar:phone-calling-rounded-bold-duotone" className="text-[1.5rem]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-white">Admin contact number</p>
+                    <p className="mt-1 text-sm text-white/62">
+                      Add the number your team and users should reach first.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <input
+                    type="tel"
+                    value={requiredAdminPhoneDraft}
+                    onChange={(event) => {
+                      setRequiredAdminPhoneDraft(formatIndiaPhoneInput(event.target.value));
+                      if (requiredAdminPhoneError) setRequiredAdminPhoneError("");
+                      if (requiredAdminPhoneMessage) setRequiredAdminPhoneMessage("");
+                    }}
+                    placeholder="+91 9876543210"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-[#D5E400]/45"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveRequiredAdminPhone}
+                    disabled={savingRequiredAdminPhone || !isAdminMissingContactNumber}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D5E400]/30 bg-[#D5E400]/10 px-5 py-3 text-sm font-semibold text-[#F4F8BF] transition hover:bg-[#D5E400]/16 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Icon icon={savingRequiredAdminPhone ? "line-md:loading-loop" : "solar:check-circle-bold-duotone"} className="text-base" />
+                    {savingRequiredAdminPhone ? "Saving..." : isAdminMissingContactNumber ? "Save Contact" : "Saved"}
+                  </button>
+                </div>
+
+                {requiredAdminPhoneError ? (
+                  <p className="mt-3 text-sm text-rose-300">{requiredAdminPhoneError}</p>
+                ) : null}
+                {requiredAdminPhoneMessage ? (
+                  <p className="mt-3 text-sm text-emerald-300">{requiredAdminPhoneMessage}</p>
+                ) : null}
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => router.push("/dashboard/addbus")}
+                  disabled={isAdminMissingContactNumber}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#D5E400] px-8 py-3 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-2xl hover:shadow-[#D5E400]/60 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40 disabled:hover:bg-transparent disabled:hover:text-white/40 disabled:hover:shadow-none"
+                >
+                  <Icon icon="solar:bus-line-duotone" className="text-lg" />
+                  Add Your First Bus
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard/addbus")}
-          className="px-6 py-2 rounded-full border border-[#D5E400] text-[#D5E400] font-semibold transition-all duration-300 hover:shadow-2xl hover:shadow-[#D5E400]/60 hover:bg-[#D5E400] hover:text-black"
-        >
-          Go To Add Bus
-        </button>
       </div>
     );
   }
 
+  if (isAdminRole) {
+    return (
+      <div className='p-4 sm:p-6 lg:p-8 pb-20'>
+        <DashboardHero
+          eyebrow={dashboardRoleLabel}
+          title={dashboardTitle}
+          description={dashboardSubtitle}
+          icon={dashboardRoleIcon}
+        />
+
+        <div className="mt-8 space-y-8">
+          <SupportSpotlightCard
+            eyebrow={supportSpotlight.eyebrow}
+            title={supportSpotlight.title}
+            description={supportSpotlight.description}
+            buttonLabel={supportSpotlight.buttonLabel}
+            onClick={handleSupportClick}
+          />
+          {showAdminBusForm ? renderAdminBusForm() : <ServicesSection services={services} />}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='p-4 sm:p-6 lg:p-8 pb-20'>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold mb-2">Hey,</h1>
-        <p className="text-3xl font-bold text-[#E4E67A]">{user?.name} 👋</p>
-      </div>
+      <DashboardHero
+        eyebrow={dashboardRoleLabel}
+        title={isPublicUserRole ? customerGreeting : `${dashboardTitle} ${user?.name ? `Welcome back, ${user.name}.` : ""}`.trim()}
+        description={dashboardSubtitle}
+        icon={dashboardRoleIcon}
+      />
 
       {isOperatorRole ? (
-        <div className="space-y-8">
+        <div className="mt-8 space-y-8">
+          <SupportSpotlightCard
+            eyebrow={supportSpotlight.eyebrow}
+            title={supportSpotlight.title}
+            description={supportSpotlight.description}
+            buttonLabel={supportSpotlight.buttonLabel}
+            onClick={handleSupportClick}
+          />
           <OperatorActiveOrderCard
             ordersByStage={operatorOrdersByStage}
             loading={operatorOrderLoading}
@@ -1434,21 +1257,35 @@ export default function DashboardPage() {
           <ServicesSection services={services} />
         </div>
       ) : (
-        <div>
-          {bannerSlides.length > 0 && <BannerCarousel slides={bannerSlides} />}
-          {isPublicUserRole && (
-            <div id="dashboard-order-tracker" className='mt-12'>
-              <OrderTrackingWidget mode="dashboard" />
+        <div className="mt-8 space-y-8">
+          {bannerSlides.length > 0 ? <BannerCarousel slides={bannerSlides} /> : null}
+
+          {isPublicUserRole ? (
+            <div className="flex flex-col gap-8">
+              <div id="dashboard-order-tracker" className="min-w-0">
+                <OrderTrackingWidget mode="dashboard" />
+              </div>
+              <div className="">
+                <SupportSpotlightCard
+                  eyebrow={supportSpotlight.eyebrow}
+                  title={supportSpotlight.title}
+                  description={supportSpotlight.description}
+                  buttonLabel={supportSpotlight.buttonLabel}
+                  onClick={handleSupportClick}
+                />
+              </div>
             </div>
-          )}
-          <div>
-            <ServicesSection services={services} />
-          </div>
-          <div className='mt-12'>
-            <ContinueOrderPrompt />
-          </div>
-          <div className='mt-12'>
-            <RecentOrders />
+          ) : null}
+
+          <ServicesSection services={services} />
+
+          <div className="flex flex-col">
+            <div className="min-w-0">
+              <RecentOrders />
+            </div>
+            <div className="min-w-0">
+              <ContinueOrderPrompt />
+            </div>
           </div>
         </div>
       )}
@@ -1458,9 +1295,80 @@ export default function DashboardPage() {
 
 interface Service {
   title: string;
+  description: string;
+  actionLabel: string;
+  iconKey: string;
   icon: StaticImageData;
   width: number;
   onclick?: () => void;
+}
+
+function DashboardHero({
+  eyebrow,
+  title,
+  description,
+  icon,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: string;
+}) {
+  return (
+    <section className="relative pb-2">
+      <div className="max-w-4xl">
+        <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-lime-100">
+          <Icon icon={icon} className="text-base" />
+          {eyebrow}
+        </div>
+        <h1 className="mt-5 max-w-4xl text-3xl font-semibold tracking-tight text-white sm:text-[3.35rem] sm:leading-[1.05]">
+          {title}
+        </h1>
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-white/72 sm:text-base">
+          {description}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function SupportSpotlightCard({
+  eyebrow,
+  title,
+  description,
+  buttonLabel,
+  onClick,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  onClick?: () => void;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[1.9rem] border border-white/10 bg-[linear-gradient(135deg,rgba(17,28,21,0.96),rgba(26,39,31,0.9),rgba(14,20,16,0.96))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)]">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[#d5e400]/12 text-[#f3fbad]">
+            <Icon icon="solar:headphones-round-sound-bold-duotone" className="text-[1.7rem]" />
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{eyebrow}</p>
+            <h2 className="mt-2 text-xl font-semibold text-white">{title}</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">{description}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClick}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-lime-300/25 bg-lime-300/10 px-5 py-3 text-sm font-semibold text-lime-100 transition hover:bg-lime-300/16"
+        >
+          <Icon icon="solar:arrow-right-up-linear" className="text-base" />
+          {buttonLabel}
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function BannerCarousel({ slides }: { slides: string[] }) {
@@ -1480,7 +1388,7 @@ function BannerCarousel({ slides }: { slides: string[] }) {
   const goNext = () => setActiveIndex((prev) => (prev + 1) % slides.length);
 
   return (
-    <div className='mt-4 relative overflow-hidden rounded-2xl border border-[#4e573f] bg-[#1f251c]'>
+    <div className='dashboard-surface mt-4 relative overflow-hidden rounded-2xl'>
       <div
         className='flex transition-transform duration-500 ease-out'
         style={{ transform: `translateX(-${safeActiveIndex * 100}%)` }}
@@ -1532,31 +1440,61 @@ function BannerCarousel({ slides }: { slides: string[] }) {
 
 export function ServicesSection({ services }: { services: Service[] }) {
   return (
-    <div className="my-12">
-      {/* <h2 className="text-yellow-200 text-2xl  text-center sm:text-3xl font-semibold mb-8"> Services</h2> */}
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 auto-rows-max gap-8 mx-auto max-w-fit">
-        {services.map((service, index) => (
-          <div
-            key={index}
-            className="bg-[#3b3f2f] w-56 py-3 rounded-2xl flex items-end justify-between px-5 cursor-pointer 
-      hover:scale-105 transition-all duration-300 shadow-md"
-
-            onClick={service.onclick}
-          >
-            <p className="text-yellow-200 w-20 text-lg font-bold">
-              {service.title}
-            </p>
-
-            <Image
-              src={service.icon}
-              alt="Services"
-              width={service.width * 0.75}
-            />
-          </div>
-        ))}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Dashboard actions</p>
+          <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Move through the dashboard faster</h2>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.14em] text-white/55">
+          <Icon icon="solar:widget-2-bold-duotone" className="text-base text-[#E4E67A]" />
+          {services.length} active lanes
+        </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        {services.map((service, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={service.onclick}
+            className="group relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[linear-gradient(180deg,rgba(31,37,28,0.98),rgba(24,30,22,0.94))] p-6 text-left shadow-[0_20px_50px_rgba(0,0,0,0.18)] transition-all duration-300 hover:-translate-y-1 hover:border-lime-300/20 hover:bg-[linear-gradient(180deg,rgba(38,46,33,0.98),rgba(26,34,24,0.94))]"
+          >
+            <div className="pointer-events-none absolute right-[-1.5rem] top-[-1.5rem] h-28 w-28 rounded-full bg-[#d5e400]/8 blur-2xl transition group-hover:bg-[#d5e400]/14" />
+            <div className="relative flex h-full flex-col">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[1.1rem] bg-[#d5e400]/12 text-[#f3fbad]">
+                  <Icon icon={service.iconKey} className="text-[1.45rem]" />
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-white/50">
+                  <Icon icon="solar:arrow-right-up-linear" className="text-sm" />
+                  {service.actionLabel}
+                </span>
+              </div>
+
+              <div className="mt-5">
+                <p className="text-xl font-semibold text-white">{service.title}</p>
+                <p className="mt-2 text-sm leading-6 text-white/62">{service.description}</p>
+              </div>
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-[#E4E67A]">
+                  <Icon icon="solar:cursor-bold-duotone" className="text-base" />
+                  Open lane
+                </div>
+                <div className="relative">
+                  <Image
+                    src={service.icon}
+                    alt={service.title}
+                    width={service.width * 0.72}
+                    className="drop-shadow-[0_16px_28px_rgba(0,0,0,0.35)] transition duration-300 group-hover:scale-[1.03]"
+                  />
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

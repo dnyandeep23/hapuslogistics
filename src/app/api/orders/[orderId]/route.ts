@@ -9,6 +9,7 @@ import User from "@/app/api/models/userModel";
 import Bus from "@/app/api/models/busModel";
 import Order from "@/app/api/models/orderModel";
 import TravelCompany from "@/app/api/models/travelCompanyModel";
+import { normalizeIndiaPhone } from "@/lib/phone";
 
 type Role = "user" | "operator" | "admin";
 
@@ -499,9 +500,12 @@ function mergeOwnerEditableContacts(
     "senderPhone",
   ]);
   if (senderContact !== null) {
-    nextSenderInfo.contact = senderContact;
-    nextSenderInfo.senderContact = senderContact;
-    nextSenderInfo.phone = senderContact;
+    const normalizedSenderContact = normalizeIndiaPhone(senderContact);
+    if (normalizedSenderContact) {
+      nextSenderInfo.contact = normalizedSenderContact;
+      nextSenderInfo.senderContact = normalizedSenderContact;
+      nextSenderInfo.phone = normalizedSenderContact;
+    }
   }
 
   const receiverContact = readFirstDefinedValue(receiverInput, [
@@ -511,9 +515,12 @@ function mergeOwnerEditableContacts(
     "receiverPhone",
   ]);
   if (receiverContact !== null) {
-    nextReceiverInfo.contact = receiverContact;
-    nextReceiverInfo.receiverContact = receiverContact;
-    nextReceiverInfo.phone = receiverContact;
+    const normalizedReceiverContact = normalizeIndiaPhone(receiverContact);
+    if (normalizedReceiverContact) {
+      nextReceiverInfo.contact = normalizedReceiverContact;
+      nextReceiverInfo.receiverContact = normalizedReceiverContact;
+      nextReceiverInfo.phone = normalizedReceiverContact;
+    }
   }
 
   return { senderInfo: nextSenderInfo, receiverInfo: nextReceiverInfo };
@@ -534,7 +541,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload;
-    const user = await User.findById(payload.id).select("_id role isSuperAdmin travelCompanyId buses");
+    const user = await User.findById(payload.id).select("_id role travelCompanyId buses");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -545,7 +552,6 @@ export async function GET(request: NextRequest, context: ParamsContext) {
     }
 
     const userRole = toStringValue((user as { role?: unknown }).role) as Role;
-    const isSuperAdmin = Boolean((user as { isSuperAdmin?: unknown }).isSuperAdmin);
 
     let orderQuery = Order.findOne({ _id: orderId });
     if (Order.schema.path("assignedBus")) {
@@ -581,7 +587,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
     const candidateBusRefs = [assignedBus, bookedBus].filter(
       (bus): bus is UnknownRecord => Boolean(bus),
     );
-    if (!isOrderOwner && !isSuperAdmin && userRole === "admin") {
+    if (!isOrderOwner && userRole === "admin") {
       const userTravelCompanyId = toStringValue((user as { travelCompanyId?: unknown }).travelCompanyId);
       const userBusIds = Array.isArray((user as { buses?: unknown[] }).buses)
         ? (user as { buses?: unknown[] }).buses!.map((id) => toStringValue(id))
@@ -599,7 +605,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
       if (!adminHasAccess) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-    } else if (!isOrderOwner && !isSuperAdmin && userRole === "operator") {
+    } else if (!isOrderOwner && userRole === "operator") {
       const hasOperatorAccess = candidateBusRefs.some((busRef) => {
         const periodsRaw = Array.isArray(busRef.operatorContactPeriods)
           ? (busRef.operatorContactPeriods as unknown[])
@@ -613,7 +619,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
       if (!hasOperatorAccess) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-    } else if (!isOrderOwner && !isSuperAdmin && userRole !== "admin" && userRole !== "operator") {
+    } else if (!isOrderOwner && userRole !== "admin" && userRole !== "operator") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -678,7 +684,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
     }
 
     const adminCanEditOrder =
-      userRole === "admin" || isSuperAdmin ? canAdminEditOrder(order.status, orderStartDateTime) : false;
+      userRole === "admin" ? canAdminEditOrder(order.status, orderStartDateTime) : false;
     const effectiveBusId = toStringValue(order.assignedBus) || toStringValue(order.bus);
     let transferCandidates: Array<{
       id: string;
@@ -690,7 +696,7 @@ export async function GET(request: NextRequest, context: ParamsContext) {
       totalCapacityKg: number;
     }> = [];
 
-    if ((userRole === "admin" || isSuperAdmin) && adminCanEditOrder) {
+    if (userRole === "admin" && adminCanEditOrder) {
       const pickupLocationId = extractLocationId(order.pickupLocation);
       const dropLocationId = extractLocationId(order.dropLocation);
       const orderDateOnly = normalizeDateOnly(order.orderDate);
@@ -800,14 +806,14 @@ export async function GET(request: NextRequest, context: ParamsContext) {
       pickupProofImage: toStringValue(order.pickupProofImage),
       dropProofImage: toStringValue(order.dropProofImage),
       operatorNote:
-        userRole === "operator" || userRole === "admin" || isSuperAdmin
+        userRole === "operator" || userRole === "admin"
           ? toStringValue(order.operatorNote) || toStringValue(order.adminNote)
           : "",
       customerNote:
         userRole === "operator"
           ? ""
           : toStringValue(order.customerNote),
-      customerEmail: userRole === "admin" || isSuperAdmin ? ownerEmail : "",
+      customerEmail: userRole === "admin" ? ownerEmail : "",
       canUserEditContacts: isOrderOwner ? canOwnerEditContacts(order.status, orderStartDateTime) : false,
       canAdminEditOrder: adminCanEditOrder,
       canTransferOrder: adminCanEditOrder,
@@ -839,7 +845,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthPayload;
-    const actor = await User.findById(payload.id).select("_id role isSuperAdmin travelCompanyId buses");
+    const actor = await User.findById(payload.id).select("_id role travelCompanyId buses");
     if (!actor) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -852,6 +858,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
     const body = (await request.json()) as {
       senderInfo?: Record<string, unknown>;
       receiverInfo?: Record<string, unknown>;
+      orderDate?: string;
       pickupLocation?: Record<string, unknown>;
       dropLocation?: Record<string, unknown>;
       packages?: unknown[];
@@ -870,15 +877,16 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
     }
 
     const actorRole = toStringValue((actor as { role?: unknown }).role);
-    const isSuperAdmin = Boolean((actor as { isSuperAdmin?: unknown }).isSuperAdmin);
     const isOwner = toStringValue(order.user) === toStringValue(actor._id);
-    const isAdminActor = actorRole === "admin" || isSuperAdmin;
+    const isAdminActor = actorRole === "admin";
 
     const legacyNote = toStringValue(body.note).trim();
     const operatorNoteInput = toStringValue(body.operatorNote).trim();
     const customerNoteInput = toStringValue(body.customerNote).trim();
     const customerEmailInput = normalizeEmail(body.customerEmail);
     const transferBusIdInput = toStringValue(body.transferBusId).trim();
+    const orderDateInput = toStringValue(body.orderDate).trim();
+    const hasOrderDateInput = Boolean(orderDateInput);
     const didTransfer = Boolean(transferBusIdInput);
     const hasSenderInfo = isRecord(body.senderInfo);
     const hasReceiverInfo = isRecord(body.receiverInfo);
@@ -887,8 +895,17 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
     const hasPackages = Array.isArray(body.packages);
     const previousTotalAmount = roundCurrency(toNumberValue(order.totalAmount));
     const previousTotalWeight = roundCurrency(toNumberValue(order.totalWeightKg));
+    const previousOrderDateOnly = normalizeDateOnly(order.orderDate);
 
-    if (!isOwner && !isSuperAdmin && actorRole === "admin") {
+    if (hasOrderDateInput && !normalizeDateOnly(orderDateInput)) {
+      return NextResponse.json({ error: "Invalid order date." }, { status: 400 });
+    }
+
+    const nextOrderDateOnly = hasOrderDateInput ? normalizeDateOnly(orderDateInput) : previousOrderDateOnly;
+    const nextOrderDateIso =
+      nextOrderDateOnly?.toISOString() ?? toIsoDate(order.orderDate);
+
+    if (!isOwner && actorRole === "admin") {
       const busIds = Array.from(
         new Set(
           [toStringValue(order.assignedBus), toStringValue(order.bus)].filter((id) =>
@@ -914,7 +931,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
       if (!hasAdminAccess) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-    } else if (!isOwner && !isSuperAdmin && actorRole !== "admin") {
+    } else if (!isOwner && actorRole !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -954,6 +971,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
         !operatorNoteInput &&
         !customerNoteInput &&
         !customerEmailInput &&
+        !hasOrderDateInput &&
         !hasPickupLocation &&
         !hasDropLocation &&
         !hasPackages &&
@@ -965,10 +983,51 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
         );
       }
       if (hasSenderInfo) {
-        order.senderInfo = body.senderInfo!;
+        const nextSenderInfo = isRecord(body.senderInfo) ? { ...body.senderInfo } : {};
+        const senderContactInput = readFirstDefinedValue(body.senderInfo, [
+          "contact",
+          "senderContact",
+          "phone",
+          "senderPhone",
+        ]);
+        if (senderContactInput !== null) {
+          const normalizedSenderContact = normalizeIndiaPhone(senderContactInput);
+          if (!normalizedSenderContact) {
+            return NextResponse.json(
+              { error: "Sender contact must be a valid Indian mobile number." },
+              { status: 400 },
+            );
+          }
+          nextSenderInfo.contact = normalizedSenderContact;
+          nextSenderInfo.senderContact = normalizedSenderContact;
+          nextSenderInfo.phone = normalizedSenderContact;
+        }
+        order.senderInfo = nextSenderInfo;
       }
       if (hasReceiverInfo) {
-        order.receiverInfo = body.receiverInfo!;
+        const nextReceiverInfo = isRecord(body.receiverInfo) ? { ...body.receiverInfo } : {};
+        const receiverContactInput = readFirstDefinedValue(body.receiverInfo, [
+          "contact",
+          "receiverContact",
+          "phone",
+          "receiverPhone",
+        ]);
+        if (receiverContactInput !== null) {
+          const normalizedReceiverContact = normalizeIndiaPhone(receiverContactInput);
+          if (!normalizedReceiverContact) {
+            return NextResponse.json(
+              { error: "Receiver contact must be a valid Indian mobile number." },
+              { status: 400 },
+            );
+          }
+          nextReceiverInfo.contact = normalizedReceiverContact;
+          nextReceiverInfo.receiverContact = normalizedReceiverContact;
+          nextReceiverInfo.phone = normalizedReceiverContact;
+        }
+        order.receiverInfo = nextReceiverInfo;
+      }
+      if (hasOrderDateInput) {
+        order.orderDate = nextOrderDateIso;
       }
       if (hasPickupLocation) {
         order.pickupLocation = body.pickupLocation!;
@@ -1034,6 +1093,34 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
           { status: 400 },
         );
       }
+
+      const senderContactInput = readFirstDefinedValue(body.senderInfo, [
+        "contact",
+        "senderContact",
+        "phone",
+        "senderPhone",
+      ]);
+      const receiverContactInput = readFirstDefinedValue(body.receiverInfo, [
+        "contact",
+        "receiverContact",
+        "phone",
+        "receiverPhone",
+      ]);
+
+      if (senderContactInput !== null && !normalizeIndiaPhone(senderContactInput)) {
+        return NextResponse.json(
+          { error: "Sender contact must be a valid Indian mobile number." },
+          { status: 400 },
+        );
+      }
+
+      if (receiverContactInput !== null && !normalizeIndiaPhone(receiverContactInput)) {
+        return NextResponse.json(
+          { error: "Receiver contact must be a valid Indian mobile number." },
+          { status: 400 },
+        );
+      }
+
       const ownerEditable = mergeOwnerEditableContacts(
         order.senderInfo,
         body.senderInfo,
@@ -1074,7 +1161,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
         );
       }
 
-      const orderDateOnly = normalizeDateOnly(order.orderDate);
+      const orderDateOnly = nextOrderDateOnly;
       if (!orderDateOnly) {
         return NextResponse.json({ error: "Order date is invalid." }, { status: 409 });
       }
@@ -1106,15 +1193,20 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
         );
       }
 
-      const session = await mongoose.startSession();
+        const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
-          const { dayStart, dayEnd } = getUtcDayRange(orderDateOnly);
+          const { dayStart: nextDayStart, dayEnd: nextDayEnd } = getUtcDayRange(orderDateOnly);
+          const previousCapacityDate = previousOrderDateOnly;
+          if (!previousCapacityDate) {
+            throw new Error("Current order date is invalid.");
+          }
+          const { dayStart: previousDayStart, dayEnd: previousDayEnd } = getUtcDayRange(previousCapacityDate);
           const reserved = await reserveBusCapacityForDay(
             session,
             new mongoose.Types.ObjectId(transferBusIdInput),
-            dayStart,
-            dayEnd,
+            nextDayStart,
+            nextDayEnd,
             reserveWeightKg,
           );
           if (!reserved) {
@@ -1124,8 +1216,8 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
           const released = await releaseBusCapacityForDay(
             session,
             new mongoose.Types.ObjectId(sourceBusId),
-            dayStart,
-            dayEnd,
+            previousDayStart,
+            previousDayEnd,
             releaseWeightKg,
           );
           if (!released) {
@@ -1162,18 +1254,49 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
       const nextWeight = roundCurrency(toNumberValue(order.totalWeightKg));
       const previousWeight = previousTotalWeight > 0 ? previousTotalWeight : 0;
       const weightDelta = roundCurrency(nextWeight - previousWeight);
+      const dateChanged = Boolean(
+        previousOrderDateOnly &&
+        nextOrderDateOnly &&
+        previousOrderDateOnly.getTime() !== nextOrderDateOnly.getTime(),
+      );
 
-      if (currentBusId && mongoose.Types.ObjectId.isValid(currentBusId) && Math.abs(weightDelta) > 0) {
-        const orderDateOnly = normalizeDateOnly(order.orderDate);
+      if (currentBusId && mongoose.Types.ObjectId.isValid(currentBusId) && (Math.abs(weightDelta) > 0 || dateChanged)) {
+        const orderDateOnly = nextOrderDateOnly;
         if (!orderDateOnly) {
           return NextResponse.json({ error: "Order date is invalid." }, { status: 409 });
+        }
+        if (!previousOrderDateOnly) {
+          return NextResponse.json({ error: "Current order date is invalid." }, { status: 409 });
         }
 
         const session = await mongoose.startSession();
         try {
           await session.withTransaction(async () => {
-            const { dayStart, dayEnd } = getUtcDayRange(orderDateOnly);
-            if (weightDelta > 0) {
+            if (dateChanged) {
+              const { dayStart: nextDayStart, dayEnd: nextDayEnd } = getUtcDayRange(orderDateOnly);
+              const { dayStart: previousDayStart, dayEnd: previousDayEnd } = getUtcDayRange(previousOrderDateOnly);
+              const reserved = await reserveBusCapacityForDay(
+                session,
+                new mongoose.Types.ObjectId(currentBusId),
+                nextDayStart,
+                nextDayEnd,
+                nextWeight,
+              );
+              if (!reserved) {
+                throw new Error("Assigned bus has insufficient capacity on the updated order date.");
+              }
+              const released = await releaseBusCapacityForDay(
+                session,
+                new mongoose.Types.ObjectId(currentBusId),
+                previousDayStart,
+                previousDayEnd,
+                previousWeight,
+              );
+              if (!released) {
+                throw new Error("Failed to release bus capacity from the previous order date.");
+              }
+            } else if (weightDelta > 0) {
+              const { dayStart, dayEnd } = getUtcDayRange(orderDateOnly);
               const reserved = await reserveBusCapacityForDay(
                 session,
                 new mongoose.Types.ObjectId(currentBusId),
@@ -1185,6 +1308,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
                 throw new Error("Assigned bus has insufficient capacity for updated packages.");
               }
             } else {
+              const { dayStart, dayEnd } = getUtcDayRange(orderDateOnly);
               const released = await releaseBusCapacityForDay(
                 session,
                 new mongoose.Types.ObjectId(currentBusId),
@@ -1208,12 +1332,12 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
       }
     }
 
-    if (isAdminActor && (hasPickupLocation || hasDropLocation)) {
+    if (isAdminActor && (hasPickupLocation || hasDropLocation || hasOrderDateInput)) {
       const busIdForRouteCheck = transferBusIdInput || toStringValue(order.assignedBus) || toStringValue(order.bus);
       if (busIdForRouteCheck && mongoose.Types.ObjectId.isValid(busIdForRouteCheck)) {
         const pickupLocationId = extractLocationId(order.pickupLocation);
         const dropLocationId = extractLocationId(order.dropLocation);
-        const orderDateOnly = normalizeDateOnly(order.orderDate);
+        const orderDateOnly = nextOrderDateOnly;
 
         if (
           pickupLocationId &&
@@ -1321,6 +1445,7 @@ export async function PATCH(request: NextRequest, context: ParamsContext) {
           totalWeightKg: roundCurrency(toNumberValue(order.totalWeightKg)),
           packageCount: Array.isArray(order.packages) ? order.packages.length : 0,
           packages: mapPackages(order.packages),
+          orderDate: toIsoDate(order.orderDate),
           adjustmentPendingAmount: roundCurrency(toNumberValue(order.adjustmentPendingAmount)),
           adjustmentRefundAmount: roundCurrency(toNumberValue(order.adjustmentRefundAmount)),
           adjustmentStatus: toStringValue(order.adjustmentStatus, "none"),

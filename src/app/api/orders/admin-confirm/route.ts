@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const actorId = extractTokenUserId(request);
-    const actor = await User.findById(actorId).select("_id role isSuperAdmin travelCompanyId buses");
-    if (!actor || (actor.role !== "admin" && !actor.isSuperAdmin)) {
+    const actor = await User.findById(actorId).select("_id role travelCompanyId buses");
+    if (!actor || actor.role !== "admin") {
       throw new ApiError("Admin access required.", 403);
     }
 
@@ -159,17 +159,15 @@ export async function POST(request: NextRequest) {
       throw new ApiError("Selected bus not found.", 404);
     }
 
-    if (!actor.isSuperAdmin) {
-      const actorCompanyId = toStringValue(actor.travelCompanyId);
-      const actorBusIds = Array.isArray(actor.buses)
-        ? actor.buses.map((id: unknown) => toStringValue(id))
-        : [];
-      const hasBusAccess =
-        (actorCompanyId && toStringValue(bookingBus.travelCompanyId) === actorCompanyId) ||
-        actorBusIds.includes(toStringValue(bookingBus._id));
-      if (!hasBusAccess) {
-        throw new ApiError("You can book only for your company buses.", 403);
-      }
+    const actorCompanyId = toStringValue(actor.travelCompanyId);
+    const actorBusIds = Array.isArray(actor.buses)
+      ? actor.buses.map((id: unknown) => toStringValue(id))
+      : [];
+    const hasBusAccess =
+      (actorCompanyId && toStringValue(bookingBus.travelCompanyId) === actorCompanyId) ||
+      actorBusIds.includes(toStringValue(bookingBus._id));
+    if (!hasBusAccess) {
+      throw new ApiError("You can book only for your company buses.", 403);
     }
 
     const [pickupLocation, dropLocation] = await Promise.all([

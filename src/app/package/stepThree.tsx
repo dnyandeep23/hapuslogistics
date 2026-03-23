@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState, useEffect, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
 import { AvailableCoupon, calculatePrice, getAvailableCoupons, type PricingInfo } from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
+import { formatIndiaPhoneInput } from "@/lib/phone";
 
 type LocationOption = {
     _id: string;
@@ -198,54 +199,54 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
         : "--/--/----";
 
     return (
-        <div className="space-y-8 text-white">
+        <div className="space-y-6 text-white sm:space-y-8">
 
             {/* Header */}
-            <div className="text-[#F6FF6A]">
-                <h2 className="text-3xl font-bold">Review & Checkout</h2>
-                <p className="mt-1">Review your order details and proceed to payment</p>
+            <div className="max-w-2xl text-[#F6FF6A]">
+                <h2 className="text-2xl font-bold sm:text-3xl">Review & Checkout</h2>
+                <p className="mt-2 text-sm leading-6 text-white/68 sm:text-base">Review your order details and proceed to payment.</p>
             </div>
 
             {/* Location Information */}
-            <div className="border relative border-[#F0FF73] bg-[#CDD645]/15 rounded-2xl p-5">
-                <span className="bg-[#CDD645]/25  absolute top-0 text-[#F0FF73] px-4 py-1 rounded-b-xl text-sm font-semibold">
+            <div className="package-panel relative rounded-[1.6rem] p-4 pt-6 sm:p-5 sm:pt-6">
+                <span className="package-badge absolute top-0 rounded-b-xl px-4 py-1 text-sm font-semibold">
                     Location Information
                 </span>
 
-                <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:justify-between">
-                    <div className="flex items-center gap-2">
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                    <div className="package-panel-soft flex items-start gap-3 rounded-[1.3rem] p-4">
                         <Icon icon="streamline-plump:location-pin-solid" className="text-green-400 text-3xl" />
                         <div>
                             <p className="text-sm text-[#F4FF9F]">Pickup Location</p>
                             <p className="font-bold text-[#e7f868]">{pickUpLoc?.name}</p>
-                            <p className="text-[#e7f868] ">{pickUpLoc?.address}, {pickUpLoc?.city}, {pickUpLoc?.state} {pickUpLoc?.zip}</p>
+                            <p className="mt-1 text-sm text-white/65">{pickUpLoc?.address}, {pickUpLoc?.city}, {pickUpLoc?.state} {pickUpLoc?.zip}</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="package-panel-soft flex items-start gap-3 rounded-[1.3rem] p-4">
                         <Icon icon="streamline-plump:location-pin-solid" className="text-red-400 text-3xl" />
                         <div>
                             <p className="text-sm text-[#F4FF9F]">Drop Location</p>
                             <p className="font-bold text-[#e7f868]">{dropLoc?.name}</p>
-                            <p className="text-[#e7f868] ">{dropLoc?.address}, {dropLoc?.city}, {dropLoc?.state} {dropLoc?.zip}</p>
+                            <p className="mt-1 text-sm text-white/65">{dropLoc?.address}, {dropLoc?.city}, {dropLoc?.state} {dropLoc?.zip}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Package Information */}
-            <div className="border relative border-[#F0FF73] bg-[#CDD645]/15 rounded-2xl pt-6 pb-5 px-5">
-                <span className="bg-[#CDD645]/25  absolute top-0 text-[#F0FF73] px-4 py-1 rounded-b-xl text-sm font-semibold">
+            <div className="package-panel relative rounded-[1.6rem] px-4 pb-4 pt-6 sm:px-5 sm:pb-5 sm:pt-6">
+                <span className="package-badge absolute top-0 rounded-b-xl px-4 py-1 text-sm font-semibold">
                     Package Information
                 </span>
-                <div className="absolute top-3 bg-amber-600/30 border rounded-full border-amber-700/40 right-3 py-0.5 px-3 text-sm  text-white/90 flex items-center gap-2"> <Icon icon="solar:calendar-linear" className=" text-white text-base" /> <span>Pickup Date {pickupDate}</span>
+                <div className="package-badge absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full px-3 py-1 text-xs text-white/90 sm:text-sm"> <Icon icon="solar:calendar-linear" className=" text-white text-base" /> <span>Pickup Date {pickupDate}</span>
                 </div>
 
                 <div className="space-y-3 mt-6">
                     {displayedItems.map((item: CartItem, index: number) => (
-                        <div key={index} className="flex w-full bg-[#7277678b] rounded-xl">
+                        <div key={index} className="package-panel-soft flex flex-col overflow-hidden rounded-[1.3rem] sm:flex-row">
                             {/* Image */}
-                            <div className="relative -18 w-20 m-2 rounded-lg bg-black/10">
+                            <div className="relative mx-3 mt-3 h-24 rounded-xl bg-black/10 sm:mb-3 sm:mr-0 sm:w-24 sm:min-w-24">
                                 <Image
                                     src={item.packageImage}
                                     alt="Package Preview"
@@ -255,13 +256,17 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                             </div>
 
                             {/* Content */}
-                            <div className="flex items-center w-full relative justify-between px-4 py-3">
+                            <div className="relative flex w-full flex-col gap-3 px-4 pb-4 pt-2 sm:flex-row sm:items-end sm:justify-between sm:py-4">
                                 {/* Left Info */}
-                                <div>
-                                    <p className="font-semibold">
-                                        {item.packageName || "Package"}
-                                    </p>
-
+                                <div className="pr-0 sm:pr-24">
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        <p className="font-semibold text-[#F6FF6A]">
+                                            {item.packageName || "Package"}
+                                        </p>
+                                        <span className="package-badge rounded-full px-3 py-1 text-[11px] font-semibold">
+                                            {item.packageType}
+                                        </span>
+                                    </div>
                                     <p className="text-sm text-white/70">
                                         {item.packageSize} | {item.packageWeight} kg | Qty:{" "}
                                         {item.packageQuantities}
@@ -272,12 +277,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     </p>
                                 </div>
 
-                                {/* Package Type Badge */}
-                                <span className="bg-[#CDD645]/30 absolute font-bold top-0 right-[20%] w-fit px-4 flex justify-center text-sm pt-1 pb-2 rounded-b-full">
-                                    {item.packageType}
-                                </span>
-
-                                <div className="absolute top-2 right-4 text-lg font-bold">
+                                <div className="text-lg font-bold sm:absolute sm:right-4 sm:top-2">
                                     {isLoadingPrice ? (
                                         <Skeleton className="h-6 w-16" />
                                     ) : (
@@ -291,19 +291,19 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
             </div>
 
             {/* Sender & Receiver Info */}
-            <div className="flex gap-6">
+            <div className="grid gap-4 lg:grid-cols-2">
 
                 {/* Sender */}
-                <div className="flex-1 border relative border-[#F0FF73] bg-[#CDD645]/15 rounded-2xl p-5">
-                    <span className="bg-[#CDD645]/25  absolute top-0 left-1/2 -translate-x-1/2 w-fit text-[#F0FF73] px-4 py-1 rounded-b-xl text-sm font-semibold">
+                <div className="package-panel relative rounded-[1.6rem] p-4 pt-6 sm:p-5 sm:pt-6">
+                    <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-4 py-1 text-sm font-semibold">
                         Sender Information
                     </span>
 
                     <div className="mt-6 space-y-3">
-                        <label className="mb-3">
+                        <label className="mb-3 block text-sm font-medium text-white/85">
                             Sender name <span className="text-red-400">*</span>
                         </label>
-                        <div className="flex items-center pt-4 pb-2  gap-2 bg-[#1e241b] px-4 rounded-lg border-b-2 border-[#F0FF73]/60">
+                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
                             <Icon icon="heroicons:identification" className="text-[#F0FF73] text-xl" />
                             <input
                                 placeholder="Sender Name"
@@ -317,19 +317,18 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         </div>
                         {errors.senderName && <p className="text-red-400 text-sm">{errors.senderName}</p>}
 
-                        <label className="mb-3">
+                        <label className="mb-3 block text-sm font-medium text-white/85">
                             Sender contact no <span className="text-red-400">*</span>
                         </label>
-                        <div className="flex items-center pt-4 pb-2  gap-2 bg-[#1e241b] px-4 rounded-lg border-b-2 border-[#F0FF73]/60">
+                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
                             <Icon icon="heroicons:phone" className="text-[#F0FF73] text-xl " />
                             <input
                                 type="tel"
                                 inputMode="numeric"
-                                placeholder="Sender Contact No"
-                                value={formData.senderContact}
+                                placeholder="+91 9876543210"
+                                value={formData.senderContact || formatIndiaPhoneInput("")}
                                 onChange={(e) => {
-                                    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
-                                    setFormData({ ...formData, senderContact: digitsOnly });
+                                    setFormData({ ...formData, senderContact: formatIndiaPhoneInput(e.target.value) });
                                 }}
                                 className="w-full text-base bg-transparent outline-none"
                             />
@@ -340,16 +339,16 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
 
                 {/* Receiver */}
-                <div className="flex-1 border relative border-[#F0FF73] bg-[#CDD645]/15 rounded-2xl p-5">
-                    <span className="bg-[#CDD645]/25 absolute top-0 left-1/2 -translate-x-1/2 w-fit text-[#F0FF73] px-4 py-1 rounded-b-xl text-sm font-semibold">
+                <div className="package-panel relative rounded-[1.6rem] p-4 pt-6 sm:p-5 sm:pt-6">
+                    <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-4 py-1 text-sm font-semibold">
                         Receiver Information
                     </span>
 
                     <div className="mt-6 space-y-3">
-                        <label className="mb-3">
+                        <label className="mb-3 block text-sm font-medium text-white/85">
                             Receiver name <span className="text-red-400">*</span>
                         </label>
-                        <div className="flex items-center pt-4 pb-2  gap-2 bg-[#1e241b] px-4 rounded-lg border-b-2 border-[#F0FF73]/60">
+                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
                             <Icon icon="heroicons:identification" className="text-[#F0FF73] text-xl" />
                             <input
                                 placeholder="Receiver Name"
@@ -362,19 +361,18 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                             />
                         </div>
                         {errors.receiverName && <p className="text-red-400 text-sm">{errors.receiverName}</p>}
-                        <label className="mb-3">
+                        <label className="mb-3 block text-sm font-medium text-white/85">
                             Receiver contact no <span className="text-red-400">*</span>
                         </label>
-                        <div className="flex items-center pt-4 pb-2  gap-2 bg-[#1e241b] px-4 rounded-lg border-b-2 border-[#F0FF73]/60">
+                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
                             <Icon icon="heroicons:phone" className="text-[#F0FF73] text-xl " />
                             <input
                                 type="tel"
                                 inputMode="numeric"
-                                placeholder="Receiver Contact No"
-                                value={formData.receiverContact}
+                                placeholder="+91 9876543210"
+                                value={formData.receiverContact || formatIndiaPhoneInput("")}
                                 onChange={(e) => {
-                                    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
-                                    setFormData({ ...formData, receiverContact: digitsOnly });
+                                    setFormData({ ...formData, receiverContact: formatIndiaPhoneInput(e.target.value) });
                                 }}
                                 className="w-full text-base bg-transparent outline-none"
                             />
@@ -385,16 +383,16 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
             </div>
 
             {/* Coupon & Amount */}
-            <div className={`flex items-start mt-6 ${shouldShowCouponSection ? "justify-between" : "justify-end"}`}>
+            <div className={`mt-6 flex flex-col gap-4 xl:flex-row xl:items-start ${shouldShowCouponSection ? "xl:justify-between" : "xl:justify-end"}`}>
 
                 {/* Coupon */}
                 {shouldShowCouponSection ? (
-                <div>
+                <div className="package-panel flex-1 rounded-[1.6rem] p-4 sm:p-5">
                     <p className="mb-2 font-semibold">Have a coupon code?</p>
                     {couponStatus === 'success' && pricingInfo?.coupon ? (
                         <div>
                             <div className="flex items-center gap-2">
-                                <div className="bg-[#CDD645]/10 border border-[#F0FF73] justify-center min-w-sm h-16 text-[#F0FF73] font-bold px-3 py-1 rounded-lg flex items-center gap-2">
+                                <div className="package-panel-soft flex h-16 min-w-[220px] items-center justify-center gap-2 rounded-2xl px-3 py-1 font-bold text-[#F0FF73]">
 
                                     <Icon icon="mdi:tick-decagram" />
                                     <span>{pricingInfo.coupon.code}</span>
@@ -410,16 +408,16 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         </div>
                     ) : (
                         <div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col gap-2 sm:flex-row">
                                 <input
                                     placeholder="Enter Coupon Code"
                                     value={coupon}
                                     onChange={handleCouponInputChange}
-                                    className="bg-[#1e241b] px-4 py-2 rounded-lg outline-none w-48"
+                                    className="package-input w-full rounded-2xl px-4 py-2 sm:w-56"
                                 />
                                 <button
                                     onClick={handleApplyCoupon}
-                                    className="bg-[#CDD645] text-black px-4 py-2 rounded-lg disabled:bg-gray-500"
+                                    className="rounded-2xl bg-[#CDD645] px-4 py-2 text-black transition hover:bg-[#dbe86b] disabled:bg-gray-500"
                                     disabled={couponStatus === 'loading' || !coupon}
                                 >
                                     {couponStatus === 'loading' ? "Applying..." : "Apply"}
@@ -450,7 +448,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                                     type="button"
                                                     key={availableCoupon.id}
                                                     onClick={() => handleSelectCoupon(availableCoupon.code)}
-                                                    className={`min-w-[220px] rounded-xl border px-3 py-2 text-left transition ${
+                                                    className={`min-w-[220px] rounded-2xl border px-3 py-2 text-left transition ${
                                                         isSelected
                                                             ? "border-[#F0FF73] bg-[#CDD645]/20"
                                                             : "border-[#F0FF73]/40 bg-[#CDD645]/5 hover:bg-[#CDD645]/15"
@@ -481,7 +479,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
 
                 {/* Amount */}
-                <div className="text-right space-y-1 w-96">
+                <div className="package-panel w-full rounded-[1.6rem] p-4 text-right space-y-1 sm:p-5 xl:w-96">
                     {isLoadingPrice && (
                         <div className="space-y-2">
                             <Skeleton className="ml-auto h-4 w-44" />

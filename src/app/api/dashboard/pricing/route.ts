@@ -14,7 +14,6 @@ type UnknownRecord = Record<string, unknown>;
 type ActorDoc = {
   _id?: unknown;
   role?: string;
-  isSuperAdmin?: boolean;
   travelCompanyId?: unknown;
   buses?: unknown[];
 };
@@ -97,15 +96,15 @@ export async function GET(request: NextRequest) {
     }
 
     const actor = await User.findById(actorId)
-      .select("_id role isSuperAdmin travelCompanyId buses")
+      .select("_id role travelCompanyId buses")
       .lean<ActorDoc | null>();
 
     if (!actor) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const role = actor.isSuperAdmin ? "superadmin" : toStringValue(actor.role);
-    if (role !== "admin" && role !== "superadmin") {
+    const role = toStringValue(actor.role);
+    if (role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -128,36 +127,37 @@ export async function GET(request: NextRequest) {
 
     const busQuery: Record<string, unknown> = {};
 
-    if (role === "superadmin") {
-      if (companyIdParam) {
-        if (!isObjectIdLike(companyIdParam)) {
-          return NextResponse.json({ success: false, message: "Invalid companyId." }, { status: 400 });
-        }
-        busQuery.travelCompanyId = new mongoose.Types.ObjectId(companyIdParam);
-      }
+    if (actor.travelCompanyId) {
+      busQuery.travelCompanyId = actor.travelCompanyId;
+    } else if (Array.isArray(actor.buses) && actor.buses.length > 0) {
+      busQuery._id = { $in: actor.buses };
     } else {
-      if (actor.travelCompanyId) {
-        busQuery.travelCompanyId = actor.travelCompanyId;
-      } else if (Array.isArray(actor.buses) && actor.buses.length > 0) {
-        busQuery._id = { $in: actor.buses };
-      } else {
-        return NextResponse.json(
-          {
-            success: true,
-            role,
-            summary: {
-              totalRevenue: 0,
-              totalOrders: 0,
-              totalBuses: 0,
-              totalCompanies: 0,
-            },
-            companies: [],
-            buses: [],
-            orders: [],
+      return NextResponse.json(
+        {
+          success: true,
+          role,
+          summary: {
+            totalRevenue: 0,
+            totalOrders: 0,
+            totalBuses: 0,
+            totalCompanies: 0,
           },
-          { status: 200 },
-        );
+          companies: [],
+          buses: [],
+          orders: [],
+        },
+        { status: 200 },
+      );
+    }
+
+    if (companyIdParam) {
+      if (!isObjectIdLike(companyIdParam)) {
+        return NextResponse.json({ success: false, message: "Invalid companyId." }, { status: 400 });
       }
+      if (actor.travelCompanyId && toStringValue(actor.travelCompanyId) !== companyIdParam) {
+        return NextResponse.json({ success: false, message: "Company access restricted." }, { status: 403 });
+      }
+      busQuery.travelCompanyId = new mongoose.Types.ObjectId(companyIdParam);
     }
 
     if (busIdParam) {

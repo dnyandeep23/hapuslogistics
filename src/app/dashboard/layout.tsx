@@ -9,11 +9,10 @@ import BottomNav from "@/components/BottomNav";
 import { defaultRole, roleMenus } from "@/data/roleMenus";
 import type { MenuItem } from "@/data/roleMenus";
 
-type DashboardRoleKey = "user" | "operator" | "admin" | "superadmin";
+type DashboardRoleKey = "user" | "operator" | "admin";
 
-const getRoleKey = (user: { role?: string; isSuperAdmin?: boolean } | null): DashboardRoleKey => {
+const getRoleKey = (user: { role?: string } | null): DashboardRoleKey => {
   if (!user) return defaultRole as DashboardRoleKey;
-  if (user.isSuperAdmin) return "superadmin";
   if (user.role === "admin") return "admin";
   if (user.role === "operator") return "operator";
   return "user";
@@ -34,9 +33,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const shellBackgroundClass = useMemo(() => {
     if (roleKey === "admin") {
       return "bg-[linear-gradient(180deg,#111a1f,#1a2c33_50%,#0f171d)]";
-    }
-    if (roleKey === "superadmin") {
-      return "bg-[linear-gradient(180deg,#11181f,#2a2233_50%,#161320)]";
     }
     return "bg-[linear-gradient(180deg,#10160f,#1a2416_50%,#10160f)]";
   }, [roleKey]);
@@ -70,6 +66,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [reason, loading, user, router]);
 
   useEffect(() => {
+    if (user?.mustChangePassword && pathname !== "/dashboard/profile") {
+      router.replace("/dashboard/profile?forcePasswordChange=true");
+    }
+  }, [pathname, router, user?.mustChangePassword]);
+
+  useEffect(() => {
     if (isAdminLocked && !isAdminLockedAllowedPath) {
       router.replace("/dashboard");
     }
@@ -95,8 +97,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className={`min-h-screen overflow-x-hidden text-white ${shellBackgroundClass}`}>
-      <div className="hidden min-w-0 lg:flex">
+    <div className={`relative min-h-screen overflow-x-hidden text-white ${shellBackgroundClass}`}>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-24 top-[-8rem] h-80 w-80 rounded-full bg-[#d5e400]/10 blur-3xl" />
+        <div className="absolute right-[-8rem] top-28 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute bottom-[-6rem] left-1/3 h-80 w-80 rounded-full bg-[#667d3f]/10 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 hidden min-w-0 lg:flex">
         <Sidebar
           user={user}
           role={roleKey}
@@ -106,12 +114,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
 
         <main className="min-w-0 flex-1 px-4 py-4 pb-24 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          {children}
+          <div className="mx-auto w-full max-w-[1700px] rounded-[2rem] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_30px_80px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            {children}
+          </div>
         </main>
       </div>
 
-      <div className="lg:hidden min-h-screen pb-24 px-4 py-4 sm:px-6 sm:py-6">
-        <main>{children}</main>
+      <div className="relative z-10 min-h-screen px-4 py-4 pb-24 sm:px-6 sm:py-6 lg:hidden">
+        <main className="mx-auto w-full max-w-[1700px] rounded-[1.75rem] border border-white/10 bg-white/5 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:p-6">
+          {children}
+        </main>
       </div>
 
       <BottomNav menus={effectiveMenus[roleKey] ?? effectiveMenus.user} />

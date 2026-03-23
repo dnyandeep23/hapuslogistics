@@ -34,7 +34,7 @@ export default function DashboardSidebar({
       >
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[#d8e0b1]">Hapus Logistics</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[#d8e0b1]">Hapus Travels</p>
             <h1 className="text-xl font-semibold text-[#E4E67A]">Control Hub</h1>
           </div>
           <button
@@ -80,7 +80,7 @@ export default function DashboardSidebar({
         <div className="mb-6 flex items-center justify-between">
           {!collapsed && (
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[#d8e0b1]">Hapus Logistics</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#d8e0b1]">Hapus Travels</p>
               <h1 className="text-xl font-semibold text-[#E4E67A]">Control Hub</h1>
             </div>
           )}

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import CustomDateRangePicker from "@/components/CustomDateRangePicker";
 import Skeleton from "@/components/Skeleton";
+import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 
 type OperatorContactPeriod = {
   operatorId: unknown;
@@ -19,8 +20,6 @@ type BusRow = {
   _id: string;
   busName: string;
   busNumber: string;
-  companyName?: string;
-  companyId?: string;
   busImages?: string[];
   capacity: number;
   autoRenewCapacity?: boolean;
@@ -34,6 +33,8 @@ type OperatorRow = {
   name: string;
   email: string;
   phone?: string;
+  accountDeletionRequestedAt?: string | null;
+  accountDeletionExpiresAt?: string | null;
   operatorApprovalStatus?:
     | "none"
     | "pending"
@@ -96,7 +97,6 @@ function AdminBusesPageContent() {
   const [loadingOperators, setLoadingOperators] = useState(false);
   const [buses, setBuses] = useState<BusRow[]>([]);
   const [operators, setOperators] = useState<OperatorRow[]>([]);
-  const [superAdminScope, setSuperAdminScope] = useState<"all" | "my_company">("all");
   const [openMenuBusId, setOpenMenuBusId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -112,23 +112,16 @@ function AdminBusesPageContent() {
   const [removeOperatorId, setRemoveOperatorId] = useState("");
   const [removing, setRemoving] = useState(false);
   const [deletingBusId, setDeletingBusId] = useState<string | null>(null);
+  const [deleteBusTarget, setDeleteBusTarget] = useState<BusRow | null>(null);
   const [deleteRescheduleState, setDeleteRescheduleState] = useState<DeleteRescheduleState | null>(null);
   const [rescheduleDeleting, setRescheduleDeleting] = useState(false);
 
-  const isAdmin = user?.role === "admin" || user?.isSuperAdmin;
-  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const isAdmin = user?.role === "admin";
 
   const loadBuses = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (isSuperAdmin) {
-        params.set("scope", superAdminScope);
-      }
-      const endpoint = params.toString()
-        ? `/api/admin/buses?${params.toString()}`
-        : "/api/admin/buses";
-      const response = await fetch(endpoint, { method: "GET" });
+      const response = await fetch("/api/admin/buses", { method: "GET" });
       const payload = await response.json();
       if (!response.ok) {
         setError(payload?.message || "Failed to load buses.");
@@ -140,7 +133,7 @@ function AdminBusesPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [isSuperAdmin, superAdminScope]);
+  }, []);
 
   const loadOperators = useCallback(async () => {
     try {
@@ -182,7 +175,22 @@ function AdminBusesPageContent() {
   }, [buses, query]);
 
   const approvedOperators = useMemo(
-    () => operators.filter((entry) => entry.operatorApprovalStatus === "approved"),
+    () =>
+      operators.filter(
+        (entry) =>
+          entry.operatorApprovalStatus === "approved" &&
+          !entry.accountDeletionRequestedAt &&
+          !entry.accountDeletionExpiresAt,
+      ),
+    [operators],
+  );
+  const scheduledDeletionApprovedCount = useMemo(
+    () =>
+      operators.filter(
+        (entry) =>
+          entry.operatorApprovalStatus === "approved" &&
+          (entry.accountDeletionRequestedAt || entry.accountDeletionExpiresAt),
+      ).length,
     [operators],
   );
 
@@ -240,6 +248,7 @@ function AdminBusesPageContent() {
     setAssignDateError("");
     setRemoveBus(null);
     setRemoveOperatorId("");
+    setDeleteBusTarget(null);
     setDeleteRescheduleState(null);
   };
 
@@ -250,12 +259,17 @@ function AdminBusesPageContent() {
 
   const handleDeleteBus = async (bus: BusRow) => {
     setOpenMenuBusId(null);
+    setDeleteBusTarget(bus);
+    setDeleteRescheduleState(null);
+  };
+
+  const confirmDeleteBus = async () => {
+    if (!deleteBusTarget) return;
+    const bus = deleteBusTarget;
+    setDeleteBusTarget(null);
     setMessage("");
     setError("");
     setDeleteRescheduleState(null);
-    const isConfirmed = window.confirm(`Delete bus "${bus.busName}" (${bus.busNumber})?`);
-    if (!isConfirmed) return;
-
     try {
       setDeletingBusId(bus._id);
       const response = await fetch(`/api/admin/buses/${bus._id}`, { method: "DELETE" });
@@ -455,7 +469,7 @@ function AdminBusesPageContent() {
         </button>
 
         {openMenuBusId === bus._id && (
-          <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-white/20 bg-[#1b2418] p-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-2 w-44 dashboard-surface-soft rounded-lg p-1 shadow-lg">
             <button
               type="button"
               onClick={() => handleModifyBus(bus)}
@@ -530,42 +544,12 @@ function AdminBusesPageContent() {
         </div>
       </div>
 
-      {isSuperAdmin && (
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#243227] p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-white/70">Scope</span>
-            <button
-              type="button"
-              onClick={() => setSuperAdminScope("all")}
-              className={`rounded-full border px-3 py-1 text-xs ${
-                superAdminScope === "all"
-                  ? "border-[#D5E400]/60 bg-[#D5E400]/10 text-[#D5E400]"
-                  : "border-white/25 text-white/70 hover:bg-white/10"
-              }`}
-            >
-              All Companies
-            </button>
-            <button
-              type="button"
-              onClick={() => setSuperAdminScope("my_company")}
-              className={`rounded-full border px-3 py-1 text-xs ${
-                superAdminScope === "my_company"
-                  ? "border-[#D5E400]/60 bg-[#D5E400]/10 text-[#D5E400]"
-                  : "border-white/25 text-white/70 hover:bg-white/10"
-              }`}
-            >
-              My Company
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-[#4E5A45] bg-[#243227] p-4">
+      <div className="dashboard-surface rounded-2xl p-4">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search by bus name or number"
-          className="w-full bg-black px-4 pt-4 pb-2 rounded-lg text-base border-b-2 border-white/60 focus:border-white focus:outline-none"
+          className="dashboard-input w-full rounded-xl px-4 py-3 text-base"
         />
       </div>
 
@@ -581,7 +565,7 @@ function AdminBusesPageContent() {
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={`bus-skeleton-${index}`}
-              className="rounded-xl border border-white/15 bg-black/25 p-4"
+              className="dashboard-surface-soft rounded-xl p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-2">
@@ -604,20 +588,15 @@ function AdminBusesPageContent() {
           ))}
         </div>
       ) : filteredBuses.length === 0 ? (
-        <div className="rounded-xl border border-white/20 bg-black/20 p-4 text-white/80">No buses found.</div>
+        <div className="dashboard-surface-soft rounded-xl p-4 text-white/80">No buses found.</div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {filteredBuses.map((bus) => (
-            <div key={bus._id} className="rounded-xl border border-white/15 bg-black/25 p-4">
+            <div key={bus._id} className="dashboard-surface-soft rounded-xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-base font-semibold text-[#E4E67A]">{bus.busName}</p>
                   <p className="text-xs text-white/60 mt-1">{bus.busNumber}</p>
-                  {isSuperAdmin && (
-                    <span className="mt-2 inline-flex rounded-full border border-sky-300/40 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-200">
-                      {bus.companyName || "No company"}
-                    </span>
-                  )}
                 </div>
                 {renderActions(bus)}
               </div>
@@ -649,16 +628,16 @@ function AdminBusesPageContent() {
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-[#4E5A45] bg-[#243227] overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-black/30 text-left text-white/70">
+        <div className="dashboard-surface overflow-hidden rounded-2xl">
+          <div className="overflow-x-auto">
+          <table className="min-w-[760px] w-full text-sm">
+            <thead className="dashboard-table-head text-left text-white/70">
               <tr>
                 <th className="px-4 py-3">Bus</th>
                 <th className="px-4 py-3">Number</th>
                 <th className="px-4 py-3">Capacity</th>
                 <th className="px-4 py-3">Route Points</th>
                 <th className="px-4 py-3">Operators</th>
-                {isSuperAdmin && <th className="px-4 py-3">Company</th>}
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -685,18 +664,18 @@ function AdminBusesPageContent() {
                       )}
                     </div>
                   </td>
-                  {isSuperAdmin && <td className="px-4 py-3">{bus.companyName || "--"}</td>}
                   <td className="px-4 py-3 text-right">{renderActions(bus)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {assignBus && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-[#4E5A45] bg-[#243227] p-5">
+          <div className="dashboard-surface w-full max-w-xl rounded-2xl p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-[#E4E67A]">Assign Operator</h2>
               <button
@@ -728,6 +707,16 @@ function AdminBusesPageContent() {
                   ))}
                 </select>
               </label>
+              {scheduledDeletionApprovedCount > 0 ? (
+                <p className="md:col-span-2 text-xs text-amber-300">
+                  {scheduledDeletionApprovedCount} approved operator{scheduledDeletionApprovedCount === 1 ? " is" : "s are"} hidden from assignment because account deletion is scheduled.
+                </p>
+              ) : null}
+              {!loadingOperators && approvedOperators.length === 0 ? (
+                <p className="md:col-span-2 text-xs text-white/60">
+                  No assignable operators are available right now.
+                </p>
+              ) : null}
 
               <label className="text-xs text-white/80 md:col-span-2">
                 Assignment Date Range
@@ -766,7 +755,7 @@ function AdminBusesPageContent() {
 
       {removeBus && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-[#4E5A45] bg-[#243227] p-5">
+          <div className="dashboard-surface w-full max-w-xl rounded-2xl p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-[#E4E67A]">Remove Operator</h2>
               <button
@@ -811,9 +800,31 @@ function AdminBusesPageContent() {
         </div>
       )}
 
+      <ConfirmationModal
+        isOpen={Boolean(deleteBusTarget)}
+        title="Delete Bus"
+        description={
+          deleteBusTarget
+            ? `Delete bus "${deleteBusTarget.busName}" (${deleteBusTarget.busNumber})?`
+            : undefined
+        }
+        confirmLabel={deletingBusId === deleteBusTarget?._id ? "Deleting..." : "Delete Bus"}
+        confirmVariant="danger"
+        isLoading={Boolean(deleteBusTarget && deletingBusId === deleteBusTarget._id)}
+        onClose={() => {
+          if (deleteBusTarget && deletingBusId === deleteBusTarget._id) return;
+          setDeleteBusTarget(null);
+        }}
+        onConfirm={confirmDeleteBus}
+      >
+        <p className="text-sm text-white/70">
+          This will remove the bus. If active orders are linked, you will be prompted to reschedule them first.
+        </p>
+      </ConfirmationModal>
+
       {deleteRescheduleState && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-[#4E5A45] bg-[#243227] p-5">
+          <div className="dashboard-surface w-full max-w-3xl rounded-2xl p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-[#E4E67A]">Reschedule Orders Before Delete</h2>
               <button
@@ -857,7 +868,7 @@ function AdminBusesPageContent() {
               </select>
             </label>
 
-            <div className="mt-4 max-h-72 overflow-auto rounded-xl border border-white/15 bg-black/25 p-3">
+            <div className="mt-4 max-h-72 overflow-auto dashboard-surface-soft rounded-xl p-3">
               {deleteRescheduleState.blockingOrders.length === 0 ? (
                 <p className="text-xs text-white/70">No active orders found.</p>
               ) : (
@@ -869,7 +880,7 @@ function AdminBusesPageContent() {
                     return (
                       <div
                         key={order.id}
-                        className="rounded-lg border border-white/15 bg-black/35 p-3 text-xs text-white/85"
+                        className="dashboard-subsurface rounded-lg p-3 text-xs text-white/85"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-semibold text-[#E4E67A]">

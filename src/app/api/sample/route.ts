@@ -43,7 +43,6 @@ export async function GET() {
             { name: "Thane (W)", address: "Thane Station Road", city: "Thane", state: "Maharashtra", zip: "400601", latitude: 19.186, longitude: 72.9754 },
             { name: "Panvel", address: "Panvel Bus Stand", city: "Navi Mumbai", state: "Maharashtra", zip: "410206", latitude: 18.9894, longitude: 73.1175 },
             { name: "Borivali (E)", address: "Opp. National Park", city: "Mumbai", state: "Maharashtra", zip: "400066", latitude: 19.2307, longitude: 72.8575 },
-
             { name: "Ratnagiri", address: "Ratnagiri Bus Depot", city: "Ratnagiri", state: "Maharashtra", zip: "415612", latitude: 16.9902, longitude: 73.312 },
             { name: "Chiplun", address: "Chiplun Bus Stand", city: "Chiplun", state: "Maharashtra", zip: "415605", latitude: 17.5333, longitude: 73.5167 },
             { name: "Kankavli", address: "Kankavli Bus Depot", city: "Kankavli", state: "Maharashtra", zip: "416602", latitude: 16.2665, longitude: 73.7139 },
@@ -61,12 +60,12 @@ export async function GET() {
 
         // --- 3. Create Travel Companies ---
         // console.log("Creating travel companies...");
-        const companies = await TravelCompany.insertMany([
-            { name: "Konkan Tours" },
-            { name: "Mumbai Roadways" }
-        ]);
+        // const companies = await TravelCompany.insertMany([
+        //     { name: "Konkan Tours" },
+        //     { name: "Mumbai Roadways" }
+        // ]);
 
-        const [konkanTours, mumbaiRoadways] = companies;
+        // const [konkanTours, mumbaiRoadways] = companies;
         // console.log(`${companies.length} companies created.`);
 
         // --- 4. Create Buses ---
@@ -192,7 +191,7 @@ export async function GET() {
             message: "Sample data inserted successfully.",
             counts: {
                 locations: locations.length,
-                companies: companies.length,
+                // companies: companies.length,
                 // buses: insertedBuses.length,
                 coupons: coupons.length,
             },

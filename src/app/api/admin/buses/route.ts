@@ -11,6 +11,7 @@ import {
   normalizeCategoryFaresForAllowedNames,
   resolveActivePackageCatalog,
 } from "@/app/api/lib/packageCatalog";
+import { normalizeIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const BUS_NUMBER_PATTERN = /^[A-Z]{2}-\d{2}-[A-Z]{2}-\d{4}$/;
@@ -172,15 +173,15 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await User.findById(userId);
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
-    const adminPhone = String(user.phone ?? "").trim();
+    const adminPhone = normalizeIndiaPhone(user.phone);
     if (!adminPhone) {
       return NextResponse.json(
         {
           success: false,
-          message: "Add your contact number before creating a bus.",
+          message: "Add your valid Indian contact number before creating a bus.",
         },
         { status: 400 },
       );
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
 
     if (allowedCategoryNames.length === 0) {
       return NextResponse.json(
-        { success: false, message: "No active package categories configured by super admin." },
+        { success: false, message: "No active package categories configured by admin." },
         { status: 400 },
       );
     }
@@ -612,30 +613,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await User.findById(userId).select("role isSuperAdmin travelCompanyId buses");
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    const user = await User.findById(userId).select("role travelCompanyId buses");
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const scope = String(searchParams.get("scope") ?? "all").trim().toLowerCase();
     const query: Record<string, unknown> = {};
-    if (user.isSuperAdmin) {
-      if (scope === "my_company") {
-        if (!user.travelCompanyId) {
-          return NextResponse.json({ success: true, buses: [] }, { status: 200 });
-        }
-        query.travelCompanyId = user.travelCompanyId;
-      }
-    } else {
-      if (user.travelCompanyId) {
-        query.travelCompanyId = user.travelCompanyId;
-      } else if (Array.isArray(user.buses) && user.buses.length > 0) {
-        query._id = { $in: user.buses };
-      } else {
-        return NextResponse.json({ success: true, buses: [] }, { status: 200 });
-      }
-    }
 
     const buses = await Bus.find(query)
       .sort({ createdAt: -1 })

@@ -478,8 +478,8 @@ export async function PATCH(
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await User.findById(userId).select("role isSuperAdmin travelCompanyId buses");
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    const user = await User.findById(userId).select("role travelCompanyId buses");
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -493,10 +493,7 @@ export async function PATCH(
       return NextResponse.json({ success: false, message: "Bus not found." }, { status: 404 });
     }
 
-    if (
-      !user.isSuperAdmin &&
-      String(bus.travelCompanyId ?? "") !== String(user.travelCompanyId ?? "")
-    ) {
+    if (String(bus.travelCompanyId ?? "") !== String(user.travelCompanyId ?? "")) {
       const canAccessByBusList = Array.isArray(user.buses)
         ? user.buses.some((id: unknown) => String(id) === busId)
         : false;
@@ -531,7 +528,7 @@ export async function PATCH(
     const allowedCategoryNames = packageCatalog.categories.map((entry) => entry.name);
     if (allowedCategoryNames.length === 0) {
       return NextResponse.json(
-        { success: false, message: "No active package categories configured by super admin." },
+        { success: false, message: "No active package categories configured by admin." },
         { status: 400 },
       );
     }
@@ -789,8 +786,8 @@ export async function DELETE(
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await User.findById(userId).select("role isSuperAdmin travelCompanyId buses");
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    const user = await User.findById(userId).select("role travelCompanyId buses");
+    if (!user || user.role !== "admin") {
       return NextResponse.json({ success: false, message: "Admin access required." }, { status: 403 });
     }
 
@@ -804,10 +801,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, message: "Bus not found." }, { status: 404 });
     }
 
-    if (
-      !user.isSuperAdmin &&
-      String(bus.travelCompanyId ?? "") !== String(user.travelCompanyId ?? "")
-    ) {
+    if (String(bus.travelCompanyId ?? "") !== String(user.travelCompanyId ?? "")) {
       const canAccessByBusList = Array.isArray(user.buses)
         ? user.buses.some((id: unknown) => String(id) === busId)
         : false;

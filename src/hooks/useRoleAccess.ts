@@ -12,7 +12,6 @@ export const useRoleAccess = () => {
 
   const role = useMemo<DashboardRole | null>(() => {
     if (!user) return null;
-    if (user.isSuperAdmin) return "superadmin";
     if (user.role === "admin") return "admin";
     if (user.role === "operator") return "operator";
     return null;

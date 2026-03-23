@@ -5,6 +5,12 @@ import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { dbConnect } from "@/app/api/lib/db";
 import { sendEmail, wasEmailAccepted } from "@/app/api/lib/mailer";
 import { createNotification } from "@/app/api/lib/notifications";
+import { resolveOperatorCompany } from "@/app/api/lib/companyResolver";
+import {
+  clearScheduledAccountDeletion,
+  isAccountDeletionExpired,
+  permanentlyDeleteUserAccount,
+} from "@/app/api/lib/accountDeletion";
 import { randomUUID } from "crypto";
 import bcryptjs from "bcryptjs";
 import {
@@ -144,35 +150,7 @@ const requestOperatorCompanyLink = async (
 ) => {
   if (!user._id || !user.email) return false;
 
-  const trimmedCompanyId = selection.companyId?.trim() ?? "";
-  const trimmedCompanyName = selection.companyName?.trim() ?? "";
-
-  let company:
-    | {
-        _id: mongoose.Types.ObjectId;
-        name: string;
-        ownerUserId?: mongoose.Types.ObjectId;
-        ownerEmail?: string;
-        contact?: { email?: string };
-      }
-    | null = null;
-
-  if (trimmedCompanyId && mongoose.Types.ObjectId.isValid(trimmedCompanyId)) {
-    company = await TravelCompany.findById(trimmedCompanyId)
-      .select("_id name ownerUserId ownerEmail contact")
-      .lean();
-  }
-
-  if (!company && trimmedCompanyName) {
-    company = await TravelCompany.findOne({
-      name: {
-        $regex: `^${trimmedCompanyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-        $options: "i",
-      },
-    })
-      .select("_id name ownerUserId ownerEmail contact")
-      .lean();
-  }
+  const { company } = await resolveOperatorCompany(selection);
 
   if (!company) {
     return false;
@@ -288,14 +266,18 @@ export async function GET(request: NextRequest) {
       const adminOtpUrl = new URL("/admin/verify-access", request.url);
       const isAdminRegisterIntent = auth.intent === "register";
       if (isAdminRegisterIntent) {
-        adminOtpUrl.searchParams.set("flow", "register");
+        loginUrl.searchParams.set(
+          "error",
+          "Admin registration is disabled. Contact support if you need access.",
+        );
+        return NextResponse.redirect(loginUrl);
       }
 
       if (!user) {
         if (!isAdminRegisterIntent) {
           loginUrl.searchParams.set(
             "error",
-            "No admin account found. Please register first.",
+            "No admin account found.",
           );
           return NextResponse.redirect(loginUrl);
         }
@@ -308,12 +290,12 @@ export async function GET(request: NextRequest) {
 
         const companyName = auth.companyName?.trim() ?? "";
         if (!companyName) {
-          const registerUrl = new URL("/admin/register", request.url);
-          registerUrl.searchParams.set(
+          const loginUrl = new URL("/admin/login", request.url);
+          loginUrl.searchParams.set(
             "error",
-            "Admin Google registration requires company name.",
+            "Admin registration is disabled. Contact support if you need access.",
           );
-          return NextResponse.redirect(registerUrl);
+          return NextResponse.redirect(loginUrl);
         }
 
         const existingCompany = await TravelCompany.findOne({
@@ -325,15 +307,14 @@ export async function GET(request: NextRequest) {
           const currentAdminCount = await User.countDocuments({
             travelCompanyId: existingCompany._id,
             role: "admin",
-            isSuperAdmin: { $ne: true },
           });
-          if (currentAdminCount >= 4) {
-            const registerUrl = new URL("/admin/register", request.url);
-            registerUrl.searchParams.set(
+          if (currentAdminCount >= 1) {
+            const loginUrl = new URL("/admin/login", request.url);
+            loginUrl.searchParams.set(
               "error",
-              "This logistics company already has 4 admins.",
+              "This logistics company already has an admin account.",
             );
-            return NextResponse.redirect(registerUrl);
+            return NextResponse.redirect(loginUrl);
           }
           targetCompanyId = existingCompany._id;
         } else {
@@ -374,7 +355,7 @@ export async function GET(request: NextRequest) {
           await companyForOwner.save();
         }
       } else {
-        const hasAdminAccess = user.role === "admin" || user.isSuperAdmin;
+        const hasAdminAccess = user.role === "admin";
         if (!isAdminRegisterIntent && !hasAdminAccess) {
           loginUrl.searchParams.set(
             "error",
@@ -382,6 +363,15 @@ export async function GET(request: NextRequest) {
           );
           return NextResponse.redirect(loginUrl);
         }
+      }
+
+      if (isAccountDeletionExpired(user)) {
+        await permanentlyDeleteUserAccount(user);
+        loginUrl.searchParams.set(
+          "error",
+          "This account was deleted. Please register again.",
+        );
+        return NextResponse.redirect(loginUrl);
       }
 
       const providers = normalizeAuthProviders(user.authProvider);
@@ -419,12 +409,12 @@ export async function GET(request: NextRequest) {
       if (isAdminRegisterIntent && !user.travelCompanyId) {
         const companyName = auth.companyName?.trim() ?? "";
         if (!companyName) {
-          const registerUrl = new URL("/admin/register", request.url);
-          registerUrl.searchParams.set(
+          const loginUrl = new URL("/admin/login", request.url);
+          loginUrl.searchParams.set(
             "error",
-            "Company name is required to complete admin registration.",
+            "Admin registration is disabled. Contact support if you need access.",
           );
-          return NextResponse.redirect(registerUrl);
+          return NextResponse.redirect(loginUrl);
         }
 
         const existingCompany = await TravelCompany.findOne({
@@ -434,16 +424,15 @@ export async function GET(request: NextRequest) {
           const currentAdminCount = await User.countDocuments({
             travelCompanyId: existingCompany._id,
             role: "admin",
-            isSuperAdmin: { $ne: true },
             _id: { $ne: user._id },
           });
-          if (currentAdminCount >= 4) {
-            const registerUrl = new URL("/admin/register", request.url);
-            registerUrl.searchParams.set(
+          if (currentAdminCount >= 1) {
+            const loginUrl = new URL("/admin/login", request.url);
+            loginUrl.searchParams.set(
               "error",
-              "This logistics company already has 4 admins.",
+              "This logistics company already has an admin account.",
             );
-            return NextResponse.redirect(registerUrl);
+            return NextResponse.redirect(loginUrl);
           }
           user.travelCompanyId = existingCompany._id;
           const companyForOwner = await TravelCompany.findById(existingCompany._id).select("ownerUserId ownerEmail");
@@ -522,6 +511,12 @@ export async function GET(request: NextRequest) {
 
     // User / Operator portals
     if (user) {
+      if (isAccountDeletionExpired(user)) {
+        await permanentlyDeleteUserAccount(user);
+        loginUrl.searchParams.set("error", "This account was deleted. Please register again.");
+        return NextResponse.redirect(loginUrl);
+      }
+
       if (user.role !== auth.role) {
         loginUrl.searchParams.set(
           "error",
@@ -564,13 +559,12 @@ export async function GET(request: NextRequest) {
 
       user.isVerified = true;
       await ensureGoogleOnlyUserHasPassword(user);
+      await clearScheduledAccountDeletion(user);
       if (auth.role === "operator" && auth.intent === "register") {
-        if (auth.companyId || auth.companyName) {
-          await requestOperatorCompanyLink(user, {
-            companyId: auth.companyId,
-            companyName: auth.companyName,
-          });
-        }
+        await requestOperatorCompanyLink(user, {
+          companyId: auth.companyId,
+          companyName: auth.companyName,
+        });
       }
       await user.save();
     } else {
@@ -603,12 +597,10 @@ export async function GET(request: NextRequest) {
         operatorApprovalStatus: "none",
       });
       if (auth.role === "operator" && auth.intent === "register") {
-        if (auth.companyId || auth.companyName) {
-          await requestOperatorCompanyLink(user, {
-            companyId: auth.companyId,
-            companyName: auth.companyName,
-          });
-        }
+        await requestOperatorCompanyLink(user, {
+          companyId: auth.companyId,
+          companyName: auth.companyName,
+        });
         await user.save();
       }
     }

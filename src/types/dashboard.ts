@@ -1,4 +1,4 @@
-export type DashboardRole = "operator" | "admin" | "superadmin";
+export type DashboardRole = "operator" | "admin";
 
 export type BusStatus = "active" | "maintenance" | "inactive";
 export type OperatorStatus = "active" | "inactive" | "suspended";

@@ -106,7 +106,7 @@ function BannerCarouselPreview({ slides }: { slides: ManagedBannerSlide[] }) {
 
   if (!slides.length) {
     return (
-      <div className="flex h-44 items-center justify-center rounded-xl border border-white/15 bg-black/20 text-xs text-white/55">
+      <div className="dashboard-surface-soft flex h-44 items-center justify-center rounded-xl text-xs text-white/55">
         No active banners to preview.
       </div>
     );
@@ -117,7 +117,7 @@ function BannerCarouselPreview({ slides }: { slides: ManagedBannerSlide[] }) {
   const goNext = () => setActiveIndex((prev) => (prev + 1) % slides.length);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/20 bg-[#11170f]">
+    <div className="dashboard-surface relative overflow-hidden rounded-xl">
       <div
         className="flex transition-transform duration-500 ease-out"
         style={{ transform: `translateX(-${safeIndex * 100}%)` }}
@@ -579,7 +579,7 @@ export default function SuperAdminCouponBannerSection({
   return (
     <div className="space-y-8">
       {showCoupons && (
-        <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-5 sm:p-6">
+        <div className="dashboard-surface rounded-2xl p-5 sm:p-6">
           <div className="mb-4 flex items-center gap-2">
             <Icon icon="mdi:ticket-percent-outline" className="text-xl text-[#E4E67A]" />
             <h2 className="text-xl font-semibold text-[#E4E67A]">Coupon Management</h2>
@@ -594,7 +594,7 @@ export default function SuperAdminCouponBannerSection({
                   setCouponForm((prev) => ({ ...prev, code: event.target.value.toUpperCase().slice(0, 20) }))
                 }
                 placeholder="Coupon Code"
-                className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/70"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/70"
               />
             </div>
             <div className="space-y-1">
@@ -606,7 +606,7 @@ export default function SuperAdminCouponBannerSection({
                 value={couponForm.discount}
                 onChange={(event) => setCouponForm((prev) => ({ ...prev, discount: event.target.value }))}
                 placeholder="Discount %"
-                className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/70"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/70"
               />
             </div>
             <div className="space-y-1">
@@ -639,7 +639,7 @@ export default function SuperAdminCouponBannerSection({
                     placeholder="Select expiry date"
                   />
                 ) : (
-                  <div className="rounded-xl border border-white/20 bg-black/30 px-3 py-3 text-xs text-white/65">
+                  <div className="dashboard-surface-soft rounded-xl px-3 py-3 text-xs text-white/65">
                     This coupon never expires.
                   </div>
                 )}
@@ -653,12 +653,12 @@ export default function SuperAdminCouponBannerSection({
                 value={couponForm.maxUsesPerUser}
                 onChange={(event) => setCouponForm((prev) => ({ ...prev, maxUsesPerUser: event.target.value }))}
                 placeholder="1"
-                className="w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[#CDD645]/70"
+                className="dashboard-input w-full rounded-lg px-3 py-2 text-sm focus:border-[#CDD645]/70"
               />
             </div>
             <div className="space-y-1">
               <p className="text-xs text-white/65">Status</p>
-              <label className="inline-flex w-full items-center gap-2 rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white/90">
+              <label className="dashboard-surface-soft inline-flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/90">
                 <input
                   type="checkbox"
                   checked={couponForm.isActive}
@@ -680,7 +680,7 @@ export default function SuperAdminCouponBannerSection({
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-white/15 bg-black/20 p-3">
+          <div className="dashboard-surface-soft mt-4 rounded-xl p-3">
             <p className="text-xs text-white/65">Coupon Preview</p>
             <div className="mt-2 flex flex-wrap items-end gap-3">
               <label className="flex flex-col gap-1 text-xs text-white/70">
@@ -690,7 +690,7 @@ export default function SuperAdminCouponBannerSection({
                   min={0}
                   value={couponPreviewAmount}
                   onChange={(event) => setCouponPreviewAmount(event.target.value)}
-                  className="w-28 rounded-md border border-white/20 bg-black/30 px-2 py-1 text-xs text-white outline-none"
+                  className="dashboard-input w-28 rounded-md px-2 py-1 text-xs"
                 />
               </label>
               <span className="text-xs text-white/80">Save: Rs {previewDiscountAmount.toFixed(2)}</span>
@@ -714,7 +714,7 @@ export default function SuperAdminCouponBannerSection({
               Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={`coupon-skeleton-${index}`}
-                  className="rounded-xl border border-white/15 bg-black/20 p-3"
+                  className="dashboard-surface-soft rounded-xl p-3"
                 >
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
                     {Array.from({ length: 7 }).map((__, cellIndex) => (
@@ -727,12 +727,12 @@ export default function SuperAdminCouponBannerSection({
                 </div>
               ))
             ) : coupons.length === 0 ? (
-              <div className="rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/70">
+              <div className="dashboard-surface-soft rounded-xl p-3 text-sm text-white/70">
                 No coupons found.
               </div>
             ) : (
               coupons.map((coupon) => (
-                <div key={coupon.id} className="rounded-xl border border-white/15 bg-black/20 p-3">
+                <div key={coupon.id} className="dashboard-surface-soft rounded-xl p-3">
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
                     <div className="space-y-1">
                       <p className="text-[11px] text-white/60">Coupon Code</p>
@@ -747,7 +747,7 @@ export default function SuperAdminCouponBannerSection({
                             ),
                           )
                         }
-                        className="w-full rounded-md border border-white/20 bg-black/40 px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </div>
                     <div className="space-y-1">
@@ -764,7 +764,7 @@ export default function SuperAdminCouponBannerSection({
                             ),
                           )
                         }
-                        className="w-full rounded-md border border-white/20 bg-black/40 px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </div>
                     <div className="space-y-1">
@@ -813,7 +813,7 @@ export default function SuperAdminCouponBannerSection({
                             placeholder="Select expiry date"
                           />
                         ) : (
-                          <div className="rounded-md border border-white/20 bg-black/40 px-2 py-2 text-[11px] text-white/65">
+                          <div className="dashboard-surface-soft rounded-md px-2 py-2 text-[11px] text-white/65">
                             Never expires
                           </div>
                         )}
@@ -834,12 +834,12 @@ export default function SuperAdminCouponBannerSection({
                             ),
                           )
                         }
-                        className="w-full rounded-md border border-white/20 bg-black/40 px-2 py-1.5 text-xs text-white outline-none"
+                        className="dashboard-input w-full rounded-md px-2 py-1.5 text-xs"
                       />
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] text-white/60">Status</p>
-                      <label className="inline-flex w-full items-center gap-2 rounded-md border border-white/20 bg-black/40 px-2 py-1.5 text-xs text-white/90">
+                      <label className="dashboard-surface-soft inline-flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/90">
                         <input
                           type="checkbox"
                           checked={coupon.isActive}
@@ -878,7 +878,7 @@ export default function SuperAdminCouponBannerSection({
       )}
 
       {showBanners && (
-        <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-5 sm:p-6">
+        <div className="dashboard-surface rounded-2xl p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Icon icon="mdi:image-multiple-outline" className="text-xl text-[#E4E67A]" />
@@ -890,7 +890,7 @@ export default function SuperAdminCouponBannerSection({
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
-            <div className="rounded-xl border border-white/15 bg-black/20 p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="text-xs text-white/70">Upload Banner Image</p>
               <div className="mt-2 flex items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#D5E400]/60 px-2 py-1 text-xs text-[#E4E67A] hover:bg-[#D5E400]/10">
@@ -920,9 +920,9 @@ export default function SuperAdminCouponBannerSection({
               <p className="mt-2 text-[11px] text-white/55">Only uploaded image banners are supported.</p>
             </div>
 
-            <div className="rounded-xl border border-white/15 bg-black/20 p-3">
+            <div className="dashboard-surface-soft rounded-xl p-3">
               <p className="text-xs text-white/65">New Banner Image Preview</p>
-              <div className="mt-2 h-28 overflow-hidden rounded-lg border border-white/15 bg-black/40">
+              <div className="dashboard-subsurface mt-2 h-28 overflow-hidden rounded-lg">
                 {getSafeImageUrl(bannerForm.imageUrl) ? (
                   <Image
                     src={getSafeImageUrl(bannerForm.imageUrl)}
@@ -939,7 +939,7 @@ export default function SuperAdminCouponBannerSection({
               </div>
             </div>
 
-            <div className="flex flex-col justify-between gap-3 rounded-xl border border-white/15 bg-black/20 p-3">
+            <div className="dashboard-surface-soft flex flex-col justify-between gap-3 rounded-xl p-3">
               <div className="space-y-1">
                 <p className="text-xs text-white/65">Status</p>
                 <label className="inline-flex items-center gap-2 text-sm text-white/85">
@@ -963,7 +963,7 @@ export default function SuperAdminCouponBannerSection({
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-white/15 bg-black/20 p-3">
+          <div className="dashboard-surface-soft mt-4 rounded-xl p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-xs text-white/65">Live Carousel Preview</p>
               <span className="text-[11px] text-white/55">
@@ -992,7 +992,7 @@ export default function SuperAdminCouponBannerSection({
               Array.from({ length: 2 }).map((_, index) => (
                 <div
                   key={`banner-skeleton-${index}`}
-                  className="rounded-xl border border-white/15 bg-black/20 p-3"
+                  className="dashboard-surface-soft rounded-xl p-3"
                 >
                   <div className="grid grid-cols-1 gap-2 lg:grid-cols-[120px_auto_auto_auto] lg:items-center">
                     <Skeleton className="h-16 w-full rounded" />
@@ -1006,14 +1006,14 @@ export default function SuperAdminCouponBannerSection({
                 </div>
               ))
             ) : banners.length === 0 ? (
-              <div className="rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/70">
+              <div className="dashboard-surface-soft rounded-xl p-3 text-sm text-white/70">
                 No banners configured yet.
               </div>
             ) : (
               banners.map((banner, index) => (
-                <div key={`${banner.imageUrl}-${index}`} className="rounded-xl border border-white/15 bg-black/20 p-3">
+                <div key={`${banner.imageUrl}-${index}`} className="dashboard-surface-soft rounded-xl p-3">
                   <div className="grid grid-cols-1 gap-2 lg:grid-cols-[120px_auto_auto_auto] lg:items-center">
-                    <div className="h-16 overflow-hidden rounded border border-white/15 bg-black/40">
+                    <div className="dashboard-subsurface h-16 overflow-hidden rounded">
                       {getSafeImageUrl(banner.imageUrl) ? (
                         <Image
                           src={getSafeImageUrl(banner.imageUrl)}
@@ -1028,7 +1028,7 @@ export default function SuperAdminCouponBannerSection({
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] text-white/60">Status</p>
-                      <label className="inline-flex items-center gap-2 rounded-md border border-white/20 bg-black/40 px-2 py-1.5 text-xs text-white/90">
+                      <label className="dashboard-surface-soft inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/90">
                         <input
                           type="checkbox"
                           checked={banner.isActive}

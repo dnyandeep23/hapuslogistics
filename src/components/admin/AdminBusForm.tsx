@@ -9,6 +9,7 @@ import { useDispatch } from "react-redux";
 import Image from "next/image";
 import CustomDateRangePicker from "@/components/CustomDateRangePicker";
 import CustomTimePicker from "@/components/CustomTimePicker";
+import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 import Skeleton from "@/components/Skeleton";
 import { AppDispatch } from "@/lib/redux/store";
 import { fetchUser } from "@/lib/redux/userSlice";
@@ -194,8 +195,8 @@ export default function AdminBusForm({
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const isEditMode = mode === "edit";
-  const isAdminRole = user?.role === "admin" || user?.isSuperAdmin;
-  const isLockedAdmin = user?.role === "admin" && !user?.isSuperAdmin && user?.hasRegisteredBus === false;
+  const isAdminRole = user?.role === "admin";
+  const isLockedAdmin = user?.role === "admin" && user?.hasRegisteredBus === false;
 
   const [busName, setBusName] = useState("");
   const [busNumber, setBusNumber] = useState("");
@@ -248,6 +249,7 @@ export default function AdminBusForm({
   const [currentStep, setCurrentStep] = useState(1);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
   const [activeRoutePointIndex, setActiveRoutePointIndex] = useState(0);
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
 
   const routeTileRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const routeTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -296,11 +298,24 @@ export default function AdminBusForm({
     !savingBus;
 
   const formSteps = [
-    { id: 1, label: "Bus Details", icon: "solar:bus-outline" },
-    { id: 2, label: "Route Setup", icon: "solar:route-outline" },
-    { id: 3, label: "Pricing", icon: "solar:card-outline" },
-    { id: 4, label: "Media", icon: "solar:gallery-outline" },
+    { id: 1, label: "Bus Details", icon: "solar:bus-line-duotone" },
+    { id: 2, label: "Route Setup", icon: "solar:route-bold-duotone" },
+    { id: 3, label: "Pricing", icon: "solar:card-bold-duotone" },
+    { id: 4, label: "Media", icon: "solar:gallery-bold-duotone" },
   ];
+
+  const pageShellClass =
+    "relative w-full min-w-0 max-w-full overflow-x-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(245,246,238,0.12),rgba(18,24,14,0.18)_38%,rgba(14,19,11,0.24))] p-4 text-white shadow-[0_30px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-6 lg:p-8";
+  const glassCardClass =
+    "rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] shadow-[0_18px_40px_rgba(0,0,0,0.14)]";
+  const darkInsetCardClass =
+    "rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(9,12,10,0.28),rgba(9,12,10,0.16))]";
+  const fieldInputClass =
+    "dashboard-input mt-2 w-full rounded-xl px-3 py-2.5 transition focus:border-[#d5e400]/55";
+  const ghostButtonClass =
+    "inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white";
+  const primaryButtonClass =
+    "inline-flex items-center gap-2 rounded-full border border-[#d5e400]/25 bg-[#d5e400]/12 px-5 py-2.5 text-sm font-semibold text-[#F2FF8F] transition hover:bg-[#d5e400]/18 disabled:opacity-60";
 
   const busImagePreviews = useMemo(
     () =>
@@ -1562,9 +1577,20 @@ export default function AdminBusForm({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-x-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(211,228,90,0.14),_transparent_45%),#1C2318] p-4 text-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.55)] sm:p-6 lg:p-8">
+    <div className={pageShellClass}>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-16 top-0 h-56 w-56 rounded-full bg-[#d5e400]/8 blur-3xl" />
+        <div className="absolute right-0 top-20 h-64 w-64 rounded-full bg-emerald-300/6 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-white/4 blur-3xl" />
+      </div>
+
+      <div className="relative">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#d5e400]/20 bg-[#d5e400]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F2FF8F]">
+            <Icon icon="solar:bus-line-duotone" className="text-base" />
+            Fleet setup
+          </div>
           <h2 className="text-xl font-semibold text-[#F3F8BC] sm:text-2xl">
             {isEditMode ? "Edit Bus Profile" : isLockedAdmin ? "Register Your First Bus" : "Bus Setup"}
           </h2>
@@ -1576,14 +1602,12 @@ export default function AdminBusForm({
           type="button"
           onClick={() => {
             if (hasUnsavedChanges) {
-              const shouldLeave = window.confirm(
-                "Some saved changes might be lost if you leave this page. Continue?",
-              );
-              if (!shouldLeave) return;
+              setShowLeaveConfirmModal(true);
+              return;
             }
             router.push(cancelHref);
           }}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10"
+          className={ghostButtonClass}
         >
           <Icon icon="solar:close-circle-outline" className="text-base" />
           Cancel
@@ -1599,21 +1623,21 @@ export default function AdminBusForm({
               type="button"
               key={step.id}
               onClick={() => handleStepChipClick(step.id)}
-              className={`rounded-2xl border px-3 py-3 transition ${
+              className={`rounded-[1.35rem] border px-3 py-3 transition ${
                 active
-                  ? "border-[#C9D957]/55 bg-[#2D3725]"
+                  ? "border-[#d5e400]/25 bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
                   : completed
-                  ? "border-[#C9D957]/35 bg-[#24301F]"
-                  : "border-white/10 bg-white/5"
-              } ${active ? "cursor-default" : "cursor-pointer hover:border-[#C9D957]/45 hover:bg-[#273222]"}`}
+                  ? "border-[#d5e400]/18 bg-[linear-gradient(135deg,rgba(213,228,0,0.1),rgba(255,255,255,0.03))]"
+                  : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]"
+              } ${active ? "cursor-default" : "cursor-pointer hover:border-[#d5e400]/20 hover:bg-white/8"}`}
             >
               <div className="flex items-center gap-2">
                 <span
                   className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
                     completed
-                      ? "bg-[#C9D957] text-black"
+                      ? "bg-[#d5e400] text-black"
                       : active
-                      ? "bg-[#C9D957]/20 text-[#E5F38E]"
+                      ? "bg-[#d5e400]/18 text-[#F2FF8F]"
                       : "bg-white/10 text-white/70"
                   }`}
                 >
@@ -1631,25 +1655,25 @@ export default function AdminBusForm({
       <form onSubmit={handleAdminBusSubmit} className="mt-7 w-full max-w-full space-y-6">
         {currentStep === 1 && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="rounded-2xl border border-white/12 bg-white/5 p-4 text-sm text-white/80">
+            <label className={`${glassCardClass} p-4 text-sm text-white/80`}>
               <span className="mb-1 inline-flex items-center gap-2 font-medium">
-                <Icon icon="solar:bus-outline" className="text-base text-[#DDEB83]" />
+                <Icon icon="solar:bus-line-duotone" className="text-base text-[#DDEB83]" />
                 Bus Name <span className="text-red-400">*</span>
               </span>
               <input
                 value={busName}
                 onChange={(event) => setBusName(event.target.value)}
                 placeholder="e.g. Hapus Express 01"
-                className={`mt-2 w-full rounded-xl border bg-transparent px-3 py-2.5 text-white outline-none transition ${
+                className={`${fieldInputClass} ${
                   adminBusFieldErrors.busName
                     ? "border-red-500"
-                    : "border-white/15 focus:border-[#DDEB83]/60"
+                    : ""
                 }`}
               />
               {adminBusFieldErrors.busName && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busName}</p>}
             </label>
 
-            <label className="rounded-2xl border border-white/12 bg-white/5 p-4 text-sm text-white/80">
+            <label className={`${glassCardClass} p-4 text-sm text-white/80`}>
               <span className="mb-1 inline-flex items-center gap-2 font-medium">
                 <Icon icon="solar:tag-horizontal-outline" className="text-base text-[#DDEB83]" />
                 Bus Number <span className="text-red-400">*</span>
@@ -1658,17 +1682,17 @@ export default function AdminBusForm({
                 value={busNumber}
                 onChange={(event) => setBusNumber(formatBusNumberInput(event.target.value))}
                 placeholder="MH-02-BL-2254"
-                className={`mt-2 w-full rounded-xl border bg-transparent px-3 py-2.5 text-white uppercase outline-none transition ${
+                className={`${fieldInputClass} uppercase ${
                   adminBusFieldErrors.busNumber
                     ? "border-red-500"
-                    : "border-white/15 focus:border-[#DDEB83]/60"
+                    : ""
                 }`}
               />
               <p className="mt-1 text-xs text-white/50">Format: AA-00-AA-0000</p>
               {adminBusFieldErrors.busNumber && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busNumber}</p>}
             </label>
 
-            <label className="rounded-2xl border border-white/12 bg-white/5 p-4 text-sm text-white/80">
+            <label className={`${glassCardClass} p-4 text-sm text-white/80`}>
               <span className="mb-1 inline-flex items-center gap-2 font-medium">
                 <Icon icon="solar:weight-outline" className="text-base text-[#DDEB83]" />
                 Capacity (KG) <span className="text-red-400">*</span>
@@ -1679,16 +1703,16 @@ export default function AdminBusForm({
                 value={capacity}
                 onChange={(event) => setCapacity(Number(event.target.value) || 1)}
                 placeholder="Capacity"
-                className={`mt-2 w-full rounded-xl border bg-transparent px-3 py-2.5 text-white outline-none transition ${
+                className={`${fieldInputClass} ${
                   adminBusFieldErrors.capacity
                     ? "border-red-500"
-                    : "border-white/15 focus:border-[#DDEB83]/60"
+                    : ""
                 }`}
               />
               {adminBusFieldErrors.capacity && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.capacity}</p>}
             </label>
 
-            <div className="rounded-2xl border border-white/12 bg-white/5 p-4 text-sm text-white/80">
+            <div className={`${glassCardClass} p-4 text-sm text-white/80`}>
               <p className="mb-1 inline-flex items-center gap-2 font-medium">
                 <Icon icon="solar:calendar-outline" className="text-base text-[#DDEB83]" />
                 Availability Date Range <span className="text-red-400">*</span>
@@ -1710,7 +1734,7 @@ export default function AdminBusForm({
               )}
             </div>
 
-            <div className="md:col-span-2 rounded-2xl border border-white/12 bg-[#242D1D] p-4">
+            <div className={`md:col-span-2 ${darkInsetCardClass} p-4`}>
               <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-white/90">
                 <input
                   type="checkbox"
@@ -1729,7 +1753,7 @@ export default function AdminBusForm({
 
         {currentStep === 2 && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/5 p-4">
+            <div className={`flex flex-wrap items-center justify-between gap-3 ${glassCardClass} p-4`}>
               <div>
                 <p className="text-sm font-semibold text-[#E5F38E]">Route Timeline</p>
                 <p className="text-xs text-white/65">Drag only from the handle to swap locations left or right.</p>
@@ -1737,7 +1761,7 @@ export default function AdminBusForm({
               <button
                 type="button"
                 onClick={addRoutePoint}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#D1DF63] px-3 py-2 text-sm font-semibold text-[#171D13] transition hover:bg-[#DEE97A]"
+                className={primaryButtonClass}
               >
                 <Icon icon="solar:add-circle-bold" />
                 Add Point
@@ -1746,7 +1770,7 @@ export default function AdminBusForm({
 
             <div
               ref={routeTimelineRef}
-              className="max-w-full overflow-x-auto rounded-2xl border border-white/12 bg-[#20281A] p-3 pb-4"
+              className={`max-w-full overflow-x-auto ${darkInsetCardClass} p-3 pb-4`}
             >
               <div className="flex min-w-max snap-x snap-mandatory items-stretch gap-3">
                 {routePoints.map((point, pointIndex) => {
@@ -1763,8 +1787,8 @@ export default function AdminBusForm({
                         }}
                         className={`group flex shrink-0 snap-start items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
                           isActive
-                            ? "border-[#D9E87B]/70 bg-[#2B361F]"
-                            : "border-white/15 bg-[#252F1D] hover:border-[#D9E87B]/35"
+                            ? "border-[#d5e400]/24 bg-[linear-gradient(135deg,rgba(213,228,0,0.14),rgba(255,255,255,0.04))]"
+                            : "border-white/12 bg-white/[0.04] hover:border-[#d5e400]/16"
                         } ${isDragging ? "scale-[1.02] border-[#D9E87B] shadow-lg shadow-[#D9E87B]/20" : ""}`}
                       >
                         <button
@@ -1784,7 +1808,7 @@ export default function AdminBusForm({
                         <button
                           type="button"
                           onPointerDown={(event) => startRouteTileDrag(pointIndex, event)}
-                          className="ml-1 inline-flex h-7 w-7 touch-none cursor-grab items-center justify-center rounded-lg border border-white/15 bg-black/20 text-white/70 transition hover:border-[#D9E87B]/50 hover:text-[#E5F38E] active:cursor-grabbing"
+                          className="dashboard-surface-soft ml-1 inline-flex h-7 w-7 touch-none cursor-grab items-center justify-center rounded-lg text-white/70 transition hover:border-[#D9E87B]/50 hover:text-[#E5F38E] active:cursor-grabbing"
                           title="Drag to reorder left/right"
                           aria-label={`Drag to reorder point ${pointIndex + 1}`}
                         >
@@ -1812,7 +1836,7 @@ export default function AdminBusForm({
             )}
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-              <div className="min-w-0 space-y-4 rounded-2xl border border-white/12 bg-white/5 p-4 lg:col-span-3">
+              <div className={`min-w-0 space-y-4 ${glassCardClass} p-4 lg:col-span-3`}>
                 {activeRoutePoint ? (
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1849,10 +1873,10 @@ export default function AdminBusForm({
                               locationId: event.target.value,
                             }))
                           }
-                          className={`mt-2 w-full rounded-xl border bg-transparent px-3 py-2.5 text-white outline-none transition ${
+                          className={`${fieldInputClass} appearance-none ${
                             adminBusFieldErrors[`routePoint.${activeRoutePointIndex}.locationId`]
                               ? "border-red-500"
-                              : "border-white/15 focus:border-[#DDEB83]/60"
+                              : ""
                           }`}
                         >
                           <option value="">Select location</option>
@@ -1877,10 +1901,10 @@ export default function AdminBusForm({
                               pointCategory: event.target.value as "pickup" | "drop",
                             }))
                           }
-                          className={`mt-2 w-full rounded-xl border bg-transparent px-3 py-2.5 text-white outline-none transition ${
+                          className={`${fieldInputClass} appearance-none ${
                             adminBusFieldErrors[`routePoint.${activeRoutePointIndex}.pointCategory`]
                               ? "border-red-500"
-                              : "border-white/15 focus:border-[#DDEB83]/60"
+                              : ""
                           }`}
                         >
                           <option value="pickup">Pickup</option>
@@ -1915,7 +1939,7 @@ export default function AdminBusForm({
                       <button
                         type="button"
                         onClick={() => openInlineLocationCreator(activeRoutePointIndex)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#D1DF63]/45 bg-[#293421] px-3 py-2 text-sm font-semibold text-[#E5F38E] transition hover:border-[#D1DF63]/70"
+                        className={primaryButtonClass}
                       >
                         <Icon icon="solar:map-point-add-bold" />
                         Add New Location with Map
@@ -1927,7 +1951,7 @@ export default function AdminBusForm({
                 )}
               </div>
 
-              <div className="min-w-0 rounded-2xl border border-white/12 bg-white/5 p-4 lg:col-span-2">
+              <div className={`min-w-0 ${glassCardClass} p-4 lg:col-span-2`}>
                 <p className="text-sm font-semibold text-[#E5F38E]">Route Map</p>
                 <p className="mt-1 text-xs text-white/65">
                   Real road distance and estimated time are fetched via OpenRouteService driving-car.
@@ -1940,12 +1964,12 @@ export default function AdminBusForm({
                       heightClassName="h-72"
                     />
                   ) : (
-                    <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-white/20 bg-black/20 p-4 text-center text-xs text-white/60">
+                    <div className="dashboard-surface-soft flex h-72 items-center justify-center rounded-2xl border border-dashed border-white/20 p-4 text-center text-xs text-white/60">
                       Select mapped locations to generate route preview.
                     </div>
                   )}
                 </div>
-                <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/70">
+                <div className={`mt-3 ${darkInsetCardClass} p-3 text-xs text-white/70`}>
                   <p>
                     Total route estimate:{" "}
                     <span className="font-semibold text-[#E5F38E]">
@@ -1965,7 +1989,7 @@ export default function AdminBusForm({
             </div>
 
             {showInlineLocationCreator && (
-              <div className="rounded-2xl border border-[#D1DF63]/35 bg-[#252F1D] p-4 sm:p-5">
+              <div className={`rounded-[1.5rem] border border-[#d5e400]/18 bg-[linear-gradient(180deg,rgba(213,228,0,0.08),rgba(255,255,255,0.03))] p-4 sm:p-5`}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-[#E5F38E]">
@@ -1976,7 +2000,7 @@ export default function AdminBusForm({
                   <button
                     type="button"
                     onClick={resetInlineLocationState}
-                    className="inline-flex items-center gap-1 rounded-xl border border-white/20 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                    className={ghostButtonClass}
                   >
                     <Icon icon="solar:close-circle-outline" />
                     Close
@@ -1991,7 +2015,7 @@ export default function AdminBusForm({
                       onChange={(event) =>
                         setInlineLocationForm((prev) => ({ ...prev, name: event.target.value }))
                       }
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-transparent px-3 py-2.5 text-white outline-none focus:border-[#DDEB83]/60"
+                      className={fieldInputClass}
                       placeholder="e.g. Nashik Market Yard"
                     />
                     {inlineLocationFieldErrors.name && <p className="mt-1 text-xs text-red-400">{inlineLocationFieldErrors.name}</p>}
@@ -2004,7 +2028,7 @@ export default function AdminBusForm({
                       onChange={(event) =>
                         setInlineLocationForm((prev) => ({ ...prev, address: event.target.value }))
                       }
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-transparent px-3 py-2.5 text-white outline-none focus:border-[#DDEB83]/60"
+                      className={fieldInputClass}
                       placeholder="Street / area"
                     />
                     {inlineLocationFieldErrors.address && <p className="mt-1 text-xs text-red-400">{inlineLocationFieldErrors.address}</p>}
@@ -2017,7 +2041,7 @@ export default function AdminBusForm({
                       onChange={(event) =>
                         setInlineLocationForm((prev) => ({ ...prev, city: event.target.value }))
                       }
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-transparent px-3 py-2.5 text-white outline-none focus:border-[#DDEB83]/60"
+                      className={fieldInputClass}
                     />
                     {inlineLocationFieldErrors.city && <p className="mt-1 text-xs text-red-400">{inlineLocationFieldErrors.city}</p>}
                   </label>
@@ -2029,7 +2053,7 @@ export default function AdminBusForm({
                       onChange={(event) =>
                         setInlineLocationForm((prev) => ({ ...prev, state: event.target.value }))
                       }
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-transparent px-3 py-2.5 text-white outline-none focus:border-[#DDEB83]/60"
+                      className={fieldInputClass}
                     />
                     {inlineLocationFieldErrors.state && <p className="mt-1 text-xs text-red-400">{inlineLocationFieldErrors.state}</p>}
                   </label>
@@ -2041,12 +2065,12 @@ export default function AdminBusForm({
                       onChange={(event) =>
                         setInlineLocationForm((prev) => ({ ...prev, zip: event.target.value }))
                       }
-                      className="mt-1.5 w-full rounded-xl border border-white/15 bg-transparent px-3 py-2.5 text-white outline-none focus:border-[#DDEB83]/60"
+                      className={fieldInputClass}
                     />
                     {inlineLocationFieldErrors.zip && <p className="mt-1 text-xs text-red-400">{inlineLocationFieldErrors.zip}</p>}
                   </label>
 
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/70">
+                  <div className="dashboard-surface-soft rounded-xl p-3 text-xs text-white/70">
                     <p className="font-medium text-white/80">Coordinates</p>
                     <p className="mt-1">Lat: {inlineLocationForm.latitude || "--"}</p>
                     <p>Lng: {inlineLocationForm.longitude || "--"}</p>
@@ -2083,7 +2107,7 @@ export default function AdminBusForm({
                     type="button"
                     onClick={handleInlineLocationCreate}
                     disabled={savingInlineLocation}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[#D1DF63] px-4 py-2 text-sm font-semibold text-[#1A2015] transition hover:bg-[#DEE97A] disabled:opacity-60"
+                    className={primaryButtonClass}
                   >
                     <Icon icon="solar:diskette-linear" />
                     {savingInlineLocation ? "Saving..." : "Save Location"}
@@ -2098,7 +2122,7 @@ export default function AdminBusForm({
 
         {currentStep === 3 && (
           <div className="space-y-5">
-            <div className="min-w-0 rounded-2xl border border-white/12 bg-white/5 p-5">
+            <div className={`min-w-0 ${glassCardClass} p-5`}>
               <p className="text-lg font-semibold text-[#E5F38E]">Route-Wide Pricing</p>
               <p className="mt-1 text-sm text-white/70">
                 Set fares once for the full route: <span className="font-semibold">{startRoutePointLabel}</span> to{" "}
@@ -2116,7 +2140,7 @@ export default function AdminBusForm({
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/12 bg-white/5 p-5">
+            <div className={`${glassCardClass} p-5`}>
               <p className="text-lg font-semibold text-[#E5F38E]">Category Fare Input (INR)</p>
               <p className="mt-1 text-sm text-white/70">
                 Enter full-route price per category. Segment fares are auto-calculated by formula.
@@ -2125,7 +2149,7 @@ export default function AdminBusForm({
                 {materialCategories.map((category) => (
                   <label
                     key={`formula-fare-${category.name}`}
-                    className="rounded-xl border border-white/10 bg-black/20 p-3 text-white/85"
+                    className={`rounded-xl ${darkInsetCardClass} p-3 text-white/85`}
                   >
                     <span className="flex items-center gap-2 text-base font-medium">
                       <Icon icon={category.icon || "mdi:shape-outline"} className="text-xl text-[#DDEB83]" />
@@ -2143,7 +2167,7 @@ export default function AdminBusForm({
                         };
                         applyFullRoutePricingFormula(nextFares);
                       }}
-                      className="mt-2 w-full rounded-lg border border-white/15 bg-transparent px-3 py-2 text-lg font-semibold text-[#F4F7CE] outline-none focus:border-[#DDEB83]/60"
+                      className="mt-2 w-full rounded-lg border border-white/12 bg-black/15 px-3 py-2 text-lg font-semibold text-[#F4F7CE] outline-none transition focus:border-[#DDEB83]/60"
                     />
                     {String(category.name ?? "").trim().toLowerCase() === "other" && (
                       <p className="mt-1 text-xs text-white/55">
@@ -2153,7 +2177,7 @@ export default function AdminBusForm({
                   </label>
                 ))}
               </div>
-              <div className="mt-4 rounded-xl border border-[#DDEB83]/25 bg-[#26311F] p-3">
+              <div className="mt-4 rounded-xl border border-[#DDEB83]/20 bg-[linear-gradient(180deg,rgba(213,228,0,0.08),rgba(255,255,255,0.03))] p-3">
                 <p className="text-sm font-semibold text-[#E5F38E]">
                   Applied Formula
                 </p>
@@ -2163,7 +2187,7 @@ export default function AdminBusForm({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/12 bg-white/5 p-5">
+            <div className={`${glassCardClass} p-5`}>
               <p className="text-lg font-semibold text-[#E5F38E]">Segment Fare Preview</p>
               <p className="mt-1 text-sm text-white/70">
                 Auto-distributed fares for each route segment.
@@ -2175,7 +2199,7 @@ export default function AdminBusForm({
                   const segmentMetric = getRouteSegmentMetric(routeIndex);
                   const segmentDistance = Number(segmentMetric?.distanceKm ?? 0);
                   return (
-                    <div key={`formula-preview-${routeIndex}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <div key={`formula-preview-${routeIndex}`} className={`rounded-xl ${darkInsetCardClass} p-3`}>
                       <p className="break-words text-sm font-semibold text-white">
                         Segment {routeIndex + 1}: {pickupLabel} → {dropLabel}
                       </p>
@@ -2188,7 +2212,7 @@ export default function AdminBusForm({
                         {materialCategories.map((category) => (
                           <div
                             key={`segment-preview-${routeIndex}-${category.name}`}
-                            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white/80"
+                            className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-white/80"
                           >
                             <span className="flex items-center gap-1">
                               <Icon icon={category.icon || "mdi:shape-outline"} className="text-sm text-[#DDEB83]" />
@@ -2213,7 +2237,7 @@ export default function AdminBusForm({
 
         {currentStep === 4 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <div className="min-w-0 rounded-2xl border border-white/12 bg-white/5 p-4 lg:col-span-3">
+            <div className={`min-w-0 ${glassCardClass} p-4 lg:col-span-3`}>
               <p className="text-sm font-semibold text-[#E5F38E]">Bus Image</p>
               <p className="mt-1 text-xs text-white/65">Upload one clear image for operator/admin listings.</p>
 
@@ -2224,7 +2248,7 @@ export default function AdminBusForm({
                     ? "border-[#DCEB81] bg-[#DCEB81]/10"
                     : adminBusFieldErrors.busImages
                     ? "border-red-500/70"
-                    : "border-white/20 bg-black/20 hover:border-[#DCEB81]/55"
+                    : "border-white/18 bg-black/15 hover:border-[#DCEB81]/55"
                 }`}
               >
                 <input {...getInputProps()} />
@@ -2241,7 +2265,7 @@ export default function AdminBusForm({
 
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {busImagePreviews.map((item) => (
-                  <div key={item.id} className="overflow-hidden rounded-xl border border-white/15 bg-black/20">
+                  <div key={item.id} className="overflow-hidden rounded-xl border border-white/12 bg-black/15">
                     <Image
                       src={item.preview}
                       alt={item.file.name}
@@ -2255,7 +2279,7 @@ export default function AdminBusForm({
                 ))}
 
                 {busImagePreviews.length === 0 && editingBus?.busImages?.[0] && (
-                  <div className="overflow-hidden rounded-xl border border-white/15 bg-black/20">
+                  <div className="overflow-hidden rounded-xl border border-white/12 bg-black/15">
                     <Image
                       src={editingBus.busImages[0]}
                       alt="Current bus"
@@ -2270,7 +2294,7 @@ export default function AdminBusForm({
               </div>
             </div>
 
-            <div className="min-w-0 rounded-2xl border border-white/12 bg-white/5 p-4 lg:col-span-2">
+            <div className={`min-w-0 ${glassCardClass} p-4 lg:col-span-2`}>
               <p className="text-sm font-semibold text-[#E5F38E]">Submission Summary</p>
               <div className="mt-3 space-y-2 text-sm text-white/75">
                 <div className="flex items-center justify-between">
@@ -2318,7 +2342,7 @@ export default function AdminBusForm({
               <button
                 type="button"
                 onClick={handlePreviousStep}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10"
+                className={ghostButtonClass}
               >
                 <Icon icon="solar:arrow-left-outline" />
                 Back
@@ -2327,7 +2351,7 @@ export default function AdminBusForm({
             <button
               type="submit"
               disabled={savingBus}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#D1DF63] px-5 py-2 text-sm font-semibold text-[#1A2015] transition hover:bg-[#DEE97A] disabled:opacity-60"
+              className={primaryButtonClass}
             >
               {currentStep === formSteps.length ? (
                 <>
@@ -2345,8 +2369,23 @@ export default function AdminBusForm({
         </div>
       </form>
 
-      {adminBusError && <p className="mt-4 text-sm text-red-400">{adminBusError}</p>}
-      {adminBusMessage && <p className="mt-4 text-sm text-emerald-300">{adminBusMessage}</p>}
+      <ConfirmationModal
+        isOpen={showLeaveConfirmModal}
+        title="Leave Page?"
+        description="Some saved changes might be lost if you leave this page."
+        confirmLabel="Continue"
+        cancelLabel="Stay Here"
+        confirmVariant="warning"
+        onClose={() => setShowLeaveConfirmModal(false)}
+        onConfirm={() => {
+          setShowLeaveConfirmModal(false);
+          router.push(cancelHref);
+        }}
+      />
+
+      {adminBusError && <p className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">{adminBusError}</p>}
+      {adminBusMessage && <p className="mt-4 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{adminBusMessage}</p>}
+      </div>
     </div>
   );
 }

@@ -79,13 +79,11 @@ export function DashboardDataProvider({ role, userEmail, userName, children }: P
   );
 
   const currentCompanyId = useMemo(() => {
-    if (role === "superadmin") return "platform";
     if (role === "admin") return adminCompany?.id ?? roleFallbackCompanyId(userEmail);
     return operatorSelf?.companyId ?? (adminCompany?.id ?? "company_alpha");
   }, [role, adminCompany?.id, operatorSelf?.companyId, userEmail]);
 
   const scopedCompanies = useMemo(() => {
-    if (role === "superadmin") return state.companies;
     if (role === "admin") {
       return adminCompany
         ? [adminCompany]
@@ -105,18 +103,15 @@ export function DashboardDataProvider({ role, userEmail, userName, children }: P
   }, [role, state.companies, adminCompany, currentCompanyId, userEmail, userName]);
 
   const scopedBuses = useMemo(() => {
-    if (role === "superadmin") return state.buses;
     return state.buses.filter((bus) => bus.companyId === currentCompanyId);
   }, [role, state.buses, currentCompanyId]);
 
   const scopedOperators = useMemo(() => {
-    if (role === "superadmin") return state.operators;
     if (role === "operator") return operatorSelf ? [operatorSelf] : [];
     return state.operators.filter((operator) => operator.companyId === currentCompanyId);
   }, [role, state.operators, currentCompanyId, operatorSelf]);
 
   const scopedTrips = useMemo(() => {
-    if (role === "superadmin") return state.trips;
     if (role === "operator") {
       return state.trips.filter((trip) => trip.operatorId === operatorSelf?.id);
     }
@@ -124,7 +119,6 @@ export function DashboardDataProvider({ role, userEmail, userName, children }: P
   }, [role, state.trips, currentCompanyId, operatorSelf?.id]);
 
   const scopedWalletTransactions = useMemo(() => {
-    if (role === "superadmin") return state.walletTransactions;
     return state.walletTransactions.filter((entry) => entry.companyId === currentCompanyId);
   }, [role, state.walletTransactions, currentCompanyId]);
 
@@ -251,8 +245,7 @@ export function DashboardDataProvider({ role, userEmail, userName, children }: P
     setState((prev) => ({
       ...prev,
       operators: prev.operators.map((operator) => {
-        const canUpdate =
-          operator.id === operatorId && (role === "superadmin" || operator.companyId === currentCompanyId);
+        const canUpdate = operator.id === operatorId && operator.companyId === currentCompanyId;
         if (!canUpdate) return operator;
 
         if (operator.status === "active") return { ...operator, status: "inactive" };
@@ -263,7 +256,7 @@ export function DashboardDataProvider({ role, userEmail, userName, children }: P
   };
 
   const suspendOperator = (operatorId: string) => {
-    if (role !== "superadmin") return;
+    if (role !== "admin") return;
     setState((prev) => ({
       ...prev,
       operators: prev.operators.map((operator) =>
@@ -392,7 +385,7 @@ export function DashboardDataProvider({ role, userEmail, userName, children }: P
   };
 
   const updateCompanyStatus = (companyId: string, status: Company["status"]) => {
-    if (role !== "superadmin") return;
+    if (role !== "admin") return;
     setState((prev) => ({
       ...prev,
       companies: prev.companies.map((company) =>

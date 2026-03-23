@@ -32,11 +32,11 @@ export default function BottomNav({ menus }: Props) {
             return currentPathWithQuery === href;
         }
         const itemPath = href.split("?")[0];
-        return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+        return pathname === itemPath;
     }, [currentPathWithQuery, pathname]);
 
     const getLogoutRedirectPath = () => {
-        if (user?.isSuperAdmin || user?.role === "admin") {
+        if (user?.role === "admin") {
             return "/admin/login";
         }
         if (user?.role === "operator") {
@@ -102,12 +102,13 @@ export default function BottomNav({ menus }: Props) {
                 <aside
                     className="
           mx-3 h-20
-          bg-[#F5F6EE]/10 backdrop-blur-md
-          text-white rounded-3xl shadow-xl
-          border border-emerald-900/40
+          rounded-[1.75rem] border border-white/10
+          bg-[linear-gradient(180deg,rgba(245,246,238,0.14),rgba(18,24,14,0.78))]
+          text-white shadow-[0_20px_50px_rgba(0,0,0,0.28)]
+          backdrop-blur-xl
         "
                 >
-                    <nav className="flex justify-around items-center h-full px-2 space-x-2">
+                    <nav className="flex h-full items-center justify-around gap-2 px-2" aria-label="Mobile dashboard navigation">
                         {bottomItems.map((item) => {
                             const active = isItemActive(item.href);
 
@@ -115,17 +116,18 @@ export default function BottomNav({ menus }: Props) {
                                 <Link
                                     key={item.href}
                                     href={item.href}
+                                    aria-current={active ? "page" : undefined}
                                     className={`
-                  flex flex-col items-center justify-center
-                  flex-1 py-2 rounded-xl
+                  group/item relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl py-2
                   transition-all duration-300
-                  ${active
-                                            ? "bg-lime-500/10 text-[#E1FF00]"
-                                            : "hover:bg-lime-800/40 text-[#B3D198]"}
+                  ${active ? "bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] text-[#F2FF8F] shadow-[0_8px_22px_rgba(0,0,0,0.14)]" : "text-[#C5D2AC] hover:bg-white/5 hover:text-[#F2FF8F]"}
                 `}
                                 >
-                                    <Icon icon={item.icon ?? "mdi:circle"} className="text-2xl" />
-                                    <span className="text-xs mt-1">{item.label}</span>
+                                    <span className={`absolute inset-x-4 top-1 h-px rounded-full transition-opacity ${active ? "bg-[#d5e400]/70 opacity-100" : "bg-transparent opacity-0"}`} />
+                                    <span className={`relative flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-300 ${active ? "bg-[#d5e400]/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
+                                        <Icon icon={item.icon ?? "mdi:circle"} className="text-xl" />
+                                    </span>
+                                    <span className="mt-1 text-[11px] font-medium tracking-tight">{item.label}</span>
                                 </Link>
                             );
                         })}
@@ -134,9 +136,12 @@ export default function BottomNav({ menus }: Props) {
                             <button
                                 type="button"
                                 onClick={() => setIsMoreOpen(true)}
-                                className={`flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 ${moreActive ? "bg-lime-500/10 text-[#E1FF00]" : "hover:bg-lime-800/40 text-[#B3D198]"}`}>
-                                <Icon icon="mdi:dots-horizontal-circle-outline" className="text-2xl" />
-                                <span className="text-xs mt-1">More</span>
+                                className={`group/item relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl py-2 transition-all duration-300 ${moreActive ? "bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] text-[#F2FF8F] shadow-[0_8px_22px_rgba(0,0,0,0.14)]" : "text-[#C5D2AC] hover:bg-white/5 hover:text-[#F2FF8F]"}`}>
+                                <span className={`absolute inset-x-4 top-1 h-px rounded-full transition-opacity ${moreActive ? "bg-[#d5e400]/70 opacity-100" : "bg-transparent opacity-0"}`} />
+                                <span className={`relative flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-300 ${moreActive ? "bg-[#d5e400]/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
+                                    <Icon icon="mdi:dots-horizontal-circle-outline" className="text-xl" />
+                                </span>
+                                <span className="mt-1 text-[11px] font-medium tracking-tight">More</span>
                             </button>
                         ) : (
                             <button
@@ -144,14 +149,15 @@ export default function BottomNav({ menus }: Props) {
                                 onClick={handleLogout}
                                 disabled={isLoggingOut}
                                 className="
-                  flex flex-col items-center justify-center
-                  flex-1 py-2 rounded-xl
-                  transition-all duration-300
-                  hover:bg-red-800/20 text-[#B3D198] disabled:opacity-60
+                  group/item flex flex-1 flex-col items-center justify-center rounded-2xl py-2
+                  text-[#C5D2AC] transition-all duration-300
+                  hover:bg-[#f3b6b6]/10 hover:text-[#f3d0d0] disabled:opacity-60
                 "
                             >
-                                <Icon icon="solar:logout-3-bold-duotone" className="text-2xl" />
-                                <span className="mt-1 inline-flex items-center gap-1 text-xs">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/5 transition-all duration-300 group-hover/item:bg-[#f3b6b6]/12">
+                                    <Icon icon="solar:logout-3-bold-duotone" className="text-xl" />
+                                </span>
+                                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium tracking-tight">
                                     {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-sm" />}
                                     {isLoggingOut ? "Logging out..." : "Logout"}
                                 </span>
@@ -167,23 +173,36 @@ export default function BottomNav({ menus }: Props) {
                         type="button"
                         aria-label="Close more menu"
                         onClick={() => setIsMoreOpen(false)}
-                        className="fixed inset-0 z-58 bg-black/45 lg:hidden"
+                        className="fixed inset-0 z-58 bg-black/45 backdrop-blur-[1px] lg:hidden"
                     />
 
-                    <aside className="fixed inset-y-4 rounded-xl right-4 z-59 w-72 border-l border-emerald-900/40 bg-[#1c2b16]/55 p-4 backdrop-blur-md lg:hidden">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-base font-semibold text-[#E4E67A]">More Options</h2>
+                    <aside
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="more-navigation-title"
+                        className="fixed inset-y-3 right-3 z-59 flex w-[19rem] max-w-[calc(100vw-1.5rem)] flex-col rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(28,40,22,0.94),rgba(20,28,16,0.98))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.38)] backdrop-blur-xl lg:hidden"
+                    >
+                        <div className="mb-4 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#d5e400]/12 text-[#F2FF8F]">
+                                    <Icon icon="mdi:menu-open" className="text-lg" />
+                                </span>
+                                <div>
+                                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">Navigation</p>
+                                    <h2 id="more-navigation-title" className="mt-1 text-lg font-semibold text-[#F2FF8F]">More options</h2>
+                                </div>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setIsMoreOpen(false)}
-                                className="rounded-lg border border-white/20 p-2 text-white/80"
-                                aria-label="Close"
+                                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/85 transition-all hover:bg-white/10 hover:text-white"
+                                aria-label="Close more menu"
                             >
-                                <Icon icon="mdi:close" className="text-lg" />
+                                <Icon icon="mdi:close" className="text-xl" />
                             </button>
                         </div>
 
-                        <nav className="space-y-2">
+                        <nav className="space-y-2 overflow-y-auto pr-1">
                             {remainingItems.map((item) => {
                                 const active = isItemActive(item.href);
                                 return (
@@ -192,12 +211,14 @@ export default function BottomNav({ menus }: Props) {
                                         href={item.href}
                                         onClick={() => setIsMoreOpen(false)}
                                         className={`
-                      flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all
-                      ${active ? "bg-lime-500/10 text-[#E1FF00]" : "text-[#B3D198] hover:bg-lime-800/30"}
+                      group/item flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-all duration-300
+                      ${active ? "border-[#d5e400]/20 bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] text-[#F2FF8F]" : "border-white/5 text-[#C5D2AC] hover:border-white/10 hover:bg-white/5 hover:text-[#F2FF8F]"}
                     `}
                                     >
-                                        <Icon icon={item.icon ?? "mdi:circle"} className="text-xl" />
-                                        <span>{item.label}</span>
+                                        <span className={`flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-300 ${active ? "bg-[#d5e400]/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
+                                            <Icon icon={item.icon ?? "mdi:circle"} className="text-xl" />
+                                        </span>
+                                        <span className="font-medium tracking-tight">{item.label}</span>
                                     </Link>
                                 );
                             })}
@@ -208,10 +229,12 @@ export default function BottomNav({ menus }: Props) {
                                 type="button"
                                 onClick={handleLogout}
                                 disabled={isLoggingOut}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#f0b2b2] transition-all hover:bg-red-800/20 disabled:opacity-60"
+                                className="flex w-full items-center gap-3 rounded-2xl border border-[#f3b6b6]/15 bg-[#f3b6b6]/8 px-3 py-3 text-sm text-[#f0b2b2] transition-all hover:bg-[#f3b6b6]/14 disabled:opacity-60"
                             >
-                                <Icon icon="solar:logout-3-bold-duotone" className="text-xl" />
-                                <span className="inline-flex items-center gap-2">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/5 transition-all duration-300">
+                                    <Icon icon="solar:logout-3-bold-duotone" className="text-xl" />
+                                </span>
+                                <span className="inline-flex items-center gap-2 font-medium tracking-tight">
                                     {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-base" />}
                                     {isLoggingOut ? "Logging out..." : "Logout"}
                                 </span>

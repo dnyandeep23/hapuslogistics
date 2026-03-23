@@ -12,17 +12,17 @@ export default function DashboardBannersPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (!user.isSuperAdmin) {
+    if (user.role !== "admin") {
       router.replace("/dashboard");
     }
   }, [router, user]);
 
-  if (!user || !user.isSuperAdmin) {
+  if (!user || user.role !== "admin") {
     return (
       <div className="rounded-2xl border border-red-500/35 bg-red-500/10 p-4 text-sm text-red-200">
         <div className="flex items-center gap-2">
           <Icon icon="mdi:shield-alert-outline" className="text-lg" />
-          Access restricted to super admin.
+          Access restricted to admin.
         </div>
       </div>
     );

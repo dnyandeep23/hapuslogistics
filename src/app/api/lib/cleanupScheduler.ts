@@ -1,4 +1,5 @@
 import { cleanupExpiredBookingSessions } from "@/app/api/lib/bookingSessionCleanup";
+import { cleanupExpiredUserAccounts } from "@/app/api/lib/accountDeletion";
 import { runOrderCleanupSafely } from "@/app/api/lib/orderCleanup";
 
 const CLEANUP_INTERVAL_MS = 60_000;
@@ -12,6 +13,7 @@ async function runCleanupCycle() {
   try {
     await cleanupExpiredBookingSessions();
     await runOrderCleanupSafely();
+    await cleanupExpiredUserAccounts();
   } catch (error: unknown) {
     console.error("[booking-cleanup] Scheduler cycle failed:", error);
   }

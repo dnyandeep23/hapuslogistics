@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
+import {
+  isAccountDeletionExpired,
+  permanentlyDeleteUserAccount,
+} from "@/app/api/lib/accountDeletion";
 import { sendEmail, wasEmailAccepted } from "@/app/api/lib/mailer";
 import {
   ADMIN_OTP_COOKIE,
@@ -31,11 +35,32 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await User.findById(pendingPayload.id);
-    if (!user || (user.role !== "admin" && !user.isSuperAdmin)) {
+    if (!user || user.role !== "admin") {
       return NextResponse.json(
         { success: false, message: "Admin account not found." },
         { status: 404 },
       );
+    }
+
+    if (isAccountDeletionExpired(user)) {
+      await permanentlyDeleteUserAccount(user);
+      const response = NextResponse.json(
+        {
+          success: false,
+          message: "This account has been deleted. Please register again.",
+        },
+        { status: 410 },
+      );
+
+      response.cookies.set(ADMIN_OTP_COOKIE, "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 0,
+      });
+
+      return response;
     }
 
     const adminOtp = generateAdminOtp();

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
-import Bus from "@/app/api/models/busModel";
 import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { createNotification } from "@/app/api/lib/notifications";
+import { permanentlyDeleteUserAccount } from "@/app/api/lib/accountDeletion";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -101,48 +101,41 @@ export async function DELETE(request: NextRequest) {
       .select("_id name ownerUserId")
       .lean<{ _id: { toString(): string }; name: string; ownerUserId?: { toString(): string } | null } | null>();
 
-    const companyId = operator.travelCompanyId;
-    operator.travelCompanyId = undefined;
-    operator.pendingTravelCompanyId = undefined;
-    operator.invitedByAdminId = undefined;
-    operator.operatorApprovalStatus = "none";
-    await operator.save();
-
-    await Bus.updateMany(
-      { travelCompanyId: companyId },
-      { $pull: { operatorContactPeriods: { operatorId: operator._id } } },
-    );
-
     if (company?.ownerUserId) {
       await createNotification({
         recipientUserId: company.ownerUserId.toString(),
         title: "Operator Left Company",
-        message: `${operator.name} (${operator.email}) left ${company.name}.`,
+        message: `${operator.name} (${operator.email}) left ${company.name} and the operator account was deleted.`,
         type: "warning",
         metadata: {
           operatorId: operator._id.toString(),
           companyId: company._id.toString(),
+          accountDeleted: true,
         },
       });
     }
 
-    await createNotification({
-      recipientUserId: operator._id.toString(),
-      title: "Left Company",
-      message: `You left ${company?.name ?? "your company"}. You can send a new company request any time.`,
-      type: "success",
-      metadata: {
-        companyId: company?._id?.toString(),
-      },
-    });
+    await permanentlyDeleteUserAccount(operator);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
-        message: `You left ${company?.name ?? "your company"} successfully.`,
+        accountDeleted: true,
+        message: `You left ${company?.name ?? "your company"} and your operator account was deleted.`,
+        redirectPath: "/operator/login?accountDeleted=true",
       },
       { status: 200 },
     );
+
+    response.cookies.set("token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 0,
+    });
+
+    return response;
   } catch (error: unknown) {
     return NextResponse.json(
       {

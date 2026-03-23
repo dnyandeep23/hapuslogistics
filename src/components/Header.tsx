@@ -41,11 +41,6 @@ const AUTH_OPTIONS: Record<AuthAction, Array<{ label: string; route: string; hin
       route: "/operator/register",
       hint: "Create operator account",
     },
-    {
-      label: "Admin",
-      route: "/admin/register",
-      hint: "Create admin account",
-    },
   ],
 };
 

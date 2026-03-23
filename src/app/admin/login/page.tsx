@@ -45,6 +45,7 @@ function LoginPageContent() {
     const registered = searchParams.get("registered");
     const error = searchParams.get("error");
     const otpRequired = searchParams.get("otpRequired");
+    const deletionScheduled = searchParams.get("deletionScheduled");
 
     if (registered === "true") {
       addToast(
@@ -67,6 +68,15 @@ function LoginPageContent() {
       setNotification({
         message: normalizeAuthQueryError(error),
         type: "error",
+        showResend: false,
+      });
+      return;
+    }
+
+    if (deletionScheduled === "true") {
+      setNotification({
+        message: "Account deletion scheduled. Log in within 3 days to cancel it.",
+        type: "warning",
         showResend: false,
       });
     }
@@ -366,13 +376,7 @@ function LoginPageContent() {
                   </span>
                 </div>
 
-                <div className="flex  justify-between items-center gap-2   text-xs md:text-sm text-white/80 mt-2">
-                  <span className="w-1/2 md:w-full">
-                    Don&apos;t have an account?{" "}
-                    <Link href="/admin/register" className="text-[#D5E400] underline cursor-pointer">
-                      Sign Up
-                    </Link>
-                  </span>
+                <div className="flex  justify-end items-center gap-2   text-xs md:text-sm text-white/80 mt-2">
                   <Link href="/forgot-password" className="text-[#D5E400] underline cursor-pointer">
                     Forgot Password?
                   </Link>

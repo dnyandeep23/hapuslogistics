@@ -21,6 +21,7 @@ import {
 } from "@/services/logistics";
 import { useDispatch, useSelector } from "react-redux";
 import { useToast } from "@/context/ToastContext";
+import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 import {
     selectPackage,
     setFormData,
@@ -44,6 +45,7 @@ import {
     type PackageCategoryConfig,
     type PackageSizeConfig,
 } from "@/lib/packageCatalog";
+import { getIndiaPhoneDigits, isValidIndiaPhone } from "@/lib/phone";
 
 export default function AddPackagePage() {
     const router = useRouter();
@@ -63,6 +65,7 @@ export default function AddPackagePage() {
     const [isUploadingPackageImage, setIsUploadingPackageImage] = useState(false);
     const [adminCustomerEmail, setAdminCustomerEmail] = useState("");
     const [showAdminConfirmModal, setShowAdminConfirmModal] = useState(false);
+    const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
     const [packageCategories, setPackageCategories] = useState<PackageCategoryConfig[]>(
         getActivePackageCategories(DEFAULT_PACKAGE_CATEGORIES),
     );
@@ -77,7 +80,7 @@ export default function AddPackagePage() {
         Boolean(pricingInfo?.busId) &&
         Boolean(pricingInfo?.sessionId) &&
         Number(pricingInfo?.total) > 0;
-    const isAdminBookingUser = Boolean(user?.role === "admin" || user?.isSuperAdmin);
+    const isAdminBookingUser = user?.role === "admin";
 
     useEffect(() => {
         const fetchPickups = async () => {
@@ -244,12 +247,7 @@ export default function AddPackagePage() {
             router.back();
             return;
         }
-        const shouldLeave = window.confirm(
-            "Some saved changes might be lost if you leave this page. Continue?",
-        );
-        if (shouldLeave) {
-            router.back();
-        }
+        setShowExitConfirmModal(true);
     };
 
     const handleClearForm = () => {
@@ -322,11 +320,16 @@ export default function AddPackagePage() {
         }
         if (currentStep === 3) {
             if (!formData.senderName?.trim()) newErrors.senderName = "Sender name is required";
-            if (!/^\d{10}$/.test(formData.senderContact)) newErrors.senderContact = "Sender contact must be 10 digits";
+            if (!isValidIndiaPhone(formData.senderContact)) newErrors.senderContact = "Enter a valid Indian mobile number";
             if (!formData.receiverName?.trim()) newErrors.receiverName = "Receiver name is required";
             if (formData.senderName === formData.receiverName) newErrors.receiverName = "Sender & receiver cannot be the same person";
-            if (!/^\d{10}$/.test(formData.receiverContact)) newErrors.receiverContact = "Receiver contact must be 10 digits";
-            if (formData.senderContact === formData.receiverContact) newErrors.receiverContact = "Sender & receiver contact numbers cannot be the same";
+            if (!isValidIndiaPhone(formData.receiverContact)) newErrors.receiverContact = "Enter a valid Indian mobile number";
+            if (
+                getIndiaPhoneDigits(formData.senderContact) &&
+                getIndiaPhoneDigits(formData.senderContact) === getIndiaPhoneDigits(formData.receiverContact)
+            ) {
+                newErrors.receiverContact = "Sender & receiver contact numbers cannot be the same";
+            }
         }
         setErrors(newErrors);
         const errorKeys = Object.keys(newErrors);
@@ -452,7 +455,7 @@ export default function AddPackagePage() {
                     contact: formData.receiverContact,
                 },
             };
-            
+
             const { sessionId, razorpayOrderId, amount } = await createBookingSession(sessionPayload);
 
             const options = {
@@ -569,216 +572,289 @@ export default function AddPackagePage() {
     if (loading) return <LoadingScreen />;
 
     return (
-        <section>
-            <div className="relative min-h-screen overflow-hidden bg-[#2A3125]">
+        <section className="relative min-h-screen overflow-hidden bg-[#21291d] text-white">
+            <div className="absolute inset-0 z-0">
+                <Image src={bg} alt="bg" fill className="object-cover opacity-40" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(213,228,0,0.14),transparent_32%),radial-gradient(circle_at_78%_10%,rgba(118,170,120,0.18),transparent_24%),linear-gradient(180deg,rgba(33,42,27,0.58),rgba(21,28,18,0.82)_30%,rgba(16,21,14,0.94)_100%)]" />
+            </div>
 
-                <div className="absolute top-0 left-0 h-screen w-full z-0">
-                    <Image src={bg} alt="bg" fill className="object-cover" />
-                    <div className="absolute inset-0 bg-linear-to-b from-[#819772]/20 to-[#2A3125]" />
-                </div>
+            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+                <div className="absolute -left-10 top-28 h-56 w-56 rounded-full bg-[#d5e400]/10 blur-3xl" />
+                <div className="absolute right-0 top-16 h-64 w-64 rounded-full bg-emerald-300/10 blur-3xl" />
+                <div className="absolute bottom-16 left-1/3 h-48 w-48 rounded-full bg-[#f6ff6a]/8 blur-3xl" />
+            </div>
 
+            <ConfirmationModal
+                isOpen={showExitConfirmModal}
+                title="Leave Page?"
+                description="Some saved changes might be lost if you leave this page."
+                confirmLabel="Continue"
+                cancelLabel="Stay Here"
+                confirmVariant="warning"
+                onClose={() => setShowExitConfirmModal(false)}
+                onConfirm={() => {
+                    setShowExitConfirmModal(false);
+                    router.back();
+                }}
+            />
 
-                {/* Header */}
-                <div
-                    className="absolute top-4 left-4 flex items-center gap-3 text-xl font-bold text-[#162D01] cursor-pointer z-20"
+            <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-12 pt-5 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+                <button
+                    type="button"
+                    className="inline-flex w-fit items-center gap-3 rounded-full border border-white/12 bg-white/6 px-4 py-2 text-sm font-semibold text-[#F4F8BF] transition hover:bg-white/10"
                     onClick={handleExitPackagePage}
                 >
-                    <Icon icon="famicons:arrow-back-circle-outline" fontSize={32} />
-                    Add Your Package
+                    <Icon icon="famicons:arrow-back-circle-outline" fontSize={26} />
+                    Back
+                </button>
+
+                <div className="mt-8 max-w-3xl">
+                    <div className="package-badge inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                        Booking Flow
+                    </div>
+                    <h1 className="mt-3 text-3xl font-bold text-[#F6FF6A] sm:text-4xl">
+                        Add Your Package
+                    </h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70 sm:text-base">
+                        Keep the same shipment flow, but with a cleaner gradient shell and better spacing for mobile, tablet, and desktop.
+                    </p>
                 </div>
 
-                {/* FORM CONTAINER */}
-                <div className="relative z-10 mt-44 mb-12 flex justify-center items-center min-h-screen px-4">
-                    <div className="w-full max-w-6xl bg-[#3E4936]/70 rounded-2xl py-6 px-22 md:py-12 text-white shadow-xl">
-                        {paymentStatus === 'idle' ? (
-                            <>
-                                {/* Step Indicator */}
-                                <div className="flex items-center mb-12 w-full">
-                                    {[1, 2, 3].map((num) => (
-                                        <div key={num} className={`flex items-center ${num !== 3 ? "flex-1" : "flex-none"}`}>
-                                            <div className={`w-15 h-15 rounded-full flex items-center justify-center border-2 border-[#CDD645] ${currentStep > num ? "bg-[#CDD645]/70" : currentStep === num ? "bg-[#CDD6D45]/50" : "bg-[#CDD645]/20"}`}>
-                                                {currentStep > num ? <Icon icon="mdi:check" fontSize={35} className="text-white text-lg font-extrabold" /> : <span className="text-[#fcffcb] text-lg font-bold">{num}</span>}
+                <div className="package-shell mt-8 rounded-[1.9rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+                    {paymentStatus === 'idle' ? (
+                        <>
+                            <div className="mb-8 overflow-hidden rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-3 py-4 sm:px-5 sm:py-5">
+                                <div className="flex items-start">
+                                    {[
+                                        { step: 1, label: "Route" },
+                                        { step: 2, label: "Package" },
+                                        { step: 3, label: "Review" },
+                                    ].map((entry, index, list) => {
+                                        const isComplete = currentStep > entry.step;
+                                        const isActive = currentStep === entry.step;
+                                        return (
+                                            <div key={entry.step} className={`flex items-center ${index !== list.length - 1 ? "flex-1" : "flex-none"}`}>
+                                                <div className="flex flex-col items-center">
+                                                    <div
+                                                        className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-bold transition sm:h-12 sm:w-12 ${
+                                                            isComplete
+                                                                ? "border-[#CDD645] bg-[#CDD645]/65 text-[#1f271a]"
+                                                                : isActive
+                                                                    ? "border-[#CDD645] bg-[#CDD645]/18 text-[#F6FF6A]"
+                                                                    : "border-[#CDD645]/45 bg-white/6 text-white/65"
+                                                        }`}
+                                                    >
+                                                        {isComplete ? <Icon icon="mdi:check" className="text-lg" /> : entry.step}
+                                                    </div>
+                                                    <p className={`mt-2 text-center text-xs font-semibold uppercase tracking-[0.14em] sm:text-sm ${
+                                                        isActive || isComplete ? "text-[#F6FF6A]" : "text-white/55"
+                                                    }`}>
+                                                        {entry.label}
+                                                    </p>
+                                                </div>
+                                                {index !== list.length - 1 ? (
+                                                    <div className="mx-2 mb-6 h-[2px] flex-1 rounded-full bg-[#CDD645]/45 sm:mx-4" />
+                                                ) : null}
                                             </div>
-                                            {num !== 3 && <div className="flex-1 h-0.5 bg-[#CDD645]" />}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
+                            </div>
 
+                            <div>
+                                {currentStep === 1 && (
+                                    <StepOne
+                                        formData={formData}
+                                        setFormData={(data: any) => dispatch(setFormData(data))}
+                                        errors={errors}
+                                        pickupLocations={pickupLocations}
+                                        dropLocations={dropLocations}
+                                        isLoadingPickup={isLoadingPickup}
+                                        isLoadingDrop={isLoadingDrop}
+                                    />
+                                )}
+
+                                {currentStep === 2 && (
+                                    <StepTwo
+                                        formData={formData}
+                                        setFormData={(data: any) => dispatch(setFormData(data))}
+                                        currentPackage={currentPackage}
+                                        setCurrentPackage={(pkg: any) => dispatch(setCurrentPackage(pkg))}
+                                        handleAddToCart={handleAddToCart}
+                                        handleClearForm={handleClearForm}
+                                        editIndex={editIndex}
+                                        setEditIndex={(idx: number | null) => dispatch(setEditIndex(idx))}
+                                        handleEdit={handleEdit}
+                                        handleDelete={handleDelete}
+                                        errors={errors}
+                                        handleFileDrop={handleFileDrop}
+                                        isUploadingPackageImage={isUploadingPackageImage}
+                                        packageCategories={packageCategories}
+                                        packageSizes={packageSizes}
+                                    />
+                                )}
+
+                                {currentStep === 3 && (
+                                    <StepThree
+                                        errors={errors}
+                                        setFormData={(data: any) => dispatch(setFormData(data))}
+                                        formData={formData}
+                                        pickupLocations={pickupLocations}
+                                        dropLocations={dropLocations}
+                                        pricingInfo={pricingInfo}
+                                        setPricingInfo={setPricingInfo}
+                                        userId={user?._id}
+                                    />
+                                )}
+
+                                {currentStep === 3 && isAdminBookingUser && (
+                                    <div className="package-panel mt-6 rounded-[1.6rem] p-4 sm:p-5">
+                                        <p className="text-sm font-semibold text-[#F6FF6A]">
+                                            Book On Behalf Of Customer
+                                        </p>
+                                        <p className="mt-1 text-xs text-white/70">
+                                            Enter existing customer email. Payment will be skipped for this booking.
+                                        </p>
+                                        <input
+                                            type="email"
+                                            value={adminCustomerEmail}
+                                            onChange={(event) => setAdminCustomerEmail(event.target.value)}
+                                            placeholder="customer@example.com"
+                                            className="package-input mt-3 w-full rounded-2xl px-3 py-3 text-sm"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-between">
                                 <div>
-                                    {/* Steps */}
-                                    {currentStep === 1 && (
-                                        <StepOne
-                                            formData={formData}
-                                            setFormData={(data: any) => dispatch(setFormData(data))}
-                                            errors={errors}
-                                            pickupLocations={pickupLocations}
-                                            dropLocations={dropLocations}
-                                            isLoadingPickup={isLoadingPickup}
-                                            isLoadingDrop={isLoadingDrop}
-                                        />
-                                    )}
-
-                                    {currentStep === 2 && (
-                                        <StepTwo
-                                            formData={formData}
-                                            setFormData={(data: any) => dispatch(setFormData(data))}
-                                            currentPackage={currentPackage}
-                                            setCurrentPackage={(pkg: any) => dispatch(setCurrentPackage(pkg))}
-                                            handleAddToCart={handleAddToCart}
-                                            handleClearForm={handleClearForm}
-                                            editIndex={editIndex}
-                                            setEditIndex={(idx: number | null) => dispatch(setEditIndex(idx))}
-                                            handleEdit={handleEdit}
-                                            handleDelete={handleDelete}
-                                            errors={errors}
-                                            handleFileDrop={handleFileDrop}
-                                            isUploadingPackageImage={isUploadingPackageImage}
-                                            packageCategories={packageCategories}
-                                            packageSizes={packageSizes}
-                                        />
-                                    )}
-
-                                    {currentStep === 3 && <StepThree errors={errors} setFormData={(data: any) => dispatch(setFormData(data))} formData={formData} pickupLocations={pickupLocations} dropLocations={dropLocations} pricingInfo={pricingInfo} setPricingInfo={setPricingInfo} userId={user?._id} />}
-
-                                    {currentStep === 3 && isAdminBookingUser && (
-                                        <div className="mt-6 rounded-xl border border-[#CDD645]/35 bg-[#1e241b]/70 p-4">
-                                            <p className="text-sm font-semibold text-[#F6FF6A]">
-                                                Book On Behalf Of Customer
-                                            </p>
-                                            <p className="mt-1 text-xs text-white/70">
-                                                Enter existing customer email. Payment will be skipped for this booking.
-                                            </p>
-                                            <input
-                                                type="email"
-                                                value={adminCustomerEmail}
-                                                onChange={(event) => setAdminCustomerEmail(event.target.value)}
-                                                placeholder="customer@example.com"
-                                                className="mt-3 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-[#CDD645]/65"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Buttons */}
-                                <div className="place-self-end flex gap-3  justify-between mt-16 mb-8">
                                     {currentStep > 1 && (
                                         <button
+                                            type="button"
                                             onClick={prevStep}
-                                            className="py-3 w-64 hover:bg-[#979646]/40 border rounded-lg border-[#979646] bg-[#979646]/20 font-bold flex gap-2 justify-center items-center text-white/60 cursor-pointer"
+                                            className="package-panel-soft flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white/75 transition hover:bg-white/10 sm:w-auto"
                                         >
-                                            <Icon icon={'material-symbols:arrow-back-ios-new-rounded'} />  Back
+                                            <Icon icon={'material-symbols:arrow-back-ios-new-rounded'} /> Back
                                         </button>
                                     )}
+                                </div>
 
+                                <div className="flex flex-col gap-3 sm:flex-row">
                                     {currentStep < 3 ? (
                                         <button
+                                            type="button"
                                             onClick={nextStep}
-                                            className="  py-3 w-64 justify-center rounded-lg hover:bg-[#CDD645] opacity-85 hover:opacity-100 hover:shadow-2xl shadow-lime-500/60  font-bold flex gap-2 items-center text-black/60 cursor-pointer bg-[#979646] "
+                                            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#CDD645] px-5 py-3 font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] sm:w-auto"
                                         >
                                             Next Step <Icon icon={'material-symbols:arrow-back-ios-new-rounded'} className="rotate-180" />
                                         </button>
                                     ) : (
                                         <button
+                                            type="button"
                                             onClick={handleSubmit}
                                             disabled={!canProceedToPayment}
-                                            className="py-3 w-64 justify-center rounded-lg hover:bg-[#CDD645] opacity-85 hover:opacity-100 hover:shadow-2xl shadow-lime-500/60 font-bold flex gap-2 items-center text-black/60 cursor-pointer bg-[#979646] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#979646]">
+                                            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#CDD645] px-5 py-3 font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                                        >
                                             {isAdminBookingUser ? "Confirm Booking" : "Proceed & Pay"}
                                         </button>
                                     )}
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center min-h-125 text-center space-y-6">
-                                {paymentStatus === 'processing' && (
-                                    <>
-                                        <div className="w-20 h-20 border-4 border-[#CDD645] border-t-transparent rounded-full animate-spin"></div>
-                                        <h3 className="text-2xl font-bold text-[#F6FF6A]">
-                                            {isAdminBookingUser ? "Confirming Booking..." : "Processing Payment..."}
-                                        </h3>
-                                        <p className="text-white/70">
-                                            {isAdminBookingUser
-                                                ? "Please wait while we confirm this manual booking."
-                                                : "Please wait while we confirm your payment. Do not close this window."}
-                                        </p>
-                                    </>
-                                )}
-
-                                {paymentStatus === 'success' && orderData && (
-                                    <>
-                                        <div className="w-24 h-24 bg-[#CDD645] rounded-full flex items-center justify-center text-[#2A3125]">
-                                            <Icon icon="mdi:check-bold" fontSize={50} />
-                                        </div>
-                                        <h3 className="text-3xl font-bold text-[#F6FF6A]">
-                                            {isAdminBookingUser ? "Booking Confirmed!" : "Payment Successful!"}
-                                        </h3>
-                                        <p className="text-white/80">
-                                            {isAdminBookingUser
-                                                ? "Order has been created on behalf of the customer."
-                                                : "Your package has been scheduled for pickup."}
-                                        </p>
-
-                                        <div className="bg-[#1e241b] p-6 rounded-xl w-full max-w-lg mt-6 border border-[#CDD645]/30">
-                                            <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
-                                                <span className="text-white/60">Order ID</span>
-                                                <span className="font-mono text-[#F6FF6A]">{orderData.orderId}</span>
-                                            </div>
-                                            <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
-                                                <span className="text-white/60">Tracking ID</span>
-                                                <span className="font-mono text-[#F6FF6A]">{orderData.trackingId}</span>
-                                            </div>
-                                            <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
-                                                <span className="text-white/60">Bus Operator</span>
-                                                <span className="font-bold">{orderData.busOperator}</span>
-                                            </div>
-                                            <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
-                                                <span className="text-white/60">Bus Number</span>
-                                                <span className="font-bold">{orderData.busNumber}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-white/60">Estimated Arrival</span>
-                                                <span className="font-bold text-green-400">{orderData.eta}</span>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={() => router.push('/dashboard')}
-                                            className="mt-8 py-3 px-8 rounded-lg bg-[#CDD645] font-bold text-black hover:bg-[#e2eb55] transition"
-                                        >
-                                            Go to Dashboard
-                                        </button>
-                                    </>
-                                )}
-
-                                {paymentStatus === 'failed' && (
-                                    <>
-                                        <div className="w-24 h-24 bg-red-500/20 border-2 border-red-500 rounded-full flex items-center justify-center text-red-500">
-                                            <Icon icon="mdi:close-thick" fontSize={50} />
-                                        </div>
-                                        <h3 className="text-3xl font-bold text-red-400">
-                                            {isAdminBookingUser ? "Booking Failed" : "Payment Failed"}
-                                        </h3>
-                                        <p className="text-white/70">
-                                            {isAdminBookingUser
-                                                ? "Could not confirm this booking. Please retry."
-                                                : "Something went wrong with the transaction. Please try again."}
-                                        </p>
-                                        <button
-                                            onClick={handleSubmit}
-                                            className="mt-6 py-3 px-8 rounded-lg bg-[#CDD645] font-bold text-black hover:bg-[#e2eb55] transition flex items-center gap-2"
-                                        >
-                                            <Icon icon="mdi:refresh" /> {isAdminBookingUser ? "Retry Booking" : "Retry Payment"}
-                                        </button>
-                                        <button
-                                            onClick={() => setPaymentStatus('idle')}
-                                            className="mt-2 text-white/50 hover:text-white text-sm underline"
-                                        >
-                                            Back to Review
-                                        </button>
-                                    </>
-                                )}
                             </div>
-                        )}
-                    </div>
+                        </>
+                    ) : (
+                        <div className="flex min-h-[65vh] flex-col items-center justify-center space-y-6 text-center">
+                            {paymentStatus === 'processing' && (
+                                <>
+                                    <div className="h-20 w-20 rounded-full border-4 border-[#CDD645] border-t-transparent animate-spin" />
+                                    <h3 className="text-2xl font-bold text-[#F6FF6A]">
+                                        {isAdminBookingUser ? "Confirming Booking..." : "Processing Payment..."}
+                                    </h3>
+                                    <p className="max-w-md text-white/70">
+                                        {isAdminBookingUser
+                                            ? "Please wait while we confirm this manual booking."
+                                            : "Please wait while we confirm your payment. Do not close this window."}
+                                    </p>
+                                </>
+                            )}
+
+                            {paymentStatus === 'success' && orderData && (
+                                <>
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#CDD645] text-[#2A3125]">
+                                        <Icon icon="mdi:check-bold" fontSize={50} />
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-[#F6FF6A]">
+                                        {isAdminBookingUser ? "Booking Confirmed!" : "Payment Successful!"}
+                                    </h3>
+                                    <p className="max-w-md text-white/80">
+                                        {isAdminBookingUser
+                                            ? "Order has been created on behalf of the customer."
+                                            : "Your package has been scheduled for pickup."}
+                                    </p>
+
+                                    <div className="package-panel w-full max-w-xl rounded-[1.6rem] p-5 sm:p-6">
+                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                            <span className="text-white/60">Order ID</span>
+                                            <span className="font-mono text-[#F6FF6A]">{orderData.orderId}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                            <span className="text-white/60">Tracking ID</span>
+                                            <span className="font-mono text-[#F6FF6A]">{orderData.trackingId}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                            <span className="text-white/60">Bus Operator</span>
+                                            <span className="font-bold">{orderData.busOperator}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                            <span className="text-white/60">Bus Number</span>
+                                            <span className="font-bold">{orderData.busNumber}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-white/60">Estimated Arrival</span>
+                                            <span className="font-bold text-green-400">{orderData.eta}</span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push('/dashboard')}
+                                        className="rounded-2xl bg-[#CDD645] px-8 py-3 font-semibold text-black transition hover:bg-[#e2eb55]"
+                                    >
+                                        Go to Dashboard
+                                    </button>
+                                </>
+                            )}
+
+                            {paymentStatus === 'failed' && (
+                                <>
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-red-500 bg-red-500/20 text-red-500">
+                                        <Icon icon="mdi:close-thick" fontSize={50} />
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-red-400">
+                                        {isAdminBookingUser ? "Booking Failed" : "Payment Failed"}
+                                    </h3>
+                                    <p className="max-w-md text-white/70">
+                                        {isAdminBookingUser
+                                            ? "Could not confirm this booking. Please retry."
+                                            : "Something went wrong with the transaction. Please try again."}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        className="flex items-center gap-2 rounded-2xl bg-[#CDD645] px-8 py-3 font-semibold text-black transition hover:bg-[#e2eb55]"
+                                    >
+                                        <Icon icon="mdi:refresh" /> {isAdminBookingUser ? "Retry Booking" : "Retry Payment"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentStatus('idle')}
+                                        className="text-sm text-white/50 underline transition hover:text-white"
+                                    >
+                                        Back to Review
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

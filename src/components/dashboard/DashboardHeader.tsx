@@ -15,7 +15,6 @@ type DashboardHeaderProps = {
 const roleLabel: Record<DashboardRole, string> = {
   operator: "Operator",
   admin: "Admin",
-  superadmin: "SuperAdmin",
 };
 
 export default function DashboardHeader({
@@ -33,7 +32,7 @@ export default function DashboardHeader({
   }, [userName]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#566044]/50 bg-[#2c3524]/95 px-4 py-3 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-[linear-gradient(180deg,rgba(36,52,29,0.92),rgba(22,31,18,0.9))] px-4 py-3 backdrop-blur-xl lg:px-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -65,7 +64,7 @@ export default function DashboardHeader({
             )}
           </button>
 
-          <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-[#1f251c]/85 px-2 py-1.5">
+          <div className="dashboard-surface-soft flex items-center gap-2 rounded-xl px-2 py-1.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#D5E400]/20 text-xs font-semibold text-[#E4E67A]">
               {initials}
             </div>

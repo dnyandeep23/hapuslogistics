@@ -66,33 +66,47 @@ export default function DataTable<T extends { id: string }>({
   };
 
   return (
-    <div className="rounded-2xl border border-[#5e684a] bg-[#1f251c]/90 p-4">
+    <div className="dashboard-surface rounded-2xl p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {title && <h3 className="text-base font-semibold text-[#E4E67A]">{title}</h3>}
         <input
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder={searchPlaceholder}
-          className="w-full max-w-xs rounded-xl border border-[#65724f] bg-[#161d13] px-3 py-2 text-sm text-white outline-none focus:border-[#E4E67A]"
+          className="dashboard-input w-full max-w-xs rounded-xl px-3 py-2 text-sm"
         />
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-[#5e684a] text-white/75">
+          <thead className="dashboard-table-head">
+            <tr className="border-b border-white/10 text-white/75">
               {columns.map((column) => (
                 <th
                   key={String(column.key)}
-                  className={`px-3 py-2 ${column.sortable ? "cursor-pointer select-none" : ""}`}
-                  onClick={() => toggleSort(column.key, column.sortable)}
+                  aria-sort={
+                    column.sortable && sortKey === column.key
+                      ? sortDirection === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
+                  }
+                  className="px-3 py-2"
                 >
-                  <span className="inline-flex items-center gap-1">
-                    {column.label}
-                    {column.sortable && sortKey === column.key && (
-                      <span className="text-[#e8f2b9]">{sortDirection === "asc" ? "↑" : "↓"}</span>
-                    )}
-                  </span>
+                  {column.sortable ? (
+                    <button
+                      type="button"
+                      className="inline-flex cursor-pointer select-none items-center gap-1 text-left transition hover:text-white"
+                      onClick={() => toggleSort(column.key, column.sortable)}
+                    >
+                      {column.label}
+                      {sortKey === column.key && (
+                        <span className="text-[#e8f2b9]">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">{column.label}</span>
+                  )}
                 </th>
               ))}
             </tr>

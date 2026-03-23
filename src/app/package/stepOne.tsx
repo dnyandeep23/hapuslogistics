@@ -29,50 +29,74 @@ export default function StepOne({
     };
 
     return (
-        <div className="space-y-5">
-            <div className="text-[#F6FF6A]">
-                <h2 className="text-3xl font-bold ">
+        <div className="space-y-6 sm:space-y-8">
+            <div className="max-w-2xl text-[#F6FF6A]">
+                <h2 className="text-2xl font-bold sm:text-3xl">
                     Select Pickup & Drop location
                 </h2>
-                <p className="mt-1">Choose where your package will be picked up and delivered</p>
+                <p className="mt-2 text-sm leading-6 text-white/68 sm:text-base">
+                    Choose where your package will be picked up and delivered.
+                </p>
             </div>
 
-            {/* Pickup */}
-            <div>
-                <div className="flex items-center gap-5 ">
-                    <Icon icon="streamline-plump:location-pin-solid" className="text-4xl text-[#e5ff90]" />
-                    <div className="w-full">
-                        <label className="mb-1.5">Select pickup location <span className="text-red-400"> *</span></label>
-                        <CustomSelect
-                            value={formData.pickupLocationId}
-                            onChange={handlePickupChange}
-                            options={pickupLocations}
-                            placeholder={isLoadingPickup ? 'Loading...' : 'Select pickup location'}
-                            isLoading={isLoadingPickup}
-                            error={errors.pickupLocationId}
-                        />
-                        {errors.pickupLocationId && <p className="text-red-400 text-sm">{errors.pickupLocationId}</p>}
+            <div className="grid gap-4 lg:grid-cols-2">
+                <div className="package-panel relative z-50 rounded-[1.6rem] p-4 sm:p-5">
+                    <div className="mb-4 flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#d5e400]/14 text-[#F6FF6A]">
+                            <Icon icon="streamline-plump:location-pin-solid" className="text-2xl" />
+                        </div>
+                        <div className="min-w-0 w-full">
+                            <label className="mb-2 block text-sm font-medium text-white/85">
+                                Select pickup location <span className="text-red-400"> *</span>
+                            </label>
+                            <p className="mb-3 text-xs text-white/55">Choose the origin point where the package enters the route.</p>
+                            <CustomSelect
+                                value={formData.pickupLocationId}
+                                onChange={handlePickupChange}
+                                options={pickupLocations}
+                                placeholder={isLoadingPickup ? 'Loading...' : 'Select pickup location'}
+                                isLoading={isLoadingPickup}
+                                error={errors.pickupLocationId}
+                            />
+                            {errors.pickupLocationId && <p className="mt-2 text-sm text-red-400">{errors.pickupLocationId}</p>}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="package-panel relative rounded-[1.6rem] z-50 p-4 sm:p-5">
+                    <div className="mb-4 flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ff8e8e]/12 text-[#ffb3b3]">
+                            <Icon icon="streamline-plump:location-pin-solid" className="text-2xl" />
+                        </div>
+                        <div className="min-w-0 w-full">
+                            <label className="mb-2 block text-sm font-medium text-white/85">
+                                Select drop location <span className="text-red-400"> *</span>
+                            </label>
+                            <p className="mb-3 text-xs text-white/55">Choose the destination point for final delivery.</p>
+                            <CustomSelect
+
+                                value={formData.dropLocationId}
+                                onChange={handleDropChange}
+                                options={dropLocations}
+                                placeholder={isLoadingDrop ? 'Loading...' : (formData.pickupLocationId ? 'Select drop location' : 'Select a pickup location first')}
+                                disabled={!formData.pickupLocationId || isLoadingDrop}
+                                isLoading={isLoadingDrop}
+                                error={errors.dropLocationId}
+                            />
+                            {errors.dropLocationId && <p className="mt-2 text-sm text-red-400">{errors.dropLocationId}</p>}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Drop */}
-            <div>
-                <div className="flex items-center gap-5 ">
-                    <Icon icon="streamline-plump:location-pin-solid" className="text-4xl text-[#FFA7A7]" />
-                    <div className="w-full">
-                        <label className="mb-1.5">Select drop location <span className="text-red-400"> *</span></label>
-                        <CustomSelect
-                            value={formData.dropLocationId}
-                            onChange={handleDropChange}
-                            options={dropLocations}
-                            placeholder={isLoadingDrop ? 'Loading...' : (formData.pickupLocationId ? 'Select drop location' : 'Select a pickup location first')}
-                            disabled={!formData.pickupLocationId || isLoadingDrop}
-                            isLoading={isLoadingDrop}
-                            error={errors.dropLocationId}
-                        />
-                        {errors.dropLocationId && <p className="text-red-400 text-sm">{errors.dropLocationId}</p>}
-                    </div>
+            <div className="package-panel-soft grid gap-4 rounded-[1.6rem] -z-30 p-4 text-sm text-white/68 sm:grid-cols-2 sm:p-5">
+                <div>
+                    <p className="font-semibold text-[#F6FF6A] -z-10">Pickup first</p>
+                    <p className="mt-1 -z-50">Drop options are filtered after you choose a pickup point.</p>
+                </div>
+                <div>
+                    <p className="font-semibold text-[#F6FF6A]">Mobile-friendly flow</p>
+                    <p className="mt-1">The selectors now stack comfortably on phones and sit side by side on tablets and desktops.</p>
                 </div>
             </div>
         </div>

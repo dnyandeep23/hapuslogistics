@@ -68,7 +68,7 @@ type OrderRevenueRow = {
 type PricingResponse = {
   success: boolean;
   message?: string;
-  role: "admin" | "superadmin";
+  role: "admin";
   summary: Summary;
   availableCompanies: AvailableCompany[];
   companies: CompanyRevenue[];
@@ -115,7 +115,6 @@ export default function PricingDashboardPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [role, setRole] = useState<"admin" | "superadmin">("admin");
   const [summary, setSummary] = useState<Summary>(defaultSummary);
   const [availableCompanies, setAvailableCompanies] = useState<AvailableCompany[]>([]);
   const [companyRows, setCompanyRows] = useState<CompanyRevenue[]>([]);
@@ -126,7 +125,7 @@ export default function PricingDashboardPage() {
   const [toDate, setToDate] = useState(todayDate());
   const [companyFilter, setCompanyFilter] = useState("");
 
-  const isAllowed = Boolean(user?.role === "admin" || user?.isSuperAdmin);
+  const isAllowed = user?.role === "admin";
 
   useEffect(() => {
     if (!user) return;
@@ -145,7 +144,7 @@ export default function PricingDashboardPage() {
       const params = new URLSearchParams();
       if (fromDate) params.set("fromDate", fromDate);
       if (toDate) params.set("toDate", toDate);
-      if (user?.isSuperAdmin && companyFilter) params.set("companyId", companyFilter);
+      if (companyFilter) params.set("companyId", companyFilter);
 
       const query = params.toString();
       const response = await fetch(`/api/dashboard/pricing${query ? `?${query}` : ""}`, {
@@ -163,7 +162,6 @@ export default function PricingDashboardPage() {
         return;
       }
 
-      setRole(payload.role);
       setSummary(payload.summary || defaultSummary);
       setAvailableCompanies(Array.isArray(payload.availableCompanies) ? payload.availableCompanies : []);
       setCompanyRows(Array.isArray(payload.companies) ? payload.companies : []);
@@ -179,7 +177,7 @@ export default function PricingDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [companyFilter, fromDate, isAllowed, toDate, user?.isSuperAdmin]);
+  }, [companyFilter, fromDate, isAllowed, toDate]);
 
   useEffect(() => {
     fetchPricing();
@@ -299,7 +297,7 @@ export default function PricingDashboardPage() {
       <div className="rounded-2xl border border-red-500/35 bg-red-500/10 p-4 text-sm text-red-200">
         <div className="flex items-center gap-2">
           <Icon icon="mdi:shield-alert-outline" className="text-lg" />
-          Access restricted to admin and super admin.
+          Access restricted to admin.
         </div>
       </div>
     );
@@ -311,9 +309,7 @@ export default function PricingDashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#E4E67A]">Pricing</h1>
           <p className="mt-1 text-sm text-white/70">
-            {role === "superadmin"
-              ? "Company-wise and bus-wise revenue across the platform."
-              : "Bus-wise revenue for your company buses only."}
+            Company-wise and bus-wise revenue for the selected filters.
           </p>
         </div>
 
@@ -348,7 +344,7 @@ export default function PricingDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#4e573f] bg-[#1f251c] p-4 md:grid-cols-4">
+      <div className="dashboard-surface grid grid-cols-1 gap-3 rounded-2xl p-4 md:grid-cols-4">
         <label className="text-xs text-white/70">
           From
           <div className="mt-1">
@@ -378,13 +374,13 @@ export default function PricingDashboardPage() {
           </div>
         </label>
 
-        {user.isSuperAdmin ? (
+        {availableCompanies.length > 0 ? (
           <label className="text-xs text-white/70 md:col-span-2">
             Company
             <select
               value={companyFilter}
               onChange={(event) => setCompanyFilter(event.target.value)}
-              className="mt-1 block w-full rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white outline-none"
+              className="dashboard-input mt-1 block w-full rounded-lg px-3 py-2 text-sm"
             >
               <option value="">All Companies</option>
               {availableCompanies.map((company) => (
@@ -406,7 +402,7 @@ export default function PricingDashboardPage() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`pricing-skeleton-${index}`} className="rounded-xl border border-white/15 bg-black/20 p-4">
+            <div key={`pricing-skeleton-${index}`} className="dashboard-surface-soft rounded-xl p-4">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="mt-2 h-3 w-56" />
             </div>
@@ -421,48 +417,46 @@ export default function PricingDashboardPage() {
             <MetricCard label="Total Companies" value={String(summary.totalCompanies)} icon="mdi:office-building-outline" />
           </div>
 
-          {role === "superadmin" ? (
-            <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-4">
-              <h2 className="text-lg font-semibold text-[#E4E67A]">Company-wise Revenue</h2>
-              {companyRows.length === 0 ? (
-                <p className="mt-3 text-sm text-white/65">No company revenue data for selected filters.</p>
-              ) : (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="text-xs uppercase tracking-wide text-white/55">
-                      <tr>
-                        <th className="px-3 py-2">Company</th>
-                        <th className="px-3 py-2">Buses</th>
-                        <th className="px-3 py-2">Orders</th>
-                        <th className="px-3 py-2">Revenue</th>
+          <div className="dashboard-surface rounded-2xl p-4">
+            <h2 className="text-lg font-semibold text-[#E4E67A]">Company-wise Revenue</h2>
+            {companyRows.length === 0 ? (
+              <p className="mt-3 text-sm text-white/65">No company revenue data for selected filters.</p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="dashboard-table-head text-xs uppercase tracking-wide text-white/55">
+                    <tr>
+                      <th className="px-3 py-2">Company</th>
+                      <th className="px-3 py-2">Buses</th>
+                      <th className="px-3 py-2">Orders</th>
+                      <th className="px-3 py-2">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companyRows.map((company) => (
+                      <tr key={company.companyId} className="border-t border-white/10">
+                        <td className="px-3 py-2">{company.companyName}</td>
+                        <td className="px-3 py-2">{company.totalBuses}</td>
+                        <td className="px-3 py-2">{company.totalOrders}</td>
+                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(company.totalRevenue)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {companyRows.map((company) => (
-                        <tr key={company.companyId} className="border-t border-white/10">
-                          <td className="px-3 py-2">{company.companyName}</td>
-                          <td className="px-3 py-2">{company.totalBuses}</td>
-                          <td className="px-3 py-2">{company.totalOrders}</td>
-                          <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(company.totalRevenue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ) : null}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
-          <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-4">
+          <div className="dashboard-surface rounded-2xl p-4">
             <h2 className="text-lg font-semibold text-[#E4E67A]">Bus-wise Revenue</h2>
             {busRows.length === 0 ? (
               <p className="mt-3 text-sm text-white/65">No bus revenue data for selected filters.</p>
             ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-white/55">
+                  <thead className="dashboard-table-head text-xs uppercase tracking-wide text-white/55">
                     <tr>
-                      {role === "superadmin" ? <th className="px-3 py-2">Company</th> : null}
+                      <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Bus</th>
                       <th className="px-3 py-2">Orders</th>
                       <th className="px-3 py-2">Revenue</th>
@@ -472,7 +466,7 @@ export default function PricingDashboardPage() {
                   <tbody>
                     {busRows.map((bus) => (
                       <tr key={bus.busId} className="border-t border-white/10">
-                        {role === "superadmin" ? <td className="px-3 py-2">{bus.companyName}</td> : null}
+                        <td className="px-3 py-2">{bus.companyName}</td>
                         <td className="px-3 py-2">{bus.busName} ({bus.busNumber})</td>
                         <td className="px-3 py-2">{bus.totalOrders}</td>
                         <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(bus.totalRevenue)}</td>
@@ -505,7 +499,7 @@ export default function PricingDashboardPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-4">
+          <div className="dashboard-surface rounded-2xl p-4">
             <h2 className="text-lg font-semibold text-[#E4E67A]">Collected By (Top)</h2>
             {topCollectors.length === 0 ? (
               <p className="mt-3 text-sm text-white/65">No collector data available.</p>
@@ -532,14 +526,14 @@ export default function PricingDashboardPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-[#4e573f] bg-[#1f251c] p-4">
+          <div className="dashboard-surface rounded-2xl p-4">
             <h2 className="text-lg font-semibold text-[#E4E67A]">Order Revenue Details</h2>
             {orderRows.length === 0 ? (
               <p className="mt-3 text-sm text-white/65">No orders found for selected filters.</p>
             ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-white/55">
+                  <thead className="dashboard-table-head text-xs uppercase tracking-wide text-white/55">
                     <tr>
                       <th className="px-3 py-2">Tracking</th>
                       <th className="px-3 py-2">Date</th>
@@ -588,7 +582,7 @@ export default function PricingDashboardPage() {
 
 function MetricCard({ label, value, icon }: { label: string; value: string; icon: string }) {
   return (
-    <div className="rounded-xl border border-white/15 bg-black/20 p-3">
+    <div className="dashboard-surface-soft rounded-xl p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-white/55">{label}</p>
         <Icon icon={icon} className="text-lg text-[#E4E67A]" />

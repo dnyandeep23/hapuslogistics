@@ -49,15 +49,15 @@ export default function CustomSelect({
         <div className="relative w-full" ref={selectRef}>
             <div
                 onClick={() => !disabled && setIsOpen(!isOpen)}
-                className={`w-full text-[#f7fac7] h-14 text-sm px-4 py-2 border-[#CDD645]/60 rounded-lg transition duration-300 ease focus:outline-none border-b-2 ${error ? "border-red-500" : "border-[#CDD645]/60 focus:border-[#CDD645]"
-                    } shadow-sm focus:shadow-md appearance-none  bg-[#1e241b] ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                className={`package-input min-h-16 w-full rounded-2xl px-4 py-3 text-sm transition duration-300 ease ${error ? "border-red-500" : "focus:border-[#CDD645]"
+                    } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                     }`}
             >
-                <div className="flex justify-between items-center">
+                <div className="flex min-h-10 items-center justify-between gap-4">
                     {selectedOption ? (
-                        <div>
-                            <p className="font-semibold">{selectedOption.name}, {selectedOption.city}</p>
-                            <p className="text-xs text-gray-400">{selectedOption.address}, {selectedOption.state} {selectedOption.zip}</p>
+                        <div className="min-w-0">
+                            <p className="truncate font-semibold text-[#F6FF6A]">{selectedOption.name}, {selectedOption.city}</p>
+                            <p className="truncate text-xs text-white/55">{selectedOption.address}, {selectedOption.state} {selectedOption.zip}</p>
                         </div>
                     ) : isLoading ? (
                         <div className="w-full space-y-1 pr-6">
@@ -65,16 +65,16 @@ export default function CustomSelect({
                             <Skeleton className="h-3 w-1/2" />
                         </div>
                     ) : (
-                        <span className="text-gray-400">{placeholder}</span>
+                        <span className="text-white/42">{placeholder}</span>
                     )}
-                    <svg xmlns="http://www.w3.org/2000/svg" className="text-[#f7fac7 h-5 w-5 ml-1 absolute  top-4.5 right-2.5" fill="none" viewBox="0 0 24 24" stroke-width="1.2" stroke="currentColor" >
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0 text-[#f7fac7]" fill="none" viewBox="0 0 24 24" strokeWidth="1.2" stroke="currentColor" >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
                     </svg>
                 </div>
             </div>
 
             {isOpen && !disabled && (
-                <div className="absolute z-10 w-full mt-1 bg-[#1e241b] border border-[#CDD645]/60 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="package-panel absolute z-10 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl shadow-lg">
                     <ul>
                         {isLoading ? (
                             <li className="space-y-2 px-4 py-3">
@@ -88,16 +88,16 @@ export default function CustomSelect({
                                 <li
                                     key={option._id}
                                     onClick={() => handleOptionClick(option._id)}
-                                    className="px-4 py-2 cursor-pointer hover:bg-[#3E4936]"
+                                    className="cursor-pointer px-4 py-3 transition bg-[#161700]/90 hover:bg-[#161700]/60"
                                 >
                                     <div>
-                                        <p className="font-semibold">{option.name}, {option.city}</p>
-                                        <p className="text-xs text-gray-400">{option.address}, {option.state} {option.zip}</p>
+                                        <p className="font-semibold text-[#F6FF6A]">{option.name}, {option.city}</p>
+                                        <p className="text-xs text-white/55">{option.address}, {option.state} {option.zip}</p>
                                     </div>
                                 </li>
                             ))
                         ) : (
-                            <li className="px-4 py-2 text-gray-400">No locations available</li>
+                            <li className="px-4 py-3 text-white/55">No locations available</li>
                         )}
                     </ul>
                 </div>

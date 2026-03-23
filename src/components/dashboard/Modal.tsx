@@ -20,7 +20,7 @@ export default function Modal({ isOpen, title, onClose, children }: ModalProps) 
         onClick={onClose}
         aria-label="Close modal"
       />
-      <div className="relative w-full max-w-lg rounded-2xl border border-[#5e684a] bg-[#1f251c] p-6 shadow-2xl">
+      <div className="dashboard-surface relative max-h-[min(88vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#E4E67A]">{title}</h2>
           <button

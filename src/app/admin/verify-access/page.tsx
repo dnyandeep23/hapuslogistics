@@ -9,10 +9,12 @@ import { resendAdminOtp, verifyAdminOtp } from "@/services/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import NotificationBox from "@/components/NotificationBox";
 import { getErrorMessage } from "@/lib/authError";
+import { useToast } from "@/context/ToastContext";
 
 function AdminVerifyAccessPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { addToast } = useToast();
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ otp?: string }>({});
@@ -68,7 +70,12 @@ function AdminVerifyAccessPageContent() {
     setLoading(true);
     setNotification({ message: "", type: "" });
     try {
-      await verifyAdminOtp(otpCode);
+      const response = (await verifyAdminOtp(otpCode)) as {
+        accountDeletionCancelled?: boolean;
+      };
+      if (response.accountDeletionCancelled) {
+        addToast("Your scheduled account deletion has been cancelled.", "success");
+      }
       router.push("/dashboard");
     } catch (error: unknown) {
       setNotification({
