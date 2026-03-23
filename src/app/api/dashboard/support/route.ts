@@ -232,12 +232,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (companyContact) {
+    if (company && companyContact) {
       pushContact({
         id: `company-${toStringValue(company._id)}`,
         label: "Company desk",
         name: pickContactValue(company.name, "Company Desk"),
-        email: pickContactValue(companyContact.email, company?.ownerEmail, owner?.email),
+        email: pickContactValue(companyContact.email, company.ownerEmail, owner?.email),
         phone: pickContactValue(companyContact.phone, owner?.phone),
         source: "company",
       });

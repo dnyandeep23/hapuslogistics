@@ -1,18 +1,13 @@
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
-import TravelCompany from "@/app/api/models/travelCompanyModel";
 import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from "bcryptjs";
 import { sendEmail, wasEmailAccepted } from "@/app/api/lib/mailer";
 import { createNotification } from "@/app/api/lib/notifications";
 import { resolveOperatorCompany } from "@/app/api/lib/companyResolver";
 import {
-  ADMIN_OTP_COOKIE,
-  ADMIN_OTP_EXPIRY_MS,
-  generateAdminOtp,
   normalizeRole,
   serializeAuthProvidersForSchema,
-  signPendingAdminToken,
 } from "@/app/api/lib/authHelpers";
 
 // dbConnect to the database
@@ -82,40 +77,6 @@ export async function POST(request: NextRequest) {
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(password, salt);
     const authProviderSchemaInstance = User.schema.path("authProvider")?.instance;
-    let travelCompanyId: string | undefined;
-
-    if (role === "admin") {
-      const existingCompany = await TravelCompany.findOne({
-        name: { $regex: `^${companyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
-      });
-
-      if (existingCompany) {
-        const currentAdminCount = await User.countDocuments({
-          travelCompanyId: existingCompany._id,
-          role: "admin",
-        });
-        if (currentAdminCount >= 1) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: "This logistics company already has an admin account.",
-            },
-            { status: 400 },
-          );
-        }
-        travelCompanyId = existingCompany._id.toString();
-      } else {
-        const company = await TravelCompany.create({
-          name: companyName,
-          ownerEmail: normalizedEmail,
-          contact: {
-            email: normalizedEmail,
-          },
-        });
-        travelCompanyId = company._id.toString();
-      }
-    }
-
     let pendingTravelCompanyId: string | undefined;
     let operatorCompanyOwnerUserId: string | undefined;
     let operatorCompanyOwnerEmail: string | undefined;
@@ -164,13 +125,12 @@ export async function POST(request: NextRequest) {
 
     // Create a new user
     const newUser = await User.create({
-      name: role === "admin" ? normalizedName || companyName : normalizedName,
+      name: normalizedName,
       role,
       email: normalizedEmail,
       password: hashedPassword,
       authProvider: serializeAuthProvidersForSchema(["local"], authProviderSchemaInstance),
-      travelCompanyId,
-      hasRegisteredBus: role === "admin" ? false : undefined,
+      travelCompanyId: undefined,
       buses: [],
       operatorApprovalStatus:
         role === "operator" && pendingTravelCompanyId ? "operator_requested" : "none",
@@ -179,65 +139,6 @@ export async function POST(request: NextRequest) {
 
     // Save the user to the database
     const savedUser = await newUser.save();
-
-    if (role === "admin" && savedUser.travelCompanyId) {
-      const company = await TravelCompany.findById(savedUser.travelCompanyId).select("ownerUserId ownerEmail");
-      if (company && !company.ownerUserId) {
-        company.ownerUserId = savedUser._id;
-      }
-      if (company && !company.ownerEmail) {
-        company.ownerEmail = savedUser.email;
-      }
-      if (company) {
-        await company.save();
-      }
-    }
-
-    if (role === "admin") {
-      const adminOtp = generateAdminOtp();
-      savedUser.role = "admin";
-      savedUser.isVerified = true;
-      savedUser.adminAccessCode = adminOtp;
-      savedUser.adminAccessCodeExpiry = new Date(Date.now() + ADMIN_OTP_EXPIRY_MS);
-      await savedUser.save();
-
-      let adminOtpSent = false;
-      try {
-        const otpEmailResult = await sendEmail({
-          email: normalizedEmail,
-          emailType: "ADMIN_OTP",
-          securityCode: adminOtp,
-        });
-        adminOtpSent = wasEmailAccepted(otpEmailResult);
-      } catch {
-        adminOtpSent = false;
-      }
-
-      const pendingToken = signPendingAdminToken({
-        id: savedUser._id.toString(),
-        role: "admin",
-        email: savedUser.email,
-      });
-
-      const response = NextResponse.json({
-        message: adminOtpSent
-          ? "Admin registration successful. Access code sent to your email."
-          : "Admin registration successful, but access code email was not delivered. Please use Resend Access Code.",
-        success: true,
-        requiresOtp: true,
-        deliveryStatus: adminOtpSent ? "sent" : "failed",
-      });
-
-      response.cookies.set(ADMIN_OTP_COOKIE, pendingToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/",
-        maxAge: ADMIN_OTP_EXPIRY_MS / 1000,
-      });
-
-      return response;
-    }
 
     if (role === "operator" && pendingTravelCompanyId && operatorCompanyResolvedName) {
       if (operatorCompanyOwnerEmail) {
@@ -293,7 +194,7 @@ export async function POST(request: NextRequest) {
           ? `User created successfully. Your operator request was sent to ${operatorCompanyResolvedName}.`
           : "User created successfully",
       success: true,
-      emailsent: res.accepted.length > 0 && res.rejected.length === 0,
+      emailsent: wasEmailAccepted(res),
     });
   } catch (error: unknown) {
     return NextResponse.json(
