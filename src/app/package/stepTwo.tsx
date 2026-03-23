@@ -97,14 +97,19 @@ export function PackageSizeSelector({
           ◀
         </button>
 
-        <Icon
-          icon="noto:package"
-          className="h-44 text-[#d2a679] transition-transform duration-1000"
+        <div
+          className="my-6 scale-3d transition-all ease-in-out duration-700"
           style={{
             fontSize: "120px",
             transform: `scale(${safePackageSizes[selectedIndex]?.scale ?? 1})`,
-          }}
-        />
+          }}>
+
+          <Icon
+            icon="noto:package"
+            className="h-24 w-24 text-[#d2a679] transition-transform duration-1000"
+
+          />
+        </div>
 
         <button type="button" onClick={handleNext} className="package-input h-11 w-11 rounded-full text-sm font-bold">
           ▶
@@ -144,20 +149,20 @@ export default function StepTwo({
   const safePackageTypes: PackageTypeOption[] =
     Array.isArray(packageCategories) && packageCategories.length > 0
       ? packageCategories.map((entry: PackageCategoryConfig, index: number) => ({
-          id: `${entry.name}-${index}`,
-          label: entry.name,
-          icon: entry.icon || "mdi:shape-outline",
-        }))
+        id: `${entry.name}-${index}`,
+        label: entry.name,
+        icon: entry.icon || "mdi:shape-outline",
+      }))
       : fallbackPackageTypes;
 
   const safePackageSizes: PackageSizeOption[] =
     Array.isArray(packageSizes) && packageSizes.length > 0
       ? packageSizes.map((entry: PackageSizeConfig, index: number) => ({
-          label: entry.name,
-          desc: entry.description || `Max ${entry.maxWeightKg} kg`,
-          // Use size order from API to keep scaling consistent for newly added sizes.
-          scale: getScaleByIndex(index, packageSizes.length),
-        }))
+        label: entry.name,
+        desc: entry.description || `Max ${entry.maxWeightKg} kg`,
+        // Use size order from API to keep scaling consistent for newly added sizes.
+        scale: getScaleByIndex(index, packageSizes.length),
+      }))
       : fallbackPackageSizes;
 
   const hasOtherCategory = useMemo(
@@ -226,11 +231,10 @@ export default function StepTwo({
               type="button"
               onClick={() => setCurrentPackage({ ...currentPackage, packageType: pkg.label })}
               className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition
-              ${
-                currentPackage.packageType === pkg.label
+              ${currentPackage.packageType === pkg.label
                   ? "border-[#F6FF6A]/40 bg-[#F6FF6A] text-black shadow-[0_18px_32px_rgba(205,214,69,0.18)]"
                   : "border-white/15 bg-white/6 text-white/80 hover:bg-white/10"
-              }`}
+                }`}
             >
               <Icon icon={pkg.icon} className="text-xl" />
               {pkg.label}

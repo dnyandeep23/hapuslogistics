@@ -146,6 +146,33 @@ export default function AddPackagePage() {
         }
     }, [formData.pickupLocationId]);
 
+    useEffect(() => {
+        if (!formData.pickupLocationId) return;
+        const pickupExists = pickupLocations.some((location) => location._id === formData.pickupLocationId);
+        if (pickupExists) return;
+
+        dispatch(
+            setFormData({
+                ...formData,
+                pickupLocationId: "",
+                dropLocationId: "",
+            }),
+        );
+    }, [dispatch, formData, pickupLocations]);
+
+    useEffect(() => {
+        if (!formData.dropLocationId) return;
+        const dropExists = dropLocations.some((location) => location._id === formData.dropLocationId);
+        if (dropExists) return;
+
+        dispatch(
+            setFormData({
+                ...formData,
+                dropLocationId: "",
+            }),
+        );
+    }, [dispatch, dropLocations, formData]);
+
 
 
     const getNextPackageNumber = () => {
@@ -312,8 +339,15 @@ export default function AddPackagePage() {
     const validateStep = () => {
         const newErrors: any = {};
         if (currentStep === 1) {
-            if (!formData.pickupLocationId) newErrors.pickupLocationId = "Pickup location required";
-            if (!formData.dropLocationId) newErrors.dropLocationId = "Drop location required";
+            const pickupExists = pickupLocations.some((location) => location._id === formData.pickupLocationId);
+            const dropExists = dropLocations.some((location) => location._id === formData.dropLocationId);
+
+            if (!formData.pickupLocationId || !pickupExists) {
+                newErrors.pickupLocationId = "Pickup location required";
+            }
+            if (!formData.dropLocationId || !dropExists) {
+                newErrors.dropLocationId = "Drop location required";
+            }
         }
         if (currentStep === 2 && formData.cart.length === 0) {
             newErrors.cart = "Please add at least one package to proceed.";
