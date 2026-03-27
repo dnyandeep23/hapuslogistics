@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
@@ -22,6 +23,29 @@ interface BusContact {
 interface SupportContact {
   name: string;
   phone: string;
+}
+
+interface OrderReport {
+  reportType?: "customer_not_at_pickup" | "customer_not_at_drop";
+  category?: string;
+  title?: string;
+  description?: string;
+  createdBy?: string;
+  createdByRole?: string;
+  createdAt?: string;
+  data?: {
+    note?: string;
+    guidance?: string;
+    processingStatus?: "attention_needed" | "office_collection_required";
+    orderId?: string;
+    busId?: string;
+  };
+  type?: "customer_not_at_pickup" | "customer_not_at_drop";
+  status?: "attention_needed" | "office_collection_required";
+  note?: string;
+  guidance?: string;
+  reportedAt?: string;
+  reportedBy?: string;
 }
 
 interface UserDashboardOrder {
@@ -50,6 +74,11 @@ interface UserDashboardOrder {
   contactLocked: boolean;
   pickupProofImage?: string;
   dropProofImage?: string;
+  feedbackSubmitted?: boolean;
+  feedbackRating?: number | null;
+  feedbackComment?: string;
+  feedbackUpdatedAt?: string | null;
+  report?: OrderReport | null;
 }
 
 interface RoleDashboardOrder {
@@ -79,6 +108,7 @@ interface RoleDashboardOrder {
   dropProofImage?: string;
   operatorNote?: string;
   customerNote?: string;
+  report?: OrderReport | null;
   user: {
     id: string;
     name: string;
@@ -110,6 +140,14 @@ interface ProofModalOrder {
   dropProofImage?: string;
 }
 
+interface FeedbackModalOrder {
+  orderId: string;
+  trackingId: string;
+  rating: number;
+  comment: string;
+  feedbackSubmitted?: boolean;
+}
+
 const ACTIVE_STATUSES = new Set(["pending", "confirmed", "allocated", "in-transit"]);
 
 function startOfDay(date: Date): Date {
@@ -135,7 +173,7 @@ function telHref(phone: string): string {
 
 function isOngoingOrder(order: UserDashboardOrder, now: Date): boolean {
   const orderStatus = order.status.toLowerCase();
-  if (orderStatus === "delivered" || orderStatus === "cancelled") {
+  if (orderStatus === "delivered" || orderStatus === "cancelled" || orderStatus === "missed_package") {
     return false;
   }
 
@@ -179,6 +217,7 @@ function getStepIndex(status: string): number {
   if (normalized === "confirmed" || normalized === "allocated") return 1;
   if (normalized === "in-transit") return 2;
   if (normalized === "delivered") return 3;
+  if (normalized === "missed_package") return -1;
   if (normalized === "cancelled") return -1;
   return 0;
 }
@@ -187,6 +226,7 @@ function getStatusBadge(status: string): string {
   const normalized = status.toLowerCase();
   if (normalized === "delivered") return "bg-green-500/20 text-green-300 border-green-500/50";
   if (normalized === "in-transit") return "bg-blue-500/20 text-blue-300 border-blue-500/50";
+  if (normalized === "missed_package") return "bg-orange-500/20 text-orange-200 border-orange-400/50";
   if (normalized === "cancelled") return "bg-red-500/20 text-red-300 border-red-500/50";
   return "bg-amber-500/20 text-amber-300 border-amber-500/50";
 }
@@ -201,6 +241,60 @@ const OPERATOR_ORDER_TAB_LABEL: Record<OperatorOrderTab, string> = {
   past: "Past Orders",
 };
 
+const modernOrderCardClass =
+  "group relative overflow-hidden rounded-[2rem] border border-white/5 bg-[#141A14] p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#D5E400]/30 hover:bg-[#1A221A] active:scale-[0.98]";
+const sectionCardClass =
+  "mt-4 p-2";
+const heroPanelClass =
+  "relative overflow-hidden rounded-[2rem] border border-white/5 bg-[#141A14] p-8 shadow-sm mb-8";
+
+function stopCardNavigation(event: React.MouseEvent<HTMLElement>) {
+  event.stopPropagation();
+}
+
+function handleCardKeyDown(
+  event: React.KeyboardEvent<HTMLElement>,
+  onOpen: () => void,
+) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onOpen();
+}
+
+function SectionHeading({
+  icon,
+  title,
+  count,
+  tone = "accent",
+}: {
+  icon: string;
+  title: string;
+  count: number;
+  tone?: "accent" | "muted";
+}) {
+  const countClass =
+    tone === "accent"
+      ? "border-[#CDD645]/35 bg-[#CDD645]/15 text-[#F6FF6A]"
+      : "border-white/12 bg-white/[0.07] text-white/80";
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#CDD645]">
+          <Icon icon={icon} className="text-lg" />
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <p className="text-xs text-white/50">Tap any order card to open the full package details.</p>
+        </div>
+      </div>
+      <span className={`rounded-full border px-3 py-1 text-xs font-medium ${countClass}`}>
+        {count} orders
+      </span>
+    </div>
+  );
+}
+
 function normalizeOperatorOrderTab(value: string | null): OperatorOrderTab {
   if (value === "upcoming" || value === "past" || value === "active") {
     return value;
@@ -210,7 +304,7 @@ function normalizeOperatorOrderTab(value: string | null): OperatorOrderTab {
 
 function classifyOperatorOrderTab(order: RoleDashboardOrder, now: Date): OperatorOrderTab {
   const normalizedStatus = toSearchText(order.status);
-  if (normalizedStatus === "delivered" || normalizedStatus === "cancelled") {
+  if (normalizedStatus === "delivered" || normalizedStatus === "cancelled" || normalizedStatus === "missed_package") {
     return "past";
   }
 
@@ -242,6 +336,10 @@ export default function OrderPage() {
   const [requiredPhoneError, setRequiredPhoneError] = useState("");
   const [savingRequiredPhone, setSavingRequiredPhone] = useState(false);
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
+  const [feedbackModalOrder, setFeedbackModalOrder] = useState<FeedbackModalOrder | null>(null);
+  const [feedbackRatingDraft, setFeedbackRatingDraft] = useState(5);
+  const [feedbackCommentDraft, setFeedbackCommentDraft] = useState("");
+  const [savingFeedbackOrderId, setSavingFeedbackOrderId] = useState<string | null>(null);
   const { addToast } = useToast();
   const router = useRouter();
 
@@ -377,6 +475,57 @@ export default function OrderPage() {
     }
   };
 
+  const openOrderDetail = (orderId: string) => {
+    if (!orderId) return;
+    router.push(`/dashboard/orders/${orderId}`);
+  };
+
+  const openFeedbackModal = (order: UserDashboardOrder) => {
+    setFeedbackModalOrder({
+      orderId: order.id,
+      trackingId: order.trackingId,
+      rating: order.feedbackRating ?? 5,
+      comment: order.feedbackComment ?? "",
+      feedbackSubmitted: order.feedbackSubmitted,
+    });
+    setFeedbackRatingDraft(order.feedbackRating ?? 5);
+    setFeedbackCommentDraft(order.feedbackComment ?? "");
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackModalOrder) return;
+
+    try {
+      setSavingFeedbackOrderId(feedbackModalOrder.orderId);
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: feedbackModalOrder.orderId,
+          rating: feedbackRatingDraft,
+          comment: feedbackCommentDraft,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        addToast(data?.message || "Failed to save feedback.", "error");
+        return;
+      }
+      addToast("Feedback saved successfully.", "success");
+      setFeedbackModalOrder(null);
+      setFeedbackCommentDraft("");
+      setFeedbackRatingDraft(5);
+      await fetchOrders();
+    } catch (feedbackError: unknown) {
+      addToast(
+        feedbackError instanceof Error ? feedbackError.message : "Failed to save feedback.",
+        "error",
+      );
+    } finally {
+      setSavingFeedbackOrderId(null);
+    }
+  };
+
   const filteredUserOrders = useMemo(() => {
     if (!normalizedSearch) return userOrders;
     return userOrders.filter((order) =>
@@ -411,6 +560,10 @@ export default function OrderPage() {
         order.user?.phone,
         order.pickupLocation?.name,
         order.dropLocation?.name,
+        order.report?.title,
+        order.report?.description,
+        order.report?.note,
+        order.report?.guidance,
       ]
         .map(toSearchText)
         .some((value) => value.includes(normalizedSearch)),
@@ -438,6 +591,10 @@ export default function OrderPage() {
             order.user?.email,
             order.pickupLocation?.name,
             order.dropLocation?.name,
+            order.report?.title,
+            order.report?.description,
+            order.report?.note,
+            order.report?.guidance,
           ]
             .map(toSearchText)
             .some((value) => value.includes(normalizedSearch)),
@@ -504,50 +661,91 @@ export default function OrderPage() {
 
   const renderOperatorOrderCard = (order: RoleDashboardOrder) => {
     return (
-      <article key={order.id} className="dashboard-surface-soft rounded-xl p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <article
+        key={order.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => openOrderDetail(order.id)}
+        onKeyDown={(event) => handleCardKeyDown(event, () => openOrderDetail(order.id))}
+        className={modernOrderCardClass}
+      >
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
-            <p className="text-sm text-white/90">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-[#CDD645]/25 bg-[#CDD645]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
+                Full detail
+              </span>
+              <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
+            </div>
+            <p className="text-base font-semibold text-white">
               {order.pickupLocation?.name || "--"} to {order.dropLocation?.name || "--"}
             </p>
             <p className="text-xs text-white/60">
               {formatDate(order.orderDate)} | {order.user?.name || "--"} ({order.user?.email || "--"})
             </p>
           </div>
-          <span className={`rounded-full border px-2.5 py-1 text-xs capitalize ${getStatusBadge(order.status)}`}>
+          <span className={`rounded-full border px-3 py-1 text-xs capitalize ${getStatusBadge(order.status)}`}>
             {order.status}
           </span>
         </div>
 
-        <div className="mt-3 grid gap-2 text-xs text-white/70 sm:grid-cols-3">
-          <p>
-            <span className="text-white/45">Bus:</span> {order.bus?.busName || "--"} {order.bus?.busNumber ? `(${order.bus.busNumber})` : ""}
-          </p>
-          <p>
-            <span className="text-white/45">Amount:</span> {formatMoney(order.totalAmount)}
-          </p>
-          <p>
-            <span className="text-white/45">Proof:</span> Pickup {order.pickupProofImage ? "Uploaded" : "Pending"}, Drop {order.dropProofImage ? "Uploaded" : "Pending"}
-          </p>
+        <div className="relative mt-4 grid gap-3 text-xs text-white/70 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Bus</p>
+            <p className="mt-1 text-sm text-white">
+              {order.bus?.busName || "--"} {order.bus?.busNumber ? `(${order.bus.busNumber})` : ""}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Amount</p>
+            <p className="mt-1 text-sm text-white">{formatMoney(order.totalAmount)}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Proof</p>
+            <p className="mt-1 text-sm text-white">
+              Pickup {order.pickupProofImage ? "Uploaded" : "Pending"}, Drop {order.dropProofImage ? "Uploaded" : "Pending"}
+            </p>
+          </div>
         </div>
 
-        {order.operatorNote ? (
+        {order.operatorNote && !order.report ? (
           <p className="mt-3 border-l-2 border-amber-300/50 pl-3 text-xs text-amber-100/90">
             {order.operatorNote}
           </p>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-            className="rounded-md border border-[#6A774F] bg-[#25311E] px-3 py-1.5 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
-          >
-            View Details
-          </button>
-          <span className="inline-flex items-center rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/55">
-            Status auto-updates from proof capture
+        {order.report ? (
+          <div className="mt-3 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-amber-100">
+                {order.report.title ||
+                  (order.report.reportType === "customer_not_at_drop"
+                    ? "Customer not at drop"
+                    : "Customer not at pickup")}
+              </p>
+              <span className="rounded-full border border-amber-300/40 bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-amber-100">
+                {order.report.data?.processingStatus === "office_collection_required" ||
+                order.report.status === "office_collection_required"
+                  ? "Office collection"
+                  : "Needs attention"}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-amber-50/90">
+              {order.report.description || order.report.data?.guidance || order.report.guidance}
+            </p>
+            <p className="mt-1 text-[11px] text-amber-100/70">
+              {order.report.data?.note || order.report.note}
+            </p>
+          </div>
+        ) : null}
+
+        <div className="relative mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-4">
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
+            Open card to view full package details
+          </span>
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-[#DDE98D]">
+            View Order
+            <Icon icon="mdi:arrow-top-right" className="text-base transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </span>
         </div>
       </article>
@@ -684,11 +882,13 @@ export default function OrderPage() {
       const normalizedStatus = order.status.toLowerCase();
       const isDelivered = normalizedStatus === "delivered";
       const isCancelled = normalizedStatus === "cancelled";
+      const isMissedPackage = normalizedStatus === "missed_package";
       const hasBusContact = Boolean(
         order.busContact?.contactPersonNumber || order.busContact?.contactPersonName,
       );
       const shouldHideUpcomingContact = Boolean(order.contactLocked);
-      const canShowBusContact = hasBusContact && !isDelivered && !isCancelled && !shouldHideUpcomingContact;
+      const canShowBusContact =
+        hasBusContact && !isDelivered && !isCancelled && !isMissedPackage && !shouldHideUpcomingContact;
       const supportPhone = order.supportContact?.phone || "";
       const supportPhoneHref = telHref(supportPhone);
 
@@ -698,19 +898,28 @@ export default function OrderPage() {
       return (
         <article
           key={order.id}
-          className="dashboard-surface rounded-2xl p-5 shadow-lg"
+          role="button"
+          tabIndex={0}
+          onClick={() => openOrderDetail(order.id)}
+          onKeyDown={(event) => handleCardKeyDown(event, () => openOrderDetail(order.id))}
+          className={modernOrderCardClass}
         >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="relative mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wider text-white/50">Tracking ID</p>
-              <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[#CDD645]/25 bg-[#CDD645]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
+                  Tap for details
+                </span>
+                <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
+              </div>
+              <p className="mt-2 text-sm text-white/65">Open the card to view the full package detail page.</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-white/50">Pickup Date</p>
-              <p className="text-sm text-white">{formatDate(order.orderDate)}</p>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-right">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">Pickup Date</p>
+              <p className="mt-1 text-sm font-semibold text-white">{formatDate(order.orderDate)}</p>
             </div>
             <span
-              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getStatusBadge(
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize backdrop-blur-sm ${getStatusBadge(
                 order.status,
               )}`}
             >
@@ -718,16 +927,16 @@ export default function OrderPage() {
             </span>
           </div>
 
-          <div className="mb-5 grid gap-3 md:grid-cols-2">
-            <div className="dashboard-surface-soft rounded-xl p-3">
-              <p className="mb-1 text-xs uppercase tracking-wide text-white/50">From</p>
+          <div className="relative mb-5 grid gap-3 md:grid-cols-2">
+            <div className="rounded-[1.25rem] border border-emerald-300/12 bg-emerald-500/6 p-4">
+              <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-emerald-100/55">From</p>
               <p className="font-semibold text-white">{order.pickupLocation.name}</p>
               <p className="text-sm text-white/70">
                 {order.pickupLocation.city}, {order.pickupLocation.state}
               </p>
             </div>
-            <div className="dashboard-surface-soft rounded-xl p-3">
-              <p className="mb-1 text-xs uppercase tracking-wide text-white/50">To</p>
+            <div className="rounded-[1.25rem] border border-sky-300/12 bg-sky-500/6 p-4">
+              <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-sky-100/55">To</p>
               <p className="font-semibold text-white">{order.dropLocation.name}</p>
               <p className="text-sm text-white/70">
                 {order.dropLocation.city}, {order.dropLocation.state}
@@ -735,8 +944,11 @@ export default function OrderPage() {
             </div>
           </div>
 
-          <div className="mb-5 dashboard-surface-soft rounded-xl p-3">
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Tracking Progress</p>
+          <div className="relative mb-5 rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Tracking Progress</p>
+              <span className="text-xs text-[#DDE98D]">Live order snapshot</span>
+            </div>
             <div className="grid grid-cols-4 gap-2">
               {steps.map((step, idx) => {
                 const active = stepIndex >= idx;
@@ -755,19 +967,20 @@ export default function OrderPage() {
           </div>
 
           {(order.pickupProofImage || order.dropProofImage) && (
-            <div className="mb-5 dashboard-surface-soft rounded-xl p-3">
+            <div className="relative mb-5 rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-xs uppercase tracking-wide text-white/50">Verification Proofs</p>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Verification Proofs</p>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={(event) => {
+                    stopCardNavigation(event);
                     setProofModalOrder({
                       orderId: order.id,
                       trackingId: order.trackingId,
                       pickupProofImage: order.pickupProofImage,
                       dropProofImage: order.dropProofImage,
-                    })
-                  }
+                    });
+                  }}
                   className="inline-flex items-center gap-1 rounded-md border border-[#6A774F] bg-[#25311E] px-2 py-1 text-[11px] font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
                 >
                   <Icon icon="mdi:magnify-plus-outline" className="text-sm" />
@@ -780,14 +993,15 @@ export default function OrderPage() {
                   {order.pickupProofImage ? (
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(event) => {
+                        stopCardNavigation(event);
                         setProofModalOrder({
                           orderId: order.id,
                           trackingId: order.trackingId,
                           pickupProofImage: order.pickupProofImage,
                           dropProofImage: order.dropProofImage,
-                        })
-                      }
+                        });
+                      }}
                       className="block w-full text-left"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -808,14 +1022,15 @@ export default function OrderPage() {
                   {order.dropProofImage ? (
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(event) => {
+                        stopCardNavigation(event);
                         setProofModalOrder({
                           orderId: order.id,
                           trackingId: order.trackingId,
                           pickupProofImage: order.pickupProofImage,
                           dropProofImage: order.dropProofImage,
-                        })
-                      }
+                        });
+                      }}
                       className="block w-full text-left"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -835,28 +1050,27 @@ export default function OrderPage() {
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-              className="dashboard-surface-soft rounded-xl p-3 text-left transition hover:bg-[#252f1f]"
-            >
-              <p className="text-xs uppercase tracking-wide text-white/50">Packages</p>
-              <p className="mt-1 text-sm text-white">{order.packageCount} item(s)</p>
-              <p className="mt-1 text-xs text-white/65">
-                {order.packageNames.slice(0, 2).join(", ") || "Package details available"}
+          <div className="relative grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-[1.25rem] border border-[#CDD645]/16 bg-[#CDD645]/8 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[#F6FF6A]/60">Packages</p>
+              <p className="mt-2 text-lg font-semibold text-white">{order.packageCount} item(s)</p>
+              <p className="mt-1 text-xs leading-5 text-white/68">
+                {order.packageNames.slice(0, 3).join(", ") || "Package details available"}
               </p>
-              <p className="mt-2 text-xs font-medium text-[#CDD645]">View full package details</p>
-            </button>
+              <div className="mt-3 flex items-center gap-2 text-xs font-medium text-[#DDE98D]">
+                <Icon icon="mdi:package-variant-closed" className="text-sm" />
+                Full package detail opens on card click
+              </div>
+            </div>
 
-            <div className="dashboard-surface-soft rounded-xl p-3">
-              <p className="text-xs uppercase tracking-wide text-white/50">Order Value</p>
-              <p className="mt-1 text-sm text-white">{formatMoney(order.totalAmount)}</p>
+            <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Order Value</p>
+              <p className="mt-2 text-lg font-semibold text-white">{formatMoney(order.totalAmount)}</p>
               <p className="mt-1 text-xs text-white/65">{order.totalWeightKg} kg total</p>
             </div>
 
-            <div className="dashboard-surface-soft rounded-xl p-3">
-              <p className="text-xs uppercase tracking-wide text-white/50">Assigned Bus</p>
+            <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Assigned Bus</p>
               {order.busContact ? (
                 <div className="mt-2 flex items-center gap-3">
                   {order.busContact.busImage ? (
@@ -885,8 +1099,8 @@ export default function OrderPage() {
               )}
             </div>
 
-            <div className="dashboard-surface-soft rounded-xl p-3">
-              <p className="text-xs uppercase tracking-wide text-white/50">Operator Contact</p>
+            <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Operator Contact</p>
 
               {canShowBusContact && order.busContact ? (
                 <div className="mt-1 space-y-1 text-sm text-white">
@@ -912,10 +1126,16 @@ export default function OrderPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
+              <Icon icon="mdi:gesture-tap" className="text-sm text-[#DDE98D]" />
+              Open this card for full package details
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
             {supportPhoneHref ? (
               <a
                 href={supportPhoneHref}
+                onClick={stopCardNavigation}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
               >
                 <Icon icon="mdi:lifebuoy" className="text-base" />
@@ -924,7 +1144,10 @@ export default function OrderPage() {
             ) : (
               <button
                 type="button"
-                onClick={() => router.push(`/dashboard/support?orderId=${order.id}`)}
+                onClick={(event) => {
+                  stopCardNavigation(event);
+                  router.push(`/dashboard/support?orderId=${order.id}`);
+                }}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
               >
                 <Icon icon="mdi:lifebuoy" className="text-base" />
@@ -933,7 +1156,10 @@ export default function OrderPage() {
             )}
             <button
               type="button"
-              onClick={() => handleDownloadInvoice(order.id)}
+              onClick={(event) => {
+                stopCardNavigation(event);
+                handleDownloadInvoice(order.id);
+              }}
               disabled={downloadingOrderId === order.id}
               className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -947,59 +1173,121 @@ export default function OrderPage() {
               />
               {downloadingOrderId === order.id ? "Preparing Invoice..." : "Download Invoice"}
             </button>
+            </div>
           </div>
+
+          {isDelivered ? (
+            <div className="mt-4 rounded-2xl border border-[#CDD645]/20 bg-[linear-gradient(135deg,rgba(205,214,69,0.08),rgba(37,49,30,0.65))] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-[#F6FF6A]/70">Delivery feedback</p>
+                  <h3 className="mt-1 text-sm font-semibold text-white">
+                    {order.feedbackSubmitted ? "Thanks for your feedback" : "Tell us how the delivery went"}
+                  </h3>
+                  <p className="mt-1 text-xs text-white/60">
+                    {order.feedbackSubmitted
+                      ? `Submitted on ${order.feedbackUpdatedAt ? formatDate(order.feedbackUpdatedAt) : "recently"}`
+                      : "Your rating helps us improve the handoff and delivery experience."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    stopCardNavigation(event);
+                    openFeedbackModal(order);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
+                >
+                  <Icon icon={order.feedbackSubmitted ? "mdi:pencil-outline" : "mdi:star-outline"} className="text-base" />
+                  {order.feedbackSubmitted ? "Edit Feedback" : "Leave Feedback"}
+                </button>
+              </div>
+              {order.feedbackSubmitted ? (
+                <div className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs uppercase tracking-wide text-white/45">Your rating</span>
+                    <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-1 text-xs text-white/80">
+                      {order.feedbackRating ?? 0}/5
+                    </span>
+                  </div>
+                  {order.feedbackComment ? (
+                    <p className="mt-2 text-sm leading-6 text-white/80">{order.feedbackComment}</p>
+                  ) : (
+                    <p className="mt-2 text-sm text-white/55">No written comment was added.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </article>
       );
     };
 
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-[#F6FF6A]">My Orders</h1>
-          <div className="relative w-full max-w-sm">
-            <Icon icon="mdi:magnify" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+        <section className={heroPanelClass}>
+          <div className="relative flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-2xl">
+              <span className="rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
+                Orders workspace
+              </span>
+              <h1 className="mt-3 text-3xl font-bold text-white">My Orders</h1>
+              <p className="mt-2 text-sm text-white/68">
+                Track active shipments, revisit past deliveries, and open any card to see the full package detail flow.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.06] px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Ongoing</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{sortedUserOrders.ongoing.length}</p>
+              </div>
+              <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.06] px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">History</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{sortedUserOrders.past.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="relative mt-5">
+            <Icon icon="mdi:magnify" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45" />
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search tracking ID, route or support contact"
-              className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
+              className="dashboard-input w-full rounded-2xl border-white/10 bg-black/15 py-3 pl-11 pr-4 text-sm placeholder:text-white/40 focus:border-[#CDD645]"
             />
           </div>
-        </div>
+        </section>
 
-        <section className="mb-8">
-          <div className="mb-3 flex items-center gap-2">
-            <Icon icon="mdi:progress-clock" className="text-[#CDD645]" />
-            <h2 className="text-lg font-semibold text-white">Ongoing Orders</h2>
-            <span className="rounded-full bg-[#CDD645]/20 px-2 py-0.5 text-xs text-[#F6FF6A]">
-              {sortedUserOrders.ongoing.length}
-            </span>
-          </div>
+        <section className={`${sectionCardClass} mt-6 mb-8`}>
+          <SectionHeading
+            icon="mdi:progress-clock"
+            title="Ongoing Orders"
+            count={sortedUserOrders.ongoing.length}
+          />
           <div className="space-y-4">
             {sortedUserOrders.ongoing.length > 0 ? (
               sortedUserOrders.ongoing.map((order) => renderUserOrderCard(order))
             ) : (
-              <div className="dashboard-surface rounded-xl p-4 text-white/65">
+              <div className="rounded-[1.35rem] border border-dashed border-white/12 bg-white/5 p-5 text-white/65">
                 {normalizedSearch ? "No ongoing orders match your search." : "No ongoing orders."}
               </div>
             )}
           </div>
         </section>
 
-        <section>
-          <div className="mb-3 flex items-center gap-2">
-            <Icon icon="mdi:archive-outline" className="text-white/70" />
-            <h2 className="text-lg font-semibold text-white">Order History</h2>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/80">
-              {sortedUserOrders.past.length}
-            </span>
-          </div>
+        <section className={sectionCardClass}>
+          <SectionHeading
+            icon="mdi:archive-outline"
+            title="Order History"
+            count={sortedUserOrders.past.length}
+            tone="muted"
+          />
           <div className="space-y-4">
             {sortedUserOrders.past.length > 0 ? (
               sortedUserOrders.past.map((order) => renderUserOrderCard(order))
             ) : (
-              <div className="dashboard-surface rounded-xl p-4 text-white/65">
+              <div className="rounded-[1.35rem] border border-dashed border-white/12 bg-white/5 p-5 text-white/65">
                 {normalizedSearch ? "No past orders match your search." : "No past orders."}
               </div>
             )}
@@ -1070,6 +1358,99 @@ export default function OrderPage() {
             </div>
           </div>
         ) : null}
+
+        {feedbackModalOrder ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+            onClick={() => setFeedbackModalOrder(null)}
+            role="presentation"
+          >
+            <div
+              className="w-full max-w-2xl dashboard-surface rounded-2xl p-5 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Delivery feedback"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-[#F6FF6A]">
+                    {feedbackModalOrder.feedbackSubmitted ? "Edit feedback" : "Share feedback"}
+                  </h3>
+                  <p className="text-xs text-white/60">{feedbackModalOrder.trackingId}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackModalOrder(null)}
+                  className="rounded-md border border-white/20 p-1.5 text-white/80 hover:border-[#CDD645] hover:text-[#CDD645]"
+                  aria-label="Close feedback modal"
+                >
+                  <Icon icon="mdi:close" className="text-lg" />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-white/75">
+                  Rate the delivery experience after completion. You can update it later if needed.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((value) => {
+                    const active = value <= feedbackRatingDraft;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFeedbackRatingDraft(value)}
+                        className={`inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition ${
+                          active
+                            ? "border-[#CDD645]/60 bg-[#CDD645]/20 text-[#F6FF6A]"
+                            : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10"
+                        }`}
+                        aria-label={`${value} star rating`}
+                      >
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+                <textarea
+                  rows={5}
+                  value={feedbackCommentDraft}
+                  onChange={(event) => setFeedbackCommentDraft(event.target.value)}
+                  placeholder="Tell us what went well or what we can improve..."
+                  className="dashboard-input mt-4 w-full rounded-2xl px-4 py-3 text-sm leading-6 focus:border-[#CDD645]/65"
+                />
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackModalOrder(null)}
+                    className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/75 hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitFeedback}
+                    disabled={savingFeedbackOrderId === feedbackModalOrder.orderId}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-4 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Icon
+                      icon={
+                        savingFeedbackOrderId === feedbackModalOrder.orderId
+                          ? "line-md:loading-loop"
+                          : "mdi:send"
+                      }
+                      className="text-base"
+                    />
+                    {savingFeedbackOrderId === feedbackModalOrder.orderId
+                      ? "Saving..."
+                      : "Save Feedback"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1078,29 +1459,44 @@ export default function OrderPage() {
     return (
       <>
         <div className="p-4 sm:p-6 lg:p-8">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-bold text-[#F6FF6A]">All Orders (Bus Wise)</h1>
-            <div className="relative w-full max-w-sm">
-              <Icon icon="mdi:magnify" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+          <section className={heroPanelClass}>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-[radial-gradient(circle_at_center,rgba(205,214,69,0.16),transparent_70%)]" />
+            <div className="relative flex flex-wrap items-center justify-between gap-4">
+              <div className="max-w-2xl">
+                <span className="rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
+                  Bus wise view
+                </span>
+                <h1 className="mt-3 text-3xl font-bold text-white">All Orders</h1>
+                <p className="mt-2 text-sm text-white/68">
+                  Review each bus manifest in a cleaner layout. Every order row now opens the complete package detail page.
+                </p>
+              </div>
+              <div className="rounded-[1.45rem] border border-white/10 bg-white/[0.06] px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Visible buses</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{sortedGroupedByBus.length}</p>
+              </div>
+            </div>
+            <div className="relative mt-5">
+              <Icon icon="mdi:magnify" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search bus, tracking ID or customer"
-                className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
+                className="dashboard-input w-full rounded-2xl border-white/10 bg-black/15 py-3 pl-11 pr-4 text-sm placeholder:text-white/40 focus:border-[#CDD645]"
               />
             </div>
-          </div>
+          </section>
           {sortedGroupedByBus.length === 0 ? (
-            <div className="dashboard-surface rounded-xl p-6 text-white/65">
+            <div className={`${sectionCardClass} mt-6 text-white/65`}>
               {normalizedSearch
                 ? "No orders match your search."
                 : "No orders found for your buses."}
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="mt-6 space-y-5">
               {sortedGroupedByBus.map((busGroup) => (
-                <section key={busGroup.busId} className="dashboard-surface rounded-2xl p-4">
+                <section key={busGroup.busId} className={sectionCardClass}>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {busGroup.busImage ? (
@@ -1127,40 +1523,86 @@ export default function OrderPage() {
 
                   <div className="space-y-3">
                     {busGroup.orders.map((order) => (
-                      <article key={order.id} className="dashboard-surface-soft rounded-xl p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                      <article
+                        key={order.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openOrderDetail(order.id)}
+                        onKeyDown={(event) => handleCardKeyDown(event, () => openOrderDetail(order.id))}
+                        className={modernOrderCardClass}
+                      >
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(205,214,69,0.16),transparent_72%)] opacity-0 transition duration-300 group-hover:opacity-100" />
+                        <div className="relative flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
-                            <p className="text-xs text-white/65">{formatDate(order.orderDate)}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full border border-[#CDD645]/25 bg-[#CDD645]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
+                                Full detail
+                              </span>
+                              <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
+                            </div>
+                            <p className="mt-2 text-xs text-white/65">{formatDate(order.orderDate)}</p>
                           </div>
                           <span className={`rounded-full border px-2.5 py-1 text-xs capitalize ${getStatusBadge(order.status)}`}>
                             {order.status}
                           </span>
                         </div>
 
-                        <div className="mt-2 grid gap-2 md:grid-cols-2">
-                          <p className="text-sm text-white/85">
-                            <span className="text-white/50">User:</span> {order.user?.name || "--"} ({order.user?.email || "--"})
-                          </p>
-                          <p className="text-sm text-white/85">
-                            <span className="text-white/50">Amount:</span> {formatMoney(order.totalAmount)}
-                          </p>
-                          <p className="text-sm text-white/85">
-                            <span className="text-white/50">From:</span> {order.pickupLocation?.name || "--"}
-                          </p>
-                          <p className="text-sm text-white/85">
-                            <span className="text-white/50">To:</span> {order.dropLocation?.name || "--"}
-                          </p>
+                        <div className="relative mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Customer</p>
+                            <p className="mt-1 text-sm text-white">{order.user?.name || "--"}</p>
+                            <p className="text-xs text-white/55">{order.user?.email || "--"}</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Amount</p>
+                            <p className="mt-1 text-sm text-white">{formatMoney(order.totalAmount)}</p>
+                          </div>
+                          <div className="rounded-2xl border border-emerald-300/12 bg-emerald-500/6 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-emerald-100/55">From</p>
+                            <p className="mt-1 text-sm text-white">{order.pickupLocation?.name || "--"}</p>
+                          </div>
+                          <div className="rounded-2xl border border-sky-300/12 bg-sky-500/6 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-sky-100/55">To</p>
+                            <p className="mt-1 text-sm text-white">{order.dropLocation?.name || "--"}</p>
+                          </div>
                         </div>
-                        <div className="mt-3 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-1.5 text-xs font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
-                          >
-                            <Icon icon="mdi:eye-outline" className="text-sm" />
-                            View Details
-                          </button>
+                        {order.report ? (
+                          <div className="mt-3 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-semibold text-amber-100">
+                                {order.report.title ||
+                                  (order.report.reportType === "customer_not_at_drop"
+                                    ? "Customer not at drop"
+                                    : "Customer not at pickup")}
+                              </p>
+                              <span className="rounded-full border border-amber-300/40 bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-amber-100">
+                                {order.report.data?.processingStatus === "office_collection_required" ||
+                                order.report.status === "office_collection_required"
+                                  ? "Office collection"
+                                  : "Needs attention"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-amber-50/90">
+                              {order.report.description || order.report.data?.guidance || order.report.guidance}
+                            </p>
+                            <p className="mt-1 text-[11px] text-amber-100/70">
+                              {order.report.data?.note || order.report.note}
+                            </p>
+                          </div>
+                        ) : null}
+                        {order.operatorNote && !order.report ? (
+                          <p className="mt-3 border-l-2 border-amber-300/50 pl-3 text-xs text-amber-100/90">
+                            {order.operatorNote}
+                          </p>
+                        ) : null}
+                        <div className="relative mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-4">
+                          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
+                            Open card to view package details
+                          </span>
+                          <span className="inline-flex items-center gap-2 text-sm font-medium text-[#DDE98D]">
+                            View Order
+                            <Icon icon="mdi:arrow-top-right" className="text-base transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                          </span>
                         </div>
                       </article>
                     ))}
@@ -1178,21 +1620,40 @@ export default function OrderPage() {
   return (
     <>
       <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-[#F6FF6A]">{OPERATOR_ORDER_TAB_LABEL[operatorTab]}</h1>
-          <div className="relative w-full max-w-sm">
-            <Icon icon="mdi:magnify" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+        <section className={heroPanelClass}>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-[radial-gradient(circle_at_center,rgba(205,214,69,0.16),transparent_70%)]" />
+          <div className="relative flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-2xl">
+              <span className="rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
+                Operator queue
+              </span>
+              <h1 className="mt-3 text-3xl font-bold text-white">{OPERATOR_ORDER_TAB_LABEL[operatorTab]}</h1>
+              <p className="mt-2 text-sm text-white/68">
+                Active, upcoming, and past assignments are grouped into a cleaner workspace. Open any card for the full package detail view.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {OPERATOR_TAB_ORDER.map((tab) => (
+                <div key={`summary-${tab}`} className="rounded-[1.35rem] border border-white/10 bg-white/[0.06] px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">{tab}</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">{operatorOrdersByTab[tab].length}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="relative mt-5">
+            <Icon icon="mdi:magnify" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45" />
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search tracking ID, customer or bus"
-              className="dashboard-input w-full rounded-lg py-2 pl-9 pr-3 text-sm placeholder:text-white/45 focus:border-[#CDD645]"
+              className="dashboard-input w-full rounded-2xl border-white/10 bg-black/15 py-3 pl-11 pr-4 text-sm placeholder:text-white/40 focus:border-[#CDD645]"
             />
           </div>
-        </div>
+        </section>
 
-        <div className="mb-5 flex flex-wrap items-center gap-2">
+        <div className="mt-6 mb-5 flex flex-wrap items-center gap-2">
           {(["active", "upcoming", "past"] as const).map((tab) => {
             const isActiveTab = operatorTab === tab;
             return (
@@ -1213,11 +1674,11 @@ export default function OrderPage() {
         </div>
 
         {!hasAnyOperatorOrders ? (
-          <div className="dashboard-surface rounded-xl p-6 text-white/65">
+          <div className={sectionCardClass}>
             {normalizedSearch ? "No orders match your search." : "No orders found for your assigned buses."}
           </div>
         ) : (
-          <div className="dashboard-surface overflow-hidden rounded-2xl">
+          <div className={`${sectionCardClass} overflow-hidden`}>
             <div
               className="flex transition-transform duration-300 ease-in-out"
               style={{

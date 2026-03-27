@@ -32,6 +32,11 @@ type OperatorRow = {
   pendingTravelCompanyId?: string;
   accountDeletionRequestedAt?: string | null;
   accountDeletionExpiresAt?: string | null;
+  assignedBusCount?: number;
+  assignedBuses?: Array<{
+    busId: string;
+    label: string;
+  }>;
 };
 
 type CompanyOfferRow = {
@@ -713,9 +718,34 @@ export default function UsersPage() {
           await updateOperatorStatus(target._id, "delete");
         }}
       >
-        <p className="text-sm text-white/70">
-          This will permanently delete the operator account and remove company-linked assignments.
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-white/70">
+            This will permanently delete the operator account and remove company-linked assignments.
+          </p>
+          {(deleteOperatorTarget?.assignedBusCount ?? 0) > 0 ? (
+            <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 p-3">
+              <p className="text-sm font-medium text-amber-100">
+                Warning: this operator is assigned to {deleteOperatorTarget?.assignedBusCount} bus
+                {(deleteOperatorTarget?.assignedBusCount ?? 0) > 1 ? "es" : ""}.
+              </p>
+              <p className="mt-1 text-xs text-amber-100/80">
+                Continuing will delete the operator account and those bus assignments will be removed as well.
+              </p>
+              {Array.isArray(deleteOperatorTarget?.assignedBuses) && deleteOperatorTarget.assignedBuses.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {deleteOperatorTarget.assignedBuses.slice(0, 6).map((bus) => (
+                    <span
+                      key={`${deleteOperatorTarget?._id}-${bus.busId}`}
+                      className="rounded-full border border-amber-300/30 bg-black/15 px-2.5 py-1 text-[11px] text-amber-50"
+                    >
+                      {bus.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </ConfirmationModal>
 
       {selectedOperator ? (

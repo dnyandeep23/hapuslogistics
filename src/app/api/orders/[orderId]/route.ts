@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { dbConnect } from "@/app/api/lib/db";
+import {
+  applyDeductionPercentToRefundPreview,
+  calculateCancellationRefund,
+  CUSTOMER_CANCELLATION_DEDUCTION_PERCENT,
+  normalizeRefundPolicySnapshot,
+} from "@/app/api/lib/orderCancellation";
 import { runOrderCleanupSafely } from "@/app/api/lib/orderCleanup";
 import { resolveBusContactForDate } from "@/app/api/lib/busContact";
 import { sendEmail } from "@/app/api/lib/mailer";
@@ -226,6 +232,13 @@ function computePackageAmount(packages: UnknownRecord[]): number {
   return roundCurrency(total);
 }
 
+function getCollectedAmountFromOrder(order: UnknownRecord): number {
+  const totalAmount = toNumberValue(order.totalAmount, 0);
+  const adjustmentPendingAmount = Math.max(0, toNumberValue(order.adjustmentPendingAmount, 0));
+  const adjustmentRefundAmount = Math.max(0, toNumberValue(order.adjustmentRefundAmount, 0));
+  return Math.max(0, roundCurrency(totalAmount + adjustmentRefundAmount - adjustmentPendingAmount));
+}
+
 function parseTimeToMinutes(value: unknown): number | null {
   const raw = toStringValue(value).trim();
   if (!raw) return null;
@@ -314,6 +327,34 @@ function canAdminEditOrder(orderStatus: unknown, startDateTime: Date | null): bo
   const deadline = getEditDeadline(startDateTime, 1);
   if (!deadline) return false;
   return new Date() < deadline;
+}
+
+function canUserCancelOrder(orderStatus: unknown, startDateTime: Date | null): boolean {
+  const status = toStringValue(orderStatus, "pending").toLowerCase();
+  if (!["pending", "confirmed", "allocated"].includes(status)) {
+    return false;
+  }
+  if (!startDateTime || Number.isNaN(startDateTime.getTime())) return false;
+  return new Date() < startDateTime;
+}
+
+function canAdminCancelOrder(orderStatus: unknown): boolean {
+  const status = toStringValue(orderStatus, "pending").toLowerCase();
+  return !["delivered", "cancelled", "missed_package"].includes(status);
+}
+
+function canProcessMissedPackageRefund(
+  orderStatus: unknown,
+  userRole: Role,
+  missedPackageDetails: unknown,
+): boolean {
+  const status = toStringValue(orderStatus, "pending").toLowerCase();
+  if (status !== "missed_package") return false;
+  if (userRole !== "admin" && userRole !== "operator") return false;
+  if (!isRecord(missedPackageDetails)) return true;
+
+  const refundStatus = toStringValue(missedPackageDetails.refundProcessingStatus, "not_started").toLowerCase();
+  return refundStatus !== "processed" && refundStatus !== "processing";
 }
 
 function isPricingEntryActiveOnDate(entry: BusPricingEntry, date: Date) {
@@ -634,7 +675,8 @@ export async function GET(request: NextRequest, context: ParamsContext) {
     const orderDateIso = toIsoDate(order.orderDate);
     const contactRevealAt = subtractDays(new Date(orderDateIso), 1);
     const shouldHideForCompletedForOwner =
-      isOrderOwner && (normalizedStatus === "delivered" || normalizedStatus === "cancelled");
+      isOrderOwner &&
+      (normalizedStatus === "delivered" || normalizedStatus === "cancelled" || normalizedStatus === "missed_package");
     const hasContactInfo = Boolean(
       contactSource &&
       (toStringValue(contactSource.contactPersonName) || toStringValue(contactSource.contactPersonNumber)),
@@ -685,6 +727,40 @@ export async function GET(request: NextRequest, context: ParamsContext) {
 
     const adminCanEditOrder =
       userRole === "admin" ? canAdminEditOrder(order.status, orderStartDateTime) : false;
+    const refundPolicy = normalizeRefundPolicySnapshot(order.refundPolicySnapshot);
+    const defaultRefundPreview = calculateCancellationRefund({
+      baseAmount: getCollectedAmountFromOrder(order),
+      orderStartDateTime,
+      refundPolicy,
+      mode: "deduction_policy",
+    });
+    const refundPreview =
+      userRole === "user"
+        ? applyDeductionPercentToRefundPreview(
+            defaultRefundPreview,
+            CUSTOMER_CANCELLATION_DEDUCTION_PERCENT,
+            `Customer cancellation deduction: ${CUSTOMER_CANCELLATION_DEDUCTION_PERCENT}%`,
+          )
+        : defaultRefundPreview;
+    const visibleReports =
+      Array.isArray(order.orderReports)
+        ? order.orderReports
+            .filter((entry): entry is UnknownRecord => {
+              if (!isRecord(entry)) return false;
+              if (userRole === "admin" || userRole === "operator") return true;
+              const createdByRole = toStringValue(entry.createdByRole).toLowerCase();
+              return createdByRole === "user" || createdByRole === "operator";
+            })
+            .map((entry) => ({
+              reportType: toStringValue(entry.reportType),
+              category: toStringValue(entry.category),
+              title: toStringValue(entry.title),
+              description: toStringValue(entry.description),
+              createdByRole: toStringValue(entry.createdByRole),
+              createdAt: toIsoDate(entry.createdAt),
+              data: isRecord(entry.data) ? entry.data : {},
+            }))
+        : [];
     const effectiveBusId = toStringValue(order.assignedBus) || toStringValue(order.bus);
     let transferCandidates: Array<{
       id: string;
@@ -818,8 +894,68 @@ export async function GET(request: NextRequest, context: ParamsContext) {
       canAdminEditOrder: adminCanEditOrder,
       canTransferOrder: adminCanEditOrder,
       canAdminUpdateAll: adminCanEditOrder,
+      canProcessMissedPackageRefund: canProcessMissedPackageRefund(
+        order.status,
+        userRole,
+        order.missedPackageDetails,
+      ),
       currentBusId: effectiveBusId,
       transferCandidates,
+      canUserCancel: isOrderOwner ? canUserCancelOrder(order.status, orderStartDateTime) : false,
+      canAdminCancel: userRole === "admin" ? canAdminCancelOrder(order.status) : false,
+      refundPolicySnapshot: refundPolicy,
+      refundPreview,
+      cancellationDetails: isRecord(order.cancellationDetails)
+        ? {
+            reasonCode: toStringValue(order.cancellationDetails.reasonCode),
+            reasonDescription: toStringValue(order.cancellationDetails.reasonDescription),
+            refundMode: toStringValue(order.cancellationDetails.refundMode, "deduction_policy"),
+            refundBaseAmount: toNumberValue(order.cancellationDetails.refundBaseAmount),
+            deductionPercent: toNumberValue(order.cancellationDetails.deductionPercent),
+            deductionAmount: toNumberValue(order.cancellationDetails.deductionAmount),
+            refundAmount: toNumberValue(order.cancellationDetails.refundAmount),
+            policyLabel: toStringValue(order.cancellationDetails.policyLabel),
+            hoursUntilStart:
+              order.cancellationDetails.hoursUntilStart === null ||
+              order.cancellationDetails.hoursUntilStart === undefined
+                ? null
+                : toNumberValue(order.cancellationDetails.hoursUntilStart),
+            processingStatus: toStringValue(order.cancellationDetails.processingStatus, "not_required"),
+            paymentRefundId: toStringValue(order.cancellationDetails.paymentRefundId),
+            paymentRefundStatus: toStringValue(order.cancellationDetails.paymentRefundStatus),
+            paymentRefundError: toStringValue(order.cancellationDetails.paymentRefundError),
+            processedAt: order.cancellationDetails.processedAt
+              ? toIsoDate(order.cancellationDetails.processedAt)
+              : "",
+            cancelledAt: order.cancellationDetails.cancelledAt
+              ? toIsoDate(order.cancellationDetails.cancelledAt)
+              : "",
+            cancelledByRole: toStringValue(order.cancellationDetails.cancelledByRole),
+          }
+        : null,
+      missedPackageDetails: isRecord(order.missedPackageDetails)
+        ? {
+            markedAt: order.missedPackageDetails.markedAt ? toIsoDate(order.missedPackageDetails.markedAt) : "",
+            markedByRole: toStringValue(order.missedPackageDetails.markedByRole),
+            reason: toStringValue(order.missedPackageDetails.reason),
+            refundBaseAmount: toNumberValue(order.missedPackageDetails.refundBaseAmount),
+            waiverPercent: toNumberValue(order.missedPackageDetails.waiverPercent),
+            waiverAmount: toNumberValue(order.missedPackageDetails.waiverAmount),
+            refundAmount: toNumberValue(order.missedPackageDetails.refundAmount),
+            refundProcessingStatus: toStringValue(order.missedPackageDetails.refundProcessingStatus, "not_started"),
+            paymentRefundId: toStringValue(order.missedPackageDetails.paymentRefundId),
+            paymentRefundStatus: toStringValue(order.missedPackageDetails.paymentRefundStatus),
+            paymentRefundError: toStringValue(order.missedPackageDetails.paymentRefundError),
+            refundTriggeredAt: order.missedPackageDetails.refundTriggeredAt
+              ? toIsoDate(order.missedPackageDetails.refundTriggeredAt)
+              : "",
+            refundTriggeredByRole: toStringValue(order.missedPackageDetails.refundTriggeredByRole),
+            refundedAt: order.missedPackageDetails.refundedAt
+              ? toIsoDate(order.missedPackageDetails.refundedAt)
+              : "",
+          }
+        : null,
+      reports: visibleReports,
       adjustmentPendingAmount: toNumberValue(order.adjustmentPendingAmount),
       adjustmentRefundAmount: toNumberValue(order.adjustmentRefundAmount),
       adjustmentStatus: toStringValue(order.adjustmentStatus, "none"),

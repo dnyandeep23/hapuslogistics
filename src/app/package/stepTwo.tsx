@@ -87,31 +87,30 @@ export function PackageSizeSelector({
   };
 
   return (
-    <div className="package-panel-soft flex w-full flex-col items-start overflow-hidden rounded-[1.6rem] p-4 sm:p-5 lg:w-1/3">
-      <label className="mb-3 text-sm font-medium text-white/85">
+    <div className="package-panel-soft flex w-full flex-col items-start overflow-hidden rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 lg:w-1/3">
+      <label className="mb-2.5 md:mb-3 text-[13px] md:text-sm font-medium text-white/85">
         Select package size <span className="text-red-400">*</span>
       </label>
 
       <div className="flex w-full items-center justify-center gap-6 sm:gap-12">
-        <button type="button" onClick={handlePrev} className="package-input h-11 w-11 rounded-full text-sm font-bold">
+        <button type="button" onClick={handlePrev} className="package-input h-9 w-9 md:h-11 md:w-11 rounded-full text-xs md:text-sm font-bold">
           ◀
         </button>
 
         <div
-          className="my-6 scale-3d transition-all ease-in-out duration-700"
+          className="my-4 md:my-6 scale-3d transition-all ease-in-out duration-700"
           style={{
-            fontSize: "120px",
             transform: `scale(${safePackageSizes[selectedIndex]?.scale ?? 1})`,
           }}>
 
           <Icon
             icon="noto:package"
-            className="h-24 w-24 text-[#d2a679] transition-transform duration-1000"
+            className="h-16 w-16 md:h-24 md:w-24 text-[#d2a679] transition-transform duration-1000"
 
           />
         </div>
 
-        <button type="button" onClick={handleNext} className="package-input h-11 w-11 rounded-full text-sm font-bold">
+        <button type="button" onClick={handleNext} className="package-input h-9 w-9 md:h-11 md:w-11 rounded-full text-xs md:text-sm font-bold">
           ▶
         </button>
       </div>
@@ -122,8 +121,8 @@ export function PackageSizeSelector({
           className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-700
           ${direction === "right" ? "animate-slideInRight" : "animate-slideInLeft"}`}
         >
-          <p className="font-semibold text-[#F6FF6A]">{safePackageSizes[selectedIndex]?.label ?? "--"}</p>
-          <p className="text-sm text-white/60">{safePackageSizes[selectedIndex]?.desc ?? "--"}</p>
+          <p className="font-semibold text-sm md:text-base text-[#F6FF6A]">{safePackageSizes[selectedIndex]?.label ?? "--"}</p>
+          <p className="text-xs md:text-sm text-white/60">{safePackageSizes[selectedIndex]?.desc ?? "--"}</p>
         </div>
       </div>
     </div>
@@ -202,41 +201,41 @@ export default function StepTwo({
   };
 
   return (
-    <div className="space-y-6 text-[#f7fac7] sm:space-y-8">
+    <div className="space-y-5 text-[#f7fac7] sm:space-y-8">
       <div className="max-w-2xl text-[#F6FF6A]">
-        <h2 className="text-2xl font-bold sm:text-3xl">Package Details</h2>
-        <p className="mt-2 text-sm leading-6 text-white/68 sm:text-base">Provide details of the package you want to send.</p>
+        <h2 className="text-xl font-bold sm:text-3xl">Package Details</h2>
+        <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">Provide details of the package you want to send.</p>
       </div>
 
-      <div className="package-panel rounded-[1.6rem] p-4 sm:p-5">
-        <label className="mb-2 block text-sm font-medium text-white/85">Package Name (optional)</label>
+      <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
+        <label className="mb-1.5 md:mb-2 block text-[13px] md:text-sm font-medium text-white/85">Package Name (optional)</label>
         <input
           placeholder="Package Name"
-          className="package-input w-full rounded-2xl px-4 py-3"
+          className="package-input text-xs md:text-sm w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3"
           value={currentPackage.packageName}
           onChange={(e) => setCurrentPackage({ ...currentPackage, packageName: e.target.value })}
         />
         {errors.packageName && <p className="mt-2 text-sm text-red-400">{errors.packageName}</p>}
       </div>
 
-      <div className="package-panel rounded-[1.6rem] p-4 sm:p-5">
-        <label className="mb-3 block text-sm font-medium text-white/85">
+      <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
+        <label className="mb-2 md:mb-3 block text-[13px] md:text-sm font-medium text-white/85">
           Select package type <span className="text-red-400">*</span>
         </label>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           {safePackageTypes.map((pkg) => (
             <button
               key={pkg.id}
               type="button"
               onClick={() => setCurrentPackage({ ...currentPackage, packageType: pkg.label })}
-              className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition
+              className={`flex items-center gap-1.5 md:gap-2 rounded-xl md:rounded-2xl border px-3 md:px-4 py-2 text-xs md:text-sm transition
               ${currentPackage.packageType === pkg.label
                   ? "border-[#F6FF6A]/40 bg-[#F6FF6A] text-black shadow-[0_18px_32px_rgba(205,214,69,0.18)]"
                   : "border-white/15 bg-white/6 text-white/80 hover:bg-white/10"
                 }`}
             >
-              <Icon icon={pkg.icon} className="text-xl" />
+              <Icon icon={pkg.icon} className="text-lg md:text-xl" />
               {pkg.label}
             </button>
           ))}
@@ -245,10 +244,10 @@ export default function StepTwo({
       </div>
 
       {isOtherCategorySelected && (
-        <div className="package-panel rounded-[1.6rem] p-4 sm:p-5">
-          <label className="block text-sm font-medium text-white/85">Specify (Other type)</label>
+        <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
+          <label className="block text-[13px] md:text-sm font-medium text-white/85">Specify (Other type)</label>
           <input
-            className="package-input mt-3 w-full rounded-2xl px-4 py-3"
+            className="package-input text-xs md:text-sm mt-2 md:mt-3 w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3"
             value={currentPackage.otherPackageType}
             onChange={(e) =>
               setCurrentPackage({
@@ -278,16 +277,16 @@ export default function StepTwo({
           packageSizes={safePackageSizes}
         />
 
-        <div className="package-panel-soft flex w-full flex-col gap-5 rounded-[1.6rem] p-4 sm:p-5 xl:w-1/3">
+        <div className="package-panel-soft flex w-full flex-col gap-3.5 md:gap-5 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 xl:w-1/3">
           <div>
-            <label className="text-sm font-medium text-white/85">
+            <label className="text-[13px] md:text-sm font-medium text-white/85">
               Enter weight <span className="text-red-400 ">*</span>
             </label>
             <input
               type="number"
               min={0}
               max={100}
-              className={`package-input mt-2 w-full rounded-2xl px-4 py-3 ${errors.packageWeight ? "border-red-500" : ""}`}
+              className={`package-input text-xs md:text-sm mt-2 w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3 ${errors.packageWeight ? "border-red-500" : ""}`}
               value={currentPackage.packageWeight}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -307,7 +306,7 @@ export default function StepTwo({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-white/85">
+            <label className="text-[13px] md:text-sm font-medium text-white/85">
               Select quantities <span className="text-red-400 ">*</span>
             </label>
             <div
@@ -354,7 +353,7 @@ export default function StepTwo({
                 </div>
               </div>
             )}
-            <label className="text-sm font-medium text-white/85">
+            <label className="text-[13px] md:text-sm font-medium text-white/85">
               Pickup Date <span className="text-red-400 ">*</span>
             </label>
             <CustomDatePicker
@@ -372,8 +371,8 @@ export default function StepTwo({
           </div>
         </div>
 
-        <div className="package-panel-soft flex w-full flex-col rounded-[1.6rem] p-4 sm:p-5 xl:w-1/3">
-          <label className="mb-3 text-sm font-medium text-white/85">
+        <div className="package-panel-soft flex w-full flex-col rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 xl:w-1/3">
+          <label className="mb-1.5 md:mb-3 text-[13px] md:text-sm font-medium text-white/85">
             Upload package image <span className="text-red-400">*</span>
           </label>
 
@@ -398,28 +397,28 @@ export default function StepTwo({
         </div>
       </div>
 
-      <div className="mt-10 flex flex-col justify-end gap-3 sm:flex-row">
+      <div className="mt-8 md:mt-10 flex flex-col justify-end gap-3 sm:flex-row">
         <button
           type="button"
           onClick={handleClearForm}
-          className="package-panel-soft flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl py-3 font-bold text-white/70 transition hover:bg-white/10 sm:w-56"
+          className="package-panel-soft flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl md:rounded-2xl py-2 md:py-3 text-xs md:text-base font-bold text-white/70 transition hover:bg-white/10 sm:w-56"
         >
-          <Icon icon="mdi:close" /> Clear Form
+          <Icon icon="mdi:close" className="text-lg md:text-xl" /> Clear Form
         </button>
 
         <button
           type="button"
           onClick={handleAddToCartClick}
           disabled={isUploadingPackageImage}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#CDD645] py-3 font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] disabled:cursor-not-allowed disabled:opacity-50 sm:w-56"
+          className="flex w-full items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-[#CDD645] py-2 md:py-3 text-xs md:text-base font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] disabled:cursor-not-allowed disabled:opacity-50 sm:w-56"
         >
           {editIndex !== null ? (
             <>
-              <Icon icon="mdi:cart-check" /> Update Cart
+              <Icon icon="mdi:cart-check" className="text-lg md:text-xl" /> Update Cart
             </>
           ) : (
             <>
-              <Icon icon="mdi:cart-plus" /> Drop into Cart
+              <Icon icon="mdi:cart-plus" className="text-lg md:text-xl" /> Drop into Cart
             </>
           )}
         </button>

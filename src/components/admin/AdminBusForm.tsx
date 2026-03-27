@@ -45,6 +45,17 @@ type AdminLocation = {
   };
 };
 
+type BusOfficeForm = {
+  officeName: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  phone: string;
+  latitude: string;
+  longitude: string;
+};
+
 type RoutePointForm = {
   locationId: string;
   pointCategory: "pickup" | "drop";
@@ -93,6 +104,7 @@ type AdminBus = {
   busName: string;
   busNumber: string;
   busImages: string[];
+  offices?: BusOfficeForm[];
   capacity: number;
   autoRenewCapacity?: boolean;
   availability?: { date?: string }[];
@@ -156,6 +168,49 @@ const makeEmptyInlineLocationForm = () => ({
   longitude: "",
 });
 
+const makeDefaultBusOffice = (): BusOfficeForm => ({
+  officeName: "",
+  address: "",
+  city: "",
+  state: "",
+  zip: "",
+  phone: "",
+  latitude: "",
+  longitude: "",
+});
+
+const normalizeBusOfficeValue = (value: unknown): BusOfficeForm => {
+  if (!value || typeof value !== "object") {
+    return makeDefaultBusOffice();
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    officeName: String(record.officeName ?? record.name ?? "").trim(),
+    address: String(record.address ?? "").trim(),
+    city: String(record.city ?? "").trim(),
+    state: String(record.state ?? "").trim(),
+    zip: String(record.zip ?? "").trim(),
+    phone: String(record.phone ?? record.contactNumber ?? "").trim(),
+    latitude:
+      record.latitude === null || record.latitude === undefined || record.latitude === ""
+        ? ""
+        : String(record.latitude).trim(),
+    longitude:
+      record.longitude === null || record.longitude === undefined || record.longitude === ""
+        ? ""
+        : String(record.longitude).trim(),
+  };
+};
+
+const ensureMinimumBusOffices = (offices: BusOfficeForm[] = []): BusOfficeForm[] => {
+  const normalizedOffices = offices.map((office) => normalizeBusOfficeValue(office));
+  while (normalizedOffices.length < 1) {
+    normalizedOffices.push(makeDefaultBusOffice());
+  }
+  return normalizedOffices;
+};
+
 const getDefaultPricingRange = () => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -202,6 +257,9 @@ export default function AdminBusForm({
   const [busNumber, setBusNumber] = useState("");
   const [capacity, setCapacity] = useState(40);
   const [autoRenewCapacity, setAutoRenewCapacity] = useState(false);
+  const [busOffices, setBusOffices] = useState<BusOfficeForm[]>([
+    makeDefaultBusOffice(),
+  ]);
   const [materialCategories, setMaterialCategories] = useState<PackageCategoryConfig[]>(
     defaultActiveMaterialCategories,
   );
@@ -268,6 +326,7 @@ export default function AdminBusForm({
         busNumber,
         capacity,
         autoRenewCapacity,
+        busOffices,
         availabilityStartDate,
         availabilityEndDate,
         routePoints,
@@ -288,6 +347,7 @@ export default function AdminBusForm({
       busNumber,
       capacity,
       editingBus?.busImages,
+      busOffices,
       routeConfigs,
       routePoints,
     ],
@@ -305,17 +365,17 @@ export default function AdminBusForm({
   ];
 
   const pageShellClass =
-    "relative w-full min-w-0 max-w-full overflow-x-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(245,246,238,0.12),rgba(18,24,14,0.18)_38%,rgba(14,19,11,0.24))] p-4 text-white shadow-[0_30px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-6 lg:p-8";
+    "relative w-full min-w-0 max-w-full rounded-[2rem] border border-white/5 bg-[#141A14] p-4 text-white shadow-2xl backdrop-blur-xl sm:p-6 lg:p-8";
   const glassCardClass =
-    "rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] shadow-[0_18px_40px_rgba(0,0,0,0.14)]";
+    "rounded-3xl border border-white/5 bg-[#1A221A] shadow-xl";
   const darkInsetCardClass =
-    "rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(9,12,10,0.28),rgba(9,12,10,0.16))]";
+    "rounded-[1.35rem] border border-white/5 bg-black/40";
   const fieldInputClass =
-    "dashboard-input mt-2 w-full rounded-xl px-3 py-2.5 transition focus:border-[#d5e400]/55";
+    "dashboard-input mt-2 w-full rounded-xl bg-[#141A14] px-4 py-3 transition border border-white/10 focus:border-[#D5E400]/50 focus:shadow-[0_0_15px_rgba(213,228,0,0.1)] outline-none";
   const ghostButtonClass =
-    "inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white";
+    "inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white";
   const primaryButtonClass =
-    "inline-flex items-center gap-2 rounded-full border border-[#d5e400]/25 bg-[#d5e400]/12 px-5 py-2.5 text-sm font-semibold text-[#F2FF8F] transition hover:bg-[#d5e400]/18 disabled:opacity-60";
+    "inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#D5E400] to-[#E4E67A] px-6 py-2.5 text-sm font-bold text-black shadow-lg transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none";
 
   const busImagePreviews = useMemo(
     () =>
@@ -566,6 +626,7 @@ export default function AdminBusForm({
     setBusNumber(formatBusNumberInput(bus.busNumber ?? ""));
     setCapacity(Number(bus.capacity) || 40);
     setAutoRenewCapacity(Boolean(bus.autoRenewCapacity));
+    setBusOffices(ensureMinimumBusOffices(Array.isArray(bus.offices) ? bus.offices : []));
 
     const availabilityDates = Array.isArray(bus.availability)
       ? bus.availability
@@ -880,6 +941,18 @@ export default function AdminBusForm({
     setRoutePoints((prev) =>
       prev.map((point, pointIndex) => (pointIndex === index ? updater(point) : point)),
     );
+  };
+
+  const updateBusOffice = (index: number, updater: (current: BusOfficeForm) => BusOfficeForm) => {
+    setBusOffices((prev) => prev.map((office, officeIndex) => (officeIndex === index ? updater(office) : office)));
+  };
+
+  const addBusOffice = () => {
+    setBusOffices((prev) => [...prev, makeDefaultBusOffice()]);
+  };
+
+  const removeBusOffice = (index: number) => {
+    setBusOffices((prev) => (prev.length <= 1 ? prev : prev.filter((_, officeIndex) => officeIndex !== index)));
   };
 
   const reorderRoutePoints = useCallback((sourceIndex: number, targetIndex: number) => {
@@ -1361,10 +1434,31 @@ export default function AdminBusForm({
     }
   };
 
+  const validateBusOffices = (fieldErrors: AdminBusFieldErrors) => {
+    if (busOffices.length < 1) {
+      fieldErrors.busOffices = "Add at least 1 bus office.";
+      return;
+    }
+
+    busOffices.forEach((office, index) => {
+      const prefix = `busOffice.${index}`;
+      if (!office.officeName.trim()) fieldErrors[`${prefix}.officeName`] = "Office name is required.";
+      if (!office.city.trim()) fieldErrors[`${prefix}.city`] = "City is required.";
+      if (!office.state.trim()) fieldErrors[`${prefix}.state`] = "State is required.";
+      if (!office.phone.trim()) fieldErrors[`${prefix}.phone`] = "Phone number is required.";
+      if (!office.latitude.trim() || !office.longitude.trim()) {
+        fieldErrors[`${prefix}.coordinates`] = "Map location is required.";
+      }
+    });
+  };
+
   const handleNextStep = () => {
     const fieldErrors: AdminBusFieldErrors = {};
 
-    if (currentStep === 1) validateBusBasics(fieldErrors);
+    if (currentStep === 1) {
+      validateBusBasics(fieldErrors);
+      validateBusOffices(fieldErrors);
+    }
     if (currentStep === 2) {
       validateRoutePoints(fieldErrors);
       if (Object.keys(fieldErrors).length === 0) {
@@ -1395,6 +1489,7 @@ export default function AdminBusForm({
 
     if (step === 1) {
       validateBusBasics(fieldErrors);
+      validateBusOffices(fieldErrors);
     }
     if (step === 2) {
       validateRoutePoints(fieldErrors);
@@ -1463,6 +1558,7 @@ export default function AdminBusForm({
     setAdminBusMessage("");
     const fieldErrors: AdminBusFieldErrors = {};
     validateBusBasics(fieldErrors);
+    validateBusOffices(fieldErrors);
     validateRoutePoints(fieldErrors);
     validateRoutePairs(fieldErrors);
     validateBusImage(fieldErrors);
@@ -1483,6 +1579,21 @@ export default function AdminBusForm({
       formData.append("autoRenewCapacity", String(autoRenewCapacity));
       formData.append("availabilityStartDate", availabilityStartDate);
       formData.append("availabilityEndDate", availabilityEndDate);
+      formData.append(
+        "busOffices",
+        JSON.stringify(
+          busOffices.map((office) => ({
+            officeName: office.officeName.trim(),
+            address: office.address.trim(),
+            city: office.city.trim(),
+            state: office.state.trim(),
+            zip: office.zip.trim(),
+            phone: office.phone.trim(),
+            latitude: office.latitude.trim() ? Number(office.latitude) : null,
+            longitude: office.longitude.trim() ? Number(office.longitude) : null,
+          })),
+        ),
+      );
 
       const serializedRoutePairs = JSON.stringify(
         routeConfigs.map((route) => ({
@@ -1614,40 +1725,53 @@ export default function AdminBusForm({
         </button>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4">
-        {formSteps.map((step) => {
+      <div className="mt-8 flex flex-wrap gap-3 mb-6">
+        {formSteps.map((step, index) => {
           const active = currentStep === step.id;
           const completed = currentStep > step.id;
           return (
-            <button
-              type="button"
-              key={step.id}
-              onClick={() => handleStepChipClick(step.id)}
-              className={`rounded-[1.35rem] border px-3 py-3 transition ${
-                active
-                  ? "border-[#d5e400]/25 bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
-                  : completed
-                  ? "border-[#d5e400]/18 bg-[linear-gradient(135deg,rgba(213,228,0,0.1),rgba(255,255,255,0.03))]"
-                  : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]"
-              } ${active ? "cursor-default" : "cursor-pointer hover:border-[#d5e400]/20 hover:bg-white/8"}`}
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
+            <React.Fragment key={step.id}>
+              <button
+                type="button"
+                onClick={() => handleStepChipClick(step.id)}
+                className={`group relative flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all duration-300 ${
+                  active
+                    ? "border-[#D5E400]/50 bg-[#D5E400]/10 shadow-[0_0_20px_rgba(213,228,0,0.15)] scale-[1.02]"
+                    : completed
+                    ? "border-[#D5E400]/20 bg-[#D5E400]/5 hover:bg-[#D5E400]/10"
+                    : "border-white/5 bg-white/5 hover:bg-white/10 opacity-70"
+                } ${active ? "cursor-default" : "cursor-pointer"}`}
+              >
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-300 ${
                     completed
-                      ? "bg-[#d5e400] text-black"
+                      ? "bg-gradient-to-br from-[#D5E400] to-[#E4E67A] text-black shadow-lg"
                       : active
-                      ? "bg-[#d5e400]/18 text-[#F2FF8F]"
-                      : "bg-white/10 text-white/70"
+                      ? "bg-[#D5E400]/20 text-[#D5E400]"
+                      : "bg-black/40 text-white/50"
                   }`}
                 >
-                  {completed ? <Icon icon="solar:check-circle-bold" /> : <Icon icon={step.icon} />}
-                </span>
-                <p className={`text-xs font-semibold sm:text-sm ${active || completed ? "text-white" : "text-white/65"}`}>
-                  {step.label}
-                </p>
-              </div>
-            </button>
+                  {completed ? (
+                    <Icon icon="solar:check-read-bold-duotone" className="text-lg" />
+                  ) : (
+                    <Icon icon={step.icon} className="text-lg" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className={`text-[10px] uppercase tracking-wider font-bold ${active || completed ? "text-[#D5E400]/70" : "text-white/40"}`}>
+                    Step {step.id}
+                  </p>
+                  <p className={`text-sm font-semibold ${active ? "text-white" : completed ? "text-white/90" : "text-white/60"}`}>
+                    {step.label}
+                  </p>
+                </div>
+              </button>
+              {index < formSteps.length - 1 && (
+                <div className="hidden items-center justify-center sm:flex">
+                  <div className={`h-px w-6 ${completed ? "bg-[#D5E400]/50" : "bg-white/10"}`} />
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
       </div>
@@ -1747,6 +1871,257 @@ export default function AdminBusForm({
               <p className="mt-1 text-xs text-white/60">
                 Keeps the selected default capacity for each new scheduling cycle.
               </p>
+            </div>
+
+            <div className={`md:col-span-2 ${glassCardClass} p-4`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#E5F38E]">Bus Offices</p>
+                  <p className="mt-1 text-xs text-white/65">
+                    Add at least 1 office and pin it on the map so drop exceptions can be routed to the nearest branch.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addBusOffice}
+                  className={primaryButtonClass}
+                >
+                  <Icon icon="solar:add-circle-bold" />
+                  Add Office
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {busOffices.map((office, officeIndex) => (
+                  <div
+                    key={`bus-office-${officeIndex}`}
+                    className={`${darkInsetCardClass} p-4`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#F2FF8F]">
+                        Office {officeIndex + 1}
+                      </p>
+                      {busOffices.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeBusOffice(officeIndex)}
+                          className="inline-flex items-center gap-1 rounded-full border border-red-300/35 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-200 transition hover:bg-red-500/20"
+                        >
+                          <Icon icon="solar:trash-bin-trash-outline" />
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <label className="text-sm text-white/80">
+                        Office Name <span className="text-red-400">*</span>
+                        <input
+                          value={office.officeName}
+                          onChange={(event) =>
+                            updateBusOffice(officeIndex, (current) => ({
+                              ...current,
+                              officeName: event.target.value,
+                            }))
+                          }
+                          className={`${fieldInputClass} ${
+                            adminBusFieldErrors[`busOffice.${officeIndex}.officeName`]
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          placeholder="Main Office"
+                        />
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.officeName`] && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.officeName`]}
+                          </p>
+                        )}
+                      </label>
+
+                      <label className="text-sm text-white/80">
+                        Phone <span className="text-red-400">*</span>
+                        <input
+                          value={office.phone}
+                          onChange={(event) =>
+                            updateBusOffice(officeIndex, (current) => ({
+                              ...current,
+                              phone: event.target.value,
+                            }))
+                          }
+                          className={`${fieldInputClass} ${
+                            adminBusFieldErrors[`busOffice.${officeIndex}.phone`]
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          placeholder="+91 9876543210"
+                        />
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.phone`] && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.phone`]}
+                          </p>
+                        )}
+                      </label>
+
+                      <label className="text-sm text-white/80 md:col-span-2">
+                        Address
+                        <input
+                          value={office.address}
+                          onChange={(event) =>
+                            updateBusOffice(officeIndex, (current) => ({
+                              ...current,
+                              address: event.target.value,
+                            }))
+                          }
+                          className={`${fieldInputClass} ${
+                            adminBusFieldErrors[`busOffice.${officeIndex}.address`]
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          placeholder="Street, area, landmark"
+                        />
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.address`] && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.address`]}
+                          </p>
+                        )}
+                      </label>
+
+                      <label className="text-sm text-white/80">
+                        City <span className="text-red-400">*</span>
+                        <input
+                          value={office.city}
+                          onChange={(event) =>
+                            updateBusOffice(officeIndex, (current) => ({
+                              ...current,
+                              city: event.target.value,
+                            }))
+                          }
+                          className={`${fieldInputClass} ${
+                            adminBusFieldErrors[`busOffice.${officeIndex}.city`]
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          placeholder="City"
+                        />
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.city`] && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.city`]}
+                          </p>
+                        )}
+                      </label>
+
+                      <label className="text-sm text-white/80">
+                        State <span className="text-red-400">*</span>
+                        <input
+                          value={office.state}
+                          onChange={(event) =>
+                            updateBusOffice(officeIndex, (current) => ({
+                              ...current,
+                              state: event.target.value,
+                            }))
+                          }
+                          className={`${fieldInputClass} ${
+                            adminBusFieldErrors[`busOffice.${officeIndex}.state`]
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          placeholder="State"
+                        />
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.state`] && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.state`]}
+                          </p>
+                        )}
+                      </label>
+
+                      <label className="text-sm text-white/80">
+                        ZIP
+                        <input
+                          value={office.zip}
+                          onChange={(event) =>
+                            updateBusOffice(officeIndex, (current) => ({
+                              ...current,
+                              zip: event.target.value,
+                            }))
+                          }
+                          className={`${fieldInputClass} ${
+                            adminBusFieldErrors[`busOffice.${officeIndex}.zip`]
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          placeholder="ZIP"
+                        />
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.zip`] && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.zip`]}
+                          </p>
+                        )}
+                      </label>
+
+                      <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/10 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-[#E5F38E]">Office Map Location</p>
+                            <p className="mt-1 text-xs text-white/60">
+                              Pin the office on the map so operator drop reports can auto-select the nearest office.
+                            </p>
+                          </div>
+                          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70">
+                            {office.latitude && office.longitude
+                              ? `${Number(office.latitude).toFixed(4)}, ${Number(office.longitude).toFixed(4)}`
+                              : "No pin selected"}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 overflow-visible rounded-2xl border border-white/10 relative z-10">
+                          <OpenStreetMapPicker
+                            value={
+                              office.latitude && office.longitude
+                                ? {
+                                    latitude: Number(office.latitude),
+                                    longitude: Number(office.longitude),
+                                  }
+                                : null
+                            }
+                            searchQuery={[office.officeName, office.address, office.city, office.state]
+                              .filter(Boolean)
+                              .join(" ")}
+                            heightClassName="h-56"
+                            onChange={({ latitude, longitude }) =>
+                              updateBusOffice(officeIndex, (current) => ({
+                                ...current,
+                                latitude: latitude.toFixed(6),
+                                longitude: longitude.toFixed(6),
+                              }))
+                            }
+                            onLocationResolved={(location) =>
+                              updateBusOffice(officeIndex, (current) => ({
+                                ...current,
+                                address: current.address || location.addressLine || current.address,
+                                city: current.city || location.city || current.city,
+                                state: current.state || location.state || current.state,
+                                zip: current.zip || location.zip || current.zip,
+                                latitude: Number(location.latitude).toFixed(6),
+                                longitude: Number(location.longitude).toFixed(6),
+                              }))
+                            }
+                          />
+                        </div>
+
+                        {adminBusFieldErrors[`busOffice.${officeIndex}.coordinates`] && (
+                          <p className="mt-2 text-xs text-red-400">
+                            {adminBusFieldErrors[`busOffice.${officeIndex}.coordinates`]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {adminBusFieldErrors.busOffices && (
+                <p className="mt-3 text-xs text-red-400">{adminBusFieldErrors.busOffices}</p>
+              )}
             </div>
           </div>
         )}
@@ -2316,6 +2691,24 @@ export default function AdminBusForm({
                 <div className="flex items-center justify-between">
                   <span>Route segments</span>
                   <span className="font-medium text-white">{routeConfigs.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Bus offices</span>
+                  <span className="font-medium text-white">{busOffices.length}</span>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-white/70">
+                  <p className="font-semibold text-[#E5F38E]">Office list</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {busOffices.map((office, index) => (
+                      <span
+                        key={`office-summary-${index}`}
+                        className="rounded-full border border-white/12 bg-white/5 px-2.5 py-1 text-[11px] text-white/80"
+                      >
+                        {office.officeName || `Office ${index + 1}`} {office.city ? `- ${office.city}` : ""}
+                        {office.latitude && office.longitude ? " · mapped" : " · no map pin"}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Distance estimate</span>

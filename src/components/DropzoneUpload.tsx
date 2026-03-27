@@ -50,14 +50,14 @@ export default function DropzoneUpload({
         <>
             <div
                 {...getRootProps()}
-                className={`package-panel-soft min-h-[220px] rounded-[1.5rem] border-2 border-dashed p-3 transition
+                className={`package-panel-soft min-h-[180px] md:min-h-[220px] rounded-[1.3rem] sm:rounded-[1.5rem] border-2 border-dashed p-2.5 sm:p-3 transition
         ${isDragActive ? "border-[#CDD645] bg-[#d5e400]/10" : "border-white/18"}
         `}
             >
                 <input {...getInputProps()} />
 
                 {previewUrl ? (
-                    <div className="relative h-[220px] w-full overflow-hidden rounded-[1.1rem] sm:h-[260px]">
+                    <div className="relative h-[180px] sm:h-[260px] w-full overflow-hidden rounded-[1.1rem]">
                         <Image
                             src={previewUrl}
                             alt="Package Preview"
@@ -83,15 +83,15 @@ export default function DropzoneUpload({
                         </button>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d5e400]/14 text-[#F6FF6A]">
-                            <Icon icon="solar:gallery-add-bold-duotone" className="text-[1.8rem]" />
+                    <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 px-3 py-6 sm:px-4 sm:py-8 text-center">
+                        <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-[#d5e400]/14 text-[#F6FF6A]">
+                            <Icon icon="solar:gallery-add-bold-duotone" className="text-[1.5rem] sm:text-[1.8rem]" />
                         </div>
                         <div>
-                            <p className="text-sm font-semibold text-[#F6FF6A]">
+                            <p className="text-[13px] sm:text-sm font-semibold text-[#F6FF6A]">
                                 {isDragActive ? "Drop image here" : "Upload package image"}
                             </p>
-                            <p className="mt-1 text-sm text-white/60">
+                            <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-sm text-white/60">
                                 Tap to browse or drag and drop on desktop.
                             </p>
                         </div>

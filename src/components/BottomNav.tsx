@@ -119,8 +119,8 @@ export default function BottomNav({ menus }: Props) {
                                     aria-current={active ? "page" : undefined}
                                     className={`
                   group/item relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl py-2
-                  transition-all duration-300
-                  ${active ? "bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] text-[#F2FF8F] shadow-[0_8px_22px_rgba(0,0,0,0.14)]" : "text-[#C5D2AC] hover:bg-white/5 hover:text-[#F2FF8F]"}
+                  transition-all duration-300 transform active:scale-95
+                  ${active ? "bg-[linear-gradient(135deg,rgba(213,228,0,0.2),rgba(255,255,255,0.05))] text-[#F6FF6A] shadow-[0_8px_22px_rgba(0,0,0,0.2)]" : "text-[#9AA685] hover:bg-white/5 hover:text-[#D5E400]"}
                 `}
                                 >
                                     <span className={`absolute inset-x-4 top-1 h-px rounded-full transition-opacity ${active ? "bg-[#d5e400]/70 opacity-100" : "bg-transparent opacity-0"}`} />
@@ -136,12 +136,12 @@ export default function BottomNav({ menus }: Props) {
                             <button
                                 type="button"
                                 onClick={() => setIsMoreOpen(true)}
-                                className={`group/item relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl py-2 transition-all duration-300 ${moreActive ? "bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] text-[#F2FF8F] shadow-[0_8px_22px_rgba(0,0,0,0.14)]" : "text-[#C5D2AC] hover:bg-white/5 hover:text-[#F2FF8F]"}`}>
-                                <span className={`absolute inset-x-4 top-1 h-px rounded-full transition-opacity ${moreActive ? "bg-[#d5e400]/70 opacity-100" : "bg-transparent opacity-0"}`} />
-                                <span className={`relative flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-300 ${moreActive ? "bg-[#d5e400]/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
+                                className={`group/item relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl py-2 transition-all duration-300 transform active:scale-95 ${moreActive ? "bg-[linear-gradient(135deg,rgba(213,228,0,0.2),rgba(255,255,255,0.08))] text-[#F6FF6A] shadow-[0_8px_22px_rgba(0,0,0,0.2)]" : "text-[#9AA685] hover:bg-white/5 hover:text-[#D5E400]"}`}>
+                                <span className={`absolute inset-x-4 top-1 h-px rounded-full transition-opacity ${moreActive ? "bg-[#d5e400]/80 opacity-100 shadow-[0_0_10px_#d5e400]" : "bg-transparent opacity-0"}`} />
+                                <span className={`relative flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-300 ${moreActive ? "bg-[#d5e400]/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
                                     <Icon icon="mdi:dots-horizontal-circle-outline" className="text-xl" />
                                 </span>
-                                <span className="mt-1 text-[11px] font-medium tracking-tight">More</span>
+                                <span className="mt-1 text-[11px] font-semibold tracking-wide">More</span>
                             </button>
                         ) : (
                             <button

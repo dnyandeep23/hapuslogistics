@@ -11,7 +11,7 @@ export async function POST() {
 
     return NextResponse.json(
       {
-        message: `Cleanup completed. Restored ${bookingResult.restored} expired booking session(s) and deleted ${orderResult.deletedOrders} expired order(s).`,
+        message: `Cleanup completed. Restored ${bookingResult.restored} expired booking session(s), auto-marked ${orderResult.autoMarkedMissedPackages} missed package order(s), and deleted ${orderResult.deletedOrders} expired order(s).`,
         bookingSessions: bookingResult,
         orders: orderResult,
       },

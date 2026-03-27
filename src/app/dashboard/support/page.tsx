@@ -305,18 +305,12 @@ export default function SupportPage() {
 
   return (
     <div className="relative mx-auto w-full max-w-7xl pb-8">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-16 top-0 h-64 w-64 rounded-full bg-lime-400/10 blur-3xl" />
-        <div className="absolute right-[-2rem] top-12 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
-      </div>
+
 
       <div className="relative space-y-6">
         <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(140deg,rgba(16,22,17,0.96),rgba(27,39,24,0.88),rgba(13,19,15,0.98))] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.28)] backdrop-blur sm:p-8">
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="relative">
-              <div className={`pointer-events-none absolute inset-x-0 top-0 h-56 rounded-[32px] bg-gradient-to-r ${roleAccents[role]} blur-3xl`} />
-
               <div className="relative">
                 <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-lime-100">
                   <Icon icon="solar:headphones-round-sound-bold-duotone" className="text-base" />

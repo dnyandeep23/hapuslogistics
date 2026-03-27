@@ -56,6 +56,8 @@ export default function PackageCatalogDashboardPage() {
   const [iconSearchResults, setIconSearchResults] = useState<string[]>([]);
   const [iconSearchLoading, setIconSearchLoading] = useState(false);
   const [iconSearchError, setIconSearchError] = useState("");
+  const [activeCategoryModal, setActiveCategoryModal] = useState<{ index: number | null; draft: CategoryDraft } | null>(null);
+  const [activeSizeModal, setActiveSizeModal] = useState<{ index: number | null; draft: SizeDraft } | null>(null);
 
   const activeCategoryCount = useMemo(
     () => categories.filter((entry) => entry.isActive).length,
@@ -123,10 +125,9 @@ export default function PackageCatalogDashboardPage() {
     setSizes((prev) => (prev.length <= 1 ? prev : prev.filter((_, entryIndex) => entryIndex !== index)));
   };
 
-  const openIconPicker = (index: number) => {
-    const seedQuery = String(categories[index]?.name ?? "").trim() || DEFAULT_ICON_SEARCH_QUERY;
-    setIconPickerCategoryIndex(index);
-    setIconSearchQuery(seedQuery);
+  const openIconPicker = (currentIconQuery: string) => {
+    setIconPickerCategoryIndex(1); // just a flag to open the modal
+    setIconSearchQuery(currentIconQuery || DEFAULT_ICON_SEARCH_QUERY);
     setIconSearchResults([]);
     setIconSearchError("");
   };
@@ -140,17 +141,13 @@ export default function PackageCatalogDashboardPage() {
   };
 
   const applyCategoryIcon = (iconName: string) => {
-    if (iconPickerCategoryIndex === null) return;
-    updateCategory(iconPickerCategoryIndex, (current) => ({ ...current, icon: iconName }));
+    if (activeCategoryModal) {
+      setActiveCategoryModal(prev => prev ? { ...prev, draft: { ...prev.draft, icon: iconName } } : prev);
+    }
     closeIconPicker();
   };
 
-  useEffect(() => {
-    if (iconPickerCategoryIndex === null) return;
-    if (!categories[iconPickerCategoryIndex]) {
-      closeIconPicker();
-    }
-  }, [categories, iconPickerCategoryIndex]);
+  // Previous effect relied on checking categories length, removed since index is not tied to active array anymore
 
   useEffect(() => {
     if (!iconPickerOpen) return;
@@ -241,18 +238,18 @@ export default function PackageCatalogDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#E4E67A]">Package Master</h1>
-          <p className="mt-1 text-sm text-white/70">
-            Manage package categories, pricing defaults and size rules used across booking, pricing and bus setup.
+          <h1 className="text-2xl font-bold tracking-tight text-[#E4E67A] xl:text-3xl">Package Catalog</h1>
+          <p className="mt-1.5 text-sm text-white/50">
+            Define package categories, sizes, and base tracking details across the platform.
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="rounded-full border border-[#E4E67A]/40 bg-[#E4E67A]/10 px-2 py-0.5 text-[#f5f7b7]">
-              Active Categories: {activeCategoryCount}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider">
+            <span className="rounded-md bg-[#E4E67A]/10 px-2.5 py-1 font-semibold text-[#f5f7b7]">
+              {activeCategoryCount} Active Categories
             </span>
-            <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-sky-200">
-              Active Sizes: {activeSizeCount}
+            <span className="rounded-md bg-sky-500/10 px-2.5 py-1 font-semibold text-sky-300">
+              {activeSizeCount} Active Sizes
             </span>
           </div>
         </div>
@@ -278,249 +275,131 @@ export default function PackageCatalogDashboardPage() {
       {loading ? (
         <div className="dashboard-surface-soft rounded-2xl p-6 text-sm text-white/70">Loading package master...</div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <section className="dashboard-surface rounded-2xl p-5">
-            <div className="mb-4 flex items-center justify-between">
+        <div className="grid gap-6 xl:grid-cols-1">
+          <section className="dashboard-surface rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-4">
               <div>
-                <h2 className="text-lg font-semibold text-[#E4E67A]">Categories</h2>
-                <p className="text-xs text-white/65">Used for package type selection and route fare inputs.</p>
+                <h2 className="text-xl font-bold text-white/90 tracking-wide">Categories</h2>
+                <p className="mt-1 text-xs text-white/40">Used for package type selection.</p>
               </div>
               <button
                 type="button"
-                onClick={addCategory}
-                className="rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/85 hover:bg-white/10"
+                onClick={() => setActiveCategoryModal({ index: null, draft: makeCategoryDraft(categories.length) })}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#CDD645]/10 border border-[#CDD645]/20 px-4 py-2 text-sm font-bold text-[#E4E67A] transition hover:bg-[#CDD645]/20"
               >
-                + Add Category
+                <Icon icon="solar:folder-with-files-bold-duotone" className="text-lg" />
+                Add Category
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((category, index) => (
-                <div key={`category-${index}`} className="dashboard-surface-soft rounded-xl p-4">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-[11px] text-white/75">
-                      Name
-                      <input
-                        value={category.name}
-                        onChange={(event) =>
-                          updateCategory(index, (current) => ({ ...current, name: event.target.value }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
-
-                    <label className="text-[11px] text-white/75">
-                      Icon (Iconify)
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <div className="dashboard-subsurface flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-base text-white">
-                          <Icon icon={category.icon || "mdi:shape-outline"} />
-                        </div>
-                        <input
-                          value={category.icon}
-                          onChange={(event) =>
-                            updateCategory(index, (current) => ({ ...current, icon: event.target.value }))
-                          }
-                          className="dashboard-input min-w-[180px] flex-1 rounded-md px-2 py-1.5 text-xs"
-                          placeholder="mdi:package-variant"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => openIconPicker(index)}
-                          className="shrink-0 rounded-md border border-[#D5E400]/45 bg-[#D5E400]/10 px-2 py-1.5 text-[11px] font-semibold text-[#EAF489] hover:bg-[#D5E400]/20"
-                        >
-                          Pick
-                        </button>
+                <div key={`category-${index}`} className="group relative flex flex-col justify-between overflow-hidden rounded-[20px] bg-[#141A14]/60 p-5 border border-white/5 shadow-lg transition hover:border-[#CDD645]/30 hover:bg-[#1A221A]/80">
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#CDD645]/10 text-2xl text-[#E4E67A] shadow-[0_0_15px_rgba(205,214,69,0.15)] group-hover:scale-110 transition-transform">
+                        <Icon icon={category.icon || "mdi:shape-outline"} />
                       </div>
-                    </label>
-
-                    <label className="text-[11px] text-white/75">
-                      Default Fare
-                      <input
-                        type="number"
-                        min={0}
-                        value={category.defaultFare}
-                        onChange={(event) =>
-                          updateCategory(index, (current) => ({
-                            ...current,
-                            defaultFare: Math.max(0, Number(event.target.value) || 0),
-                          }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
-
-                    <label className="text-[11px] text-white/75">
-                      Sort Order
-                      <input
-                        type="number"
-                        min={0}
-                        value={category.sortOrder}
-                        onChange={(event) =>
-                          updateCategory(index, (current) => ({
-                            ...current,
-                            sortOrder: Math.max(0, Number(event.target.value) || 0),
-                          }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${category.isActive ? "bg-emerald-400/15 text-emerald-300" : "bg-white/10 text-white/50"
+                        }`}>
+                        <div className={`h-1.5 w-1.5 rounded-full ${category.isActive ? "bg-emerald-400" : "bg-white/40"}`} />
+                        {category.isActive ? "Active" : "Hidden"}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white/90">{category.name || "Unnamed Category"}</h3>
+                    <p className="mt-1 text-sm font-semibold text-[#E4E67A]">
+                      Base Fare: ₹{(category.defaultFare || 0).toFixed(2)}
+                    </p>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between">
-                    <label className="inline-flex items-center gap-2 text-xs text-white/80">
-                      <input
-                        type="checkbox"
-                        checked={category.isActive}
-                        onChange={(event) =>
-                          updateCategory(index, (current) => ({ ...current, isActive: event.target.checked }))
-                        }
-                        className="h-4 w-4 accent-[#CDD645]"
-                      />
-                      Active
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => removeCategory(index)}
-                      className="text-xs text-red-300 hover:text-red-200"
-                    >
-                      Remove
-                    </button>
+                  <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
+                    <span className="text-[11px] font-mono text-white/40 bg-white/5 px-2 py-1 rounded-md">Order: {category.sortOrder}</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveCategoryModal({ index, draft: { ...category } })}
+                        className="rounded-lg bg-white/10 p-2 text-white/80 transition hover:bg-white/20 hover:text-white"
+                      >
+                        <Icon icon="solar:pen-bold-duotone" className="text-base" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeCategory(index)}
+                        className="rounded-lg bg-red-500/10 p-2 text-red-400 transition hover:bg-red-500/20"
+                      >
+                        <Icon icon="solar:trash-bin-trash-broken" className="text-base" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="dashboard-surface rounded-2xl p-5">
-            <div className="mb-4 flex items-center justify-between">
+          <section className="dashboard-surface rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/5 pb-4">
               <div>
-                <h2 className="text-lg font-semibold text-[#E4E67A]">Sizes</h2>
-                <p className="text-xs text-white/65">Controls package size picker, max weight rules and price multiplier.</p>
+                <h2 className="text-xl font-bold text-white/90 tracking-wide">Package Sizes</h2>
+                <p className="mt-1 text-xs text-white/40">Multipliers and limit rules for packages.</p>
               </div>
               <button
                 type="button"
-                onClick={addSize}
-                className="rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/85 hover:bg-white/10"
+                onClick={() => setActiveSizeModal({ index: null, draft: makeSizeDraft(sizes.length) })}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#CDD645]/10 border border-[#CDD645]/20 px-4 py-2 text-sm font-bold text-[#E4E67A] transition hover:bg-[#CDD645]/20"
               >
-                + Add Size
+                <Icon icon="solar:maximize-square-minimum-bold-duotone" className="text-lg" />
+                Add Size
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {sizes.map((size, index) => (
-                <div key={`size-${index}`} className="dashboard-surface-soft rounded-xl p-4">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-[11px] text-white/75">
-                      Name
-                      <input
-                        value={size.name}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({ ...current, name: event.target.value }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
+                <div key={`size-${index}`} className="group relative flex flex-col justify-between overflow-hidden rounded-[20px] bg-[#141A14]/60 p-5 border border-white/5 shadow-lg transition hover:border-[#CDD645]/30 hover:bg-[#1A221A]/80">
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="flex bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 text-white/80 shrink-0">
+                        <span className="text-sm font-bold">{size.maxWeightKg}</span><span className="text-[10px] ml-0.5 mt-1 font-semibold text-white/40 uppercase">KG Max</span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${size.isActive ? "bg-emerald-400/15 text-emerald-300" : "bg-white/10 text-white/50"
+                        }`}>
+                        <div className={`h-1.5 w-1.5 rounded-full ${size.isActive ? "bg-emerald-400" : "bg-white/40"}`} />
+                        {size.isActive ? "Active" : "Hidden"}
+                      </span>
+                    </div>
 
-                    <label className="text-[11px] text-white/75">
-                      Description
-                      <input
-                        value={size.description}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({ ...current, description: event.target.value }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
+                    <h3 className="text-lg font-bold text-white/90">{size.name || "Unnamed Size"}</h3>
+                    <p className="mt-1 text-xs text-white/60 line-clamp-2">{size.description || "No description provided."}</p>
 
-                    <label className="text-[11px] text-white/75">
-                      Max Weight (kg)
-                      <input
-                        type="number"
-                        min={0.1}
-                        step={0.1}
-                        value={size.maxWeightKg}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({
-                            ...current,
-                            maxWeightKg: Math.max(0.1, Number(event.target.value) || 0.1),
-                          }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
-
-                    <label className="text-[11px] text-white/75">
-                      Price Multiplier
-                      <input
-                        type="number"
-                        min={0.1}
-                        step={0.1}
-                        value={size.priceMultiplier}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({
-                            ...current,
-                            priceMultiplier: Math.max(0.1, Number(event.target.value) || 0.1),
-                          }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
-
-                    <label className="text-[11px] text-white/75">
-                      Visual Scale
-                      <input
-                        type="number"
-                        min={0.5}
-                        step={0.1}
-                        value={size.visualScale}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({
-                            ...current,
-                            visualScale: Math.max(0.5, Number(event.target.value) || 0.5),
-                          }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
-
-                    <label className="text-[11px] text-white/75">
-                      Sort Order
-                      <input
-                        type="number"
-                        min={0}
-                        value={size.sortOrder}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({
-                            ...current,
-                            sortOrder: Math.max(0, Number(event.target.value) || 0),
-                          }))
-                        }
-                        className="dashboard-input mt-1 w-full rounded-md px-2 py-1.5 text-xs"
-                      />
-                    </label>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 px-2 py-1 text-[11px] font-bold text-indigo-300 border border-indigo-500/20">
+                        <Icon icon="solar:calculator-bold-duotone" className="text-indigo-400" />
+                        {size.priceMultiplier}x Fare
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/10 px-2 py-1 text-[11px] font-bold text-orange-300 border border-orange-500/20">
+                        <Icon icon="solar:pipette-bold-duotone" className="text-orange-400" />
+                        {size.visualScale}x Scale
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between">
-                    <label className="inline-flex items-center gap-2 text-xs text-white/80">
-                      <input
-                        type="checkbox"
-                        checked={size.isActive}
-                        onChange={(event) =>
-                          updateSize(index, (current) => ({ ...current, isActive: event.target.checked }))
-                        }
-                        className="h-4 w-4 accent-[#CDD645]"
-                      />
-                      Active
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => removeSize(index)}
-                      className="text-xs text-red-300 hover:text-red-200"
-                    >
-                      Remove
-                    </button>
+                  <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
+                    <span className="text-[11px] font-mono text-white/40 bg-white/5 px-2 py-1 rounded-md">Order: {size.sortOrder}</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSizeModal({ index, draft: { ...size } })}
+                        className="rounded-lg bg-white/10 p-2 text-white/80 transition hover:bg-white/20 hover:text-white"
+                      >
+                        <Icon icon="solar:pen-bold-duotone" className="text-base" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeSize(index)}
+                        className="rounded-lg bg-red-500/10 p-2 text-red-400 transition hover:bg-red-500/20"
+                      >
+                        <Icon icon="solar:trash-bin-trash-broken" className="text-base" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -530,72 +409,326 @@ export default function PackageCatalogDashboardPage() {
       )}
 
       {iconPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-          <div className="dashboard-surface w-full max-w-4xl rounded-2xl p-4 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="relative dashboard-surface w-full max-w-2xl rounded-[24px] p-6 shadow-2xl border border-white/10">
+            <div className="flex items-center justify-between gap-3 mb-6">
               <div>
-                <h3 className="text-lg font-semibold text-[#E4E67A]">Pick Icon</h3>
-                <p className="mt-0.5 text-xs text-white/65">
-                  Search Iconify icons and apply to <span className="font-semibold text-white">{iconPickerCategoryName || "category"}</span>.
+                <h3 className="text-xl font-bold text-[#E4E67A]">Icon Library</h3>
+                <p className="mt-1 text-xs text-white/50">
+                  Search Iconify database to represent your category.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeIconPicker}
-                className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
               >
-                Close
+                <Icon icon="mdi:close" className="text-xl" />
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <input
-                value={iconSearchQuery}
-                onChange={(event) => setIconSearchQuery(event.target.value)}
-                placeholder="Search icon... e.g. truck, box, package, flash"
-                className="dashboard-input min-w-[240px] flex-1 rounded-lg px-3 py-2 text-sm focus:border-[#D5E400]/60"
-              />
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="relative flex-1">
+                <Icon icon="solar:minimalistic-magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg" />
+                <input
+                  value={iconSearchQuery}
+                  onChange={(event) => setIconSearchQuery(event.target.value)}
+                  placeholder="e.g. truck, box, package, document..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-10 py-3 text-sm text-white focus:border-[#CDD645]/50 outline-none transition"
+                />
+              </div>
+            </div>
+
+            {iconSearchLoading && (
+              <div className="flex justify-center p-8 text-[#CDD645]">
+                <Icon icon="line-md:loading-loop" className="text-4xl" />
+              </div>
+            )}
+
+            {!iconSearchLoading && iconSearchError && (
+              <div className="rounded-xl border border-red-500/35 bg-red-500/10 p-4 text-sm text-red-300 text-center">
+                {iconSearchError}
+              </div>
+            )}
+
+            {!iconSearchLoading && !iconSearchError && (
+              <div className="mt-4 grid max-h-[50vh] grid-cols-3 gap-3 overflow-y-auto pr-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 custom-scrollbar">
+                {iconSearchResults.map((iconName) => (
+                  <button
+                    key={iconName}
+                    type="button"
+                    onClick={() => applyCategoryIcon(iconName)}
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl bg-white/5 p-3 text-white/70 hover:bg-[#CDD645]/20 hover:text-[#E4E67A] transition-all border border-transparent hover:border-[#CDD645]/30 group"
+                    title={iconName}
+                  >
+                    <Icon icon={iconName} className="text-3xl group-hover:scale-110 transition-transform" />
+                    <span className="w-full truncate text-[10px] text-center font-medium opacity-50 group-hover:opacity-100">{iconName.split(":").pop()}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveCategoryModal(null)} />
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#1A221A] shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-5">
+              <h2 className="text-xl font-bold text-[#E4E67A]">
+                {activeCategoryModal.index === null ? "New Category" : "Edit Category"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveCategoryModal(null)}
+                className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                <Icon icon="mdi:close" className="text-xl" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                Category Name
+                <input
+                  value={activeCategoryModal.draft.name}
+                  onChange={(e) => setActiveCategoryModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, name: e.target.value } }) : prev)}
+                  placeholder="e.g. Standard Box"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                  Default Fare (₹)
+                  <input
+                    type="number"
+                    min={0}
+                    value={activeCategoryModal.draft.defaultFare}
+                    onChange={(e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setActiveCategoryModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, defaultFare: val } }) : prev);
+                    }}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                  />
+                </label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                  Sort Order
+                  <input
+                    type="number"
+                    min={0}
+                    value={activeCategoryModal.draft.sortOrder}
+                    onChange={(e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setActiveCategoryModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, sortOrder: val } }) : prev);
+                    }}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                  />
+                </label>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">Category Icon</p>
+                <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/10">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#CDD645]/10 text-2xl text-[#E4E67A]">
+                    <Icon icon={activeCategoryModal.draft.icon || "mdi:shape-outline"} />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="truncate text-sm font-medium text-white/90">{activeCategoryModal.draft.icon || "No Icon Picked"}</p>
+                    <p className="text-[10px] text-white/40">From Iconify Library</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openIconPicker(activeCategoryModal.draft.name)}
+                    className="rounded-lg bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-[#CDD645]/90 hover:text-black"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/5 bg-black/20 p-4 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Status</p>
+                <label className="inline-flex cursor-pointer items-center gap-3">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={activeCategoryModal.draft.isActive}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setActiveCategoryModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, isActive: val } }) : prev);
+                      }}
+                      className="peer sr-only"
+                    />
+                    <div className="h-5 w-9 rounded-full bg-white/10 shadow-inner transition peer-checked:bg-[#CDD645]"></div>
+                    <div className="absolute inset-y-0 left-0 m-0.5 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-4"></div>
+                  </div>
+                  <span className="text-[11px] font-bold text-white/80">Active</span>
+                </label>
+              </div>
+
+            </div>
+
+            <div className="border-t border-white/10 bg-black/20 p-5">
               <button
                 type="button"
                 onClick={() => {
-                  if (iconPickerCategoryIndex === null) return;
-                  updateCategory(iconPickerCategoryIndex, (current) => ({
-                    ...current,
-                    icon: "mdi:shape-outline",
-                  }));
+                  if (activeCategoryModal.index === null) {
+                    setCategories(prev => [...prev, activeCategoryModal.draft]);
+                  } else {
+                    updateCategory(activeCategoryModal.index, () => activeCategoryModal.draft);
+                  }
+                  setActiveCategoryModal(null);
                 }}
-                className="rounded-lg border border-white/20 px-3 py-2 text-xs text-white/85 hover:bg-white/10"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#CDD645] px-5 py-3.5 text-[15px] font-bold tracking-wide text-black shadow-lg shadow-[#CDD645]/20 transition-all hover:bg-[#E4E67A] active:scale-95"
               >
-                Reset Icon
+                <Icon icon="solar:diskette-bold-duotone" className="text-xl" />
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSizeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveSizeModal(null)} />
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#1A221A] shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-5">
+              <h2 className="text-xl font-bold text-[#E4E67A]">
+                {activeSizeModal.index === null ? "New Size" : "Edit Size"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveSizeModal(null)}
+                className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                <Icon icon="mdi:close" className="text-xl" />
               </button>
             </div>
 
-            {iconSearchLoading ? (
-              <div className="dashboard-surface-soft mt-4 rounded-lg p-3 text-xs text-white/70">
-                Searching icons...
-              </div>
-            ) : null}
-            {iconSearchError ? (
-              <div className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-200">
-                {iconSearchError}
-              </div>
-            ) : null}
+            <div className="p-5 sm:p-6 space-y-5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                Size Title
+                <input
+                  value={activeSizeModal.draft.name}
+                  onChange={(e) => setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, name: e.target.value } }) : prev)}
+                  placeholder="e.g. Medium Case"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                />
+              </label>
 
-            <div className="mt-4 grid max-h-[58vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {iconSearchResults.map((iconName) => (
-                <button
-                  key={iconName}
-                  type="button"
-                  onClick={() => applyCategoryIcon(iconName)}
-                  className="dashboard-surface-soft rounded-lg p-2 text-left text-white/90 hover:border-[#D5E400]/35 hover:bg-[#D5E400]/10"
-                  title={iconName}
-                >
-                  <div className="dashboard-subsurface mb-1 flex h-8 w-8 items-center justify-center rounded-md text-lg">
-                    <Icon icon={iconName} />
+              <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                Description
+                <textarea
+                  value={activeSizeModal.draft.description}
+                  onChange={(e) => setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, description: e.target.value } }) : prev)}
+                  placeholder="e.g. Fits two laptops or small electronics."
+                  rows={2}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none custom-scrollbar"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                  Max Weight (KG)
+                  <input
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={activeSizeModal.draft.maxWeightKg}
+                    onChange={(e) => {
+                      const val = Math.max(0.1, Number(e.target.value) || 0.1);
+                      setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, maxWeightKg: val } }) : prev);
+                    }}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                  />
+                </label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                  Price Multiplier
+                  <input
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={activeSizeModal.draft.priceMultiplier}
+                    onChange={(e) => {
+                      const val = Math.max(0.1, Number(e.target.value) || 0.1);
+                      setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, priceMultiplier: val } }) : prev);
+                    }}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                  Visual Scale
+                  <input
+                    type="number"
+                    min={0.5}
+                    step={0.1}
+                    value={activeSizeModal.draft.visualScale}
+                    onChange={(e) => {
+                      const val = Math.max(0.5, Number(e.target.value) || 0.5);
+                      setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, visualScale: val } }) : prev);
+                    }}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                  />
+                </label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-white/50 block">
+                  Sort Order
+                  <input
+                    type="number"
+                    min={0}
+                    value={activeSizeModal.draft.sortOrder}
+                    onChange={(e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, sortOrder: val } }) : prev);
+                    }}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white shadow-inner transition-all focus:border-[#CDD645]/50 focus:bg-black/60 focus:outline-none"
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-white/5 bg-black/20 p-4 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Status</p>
+                <label className="inline-flex cursor-pointer items-center gap-3">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={activeSizeModal.draft.isActive}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setActiveSizeModal(prev => prev ? ({ ...prev, draft: { ...prev.draft, isActive: val } }) : prev);
+                      }}
+                      className="peer sr-only"
+                    />
+                    <div className="h-5 w-9 rounded-full bg-white/10 shadow-inner transition peer-checked:bg-[#CDD645]"></div>
+                    <div className="absolute inset-y-0 left-0 m-0.5 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-4"></div>
                   </div>
-                  <p className="truncate text-[11px] leading-tight">{iconName}</p>
-                </button>
-              ))}
+                  <span className="text-[11px] font-bold text-white/80">Active</span>
+                </label>
+              </div>
+
+            </div>
+
+            <div className="border-t border-white/10 bg-black/20 p-5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeSizeModal.index === null) {
+                    setSizes(prev => [...prev, activeSizeModal.draft]);
+                  } else {
+                    updateSize(activeSizeModal.index, () => activeSizeModal.draft);
+                  }
+                  setActiveSizeModal(null);
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#CDD645] px-5 py-3.5 text-[15px] font-bold tracking-wide text-black shadow-lg shadow-[#CDD645]/20 transition-all hover:bg-[#E4E67A] active:scale-95"
+              >
+                <Icon icon="solar:diskette-bold-duotone" className="text-xl" />
+                Done
+              </button>
             </div>
           </div>
         </div>

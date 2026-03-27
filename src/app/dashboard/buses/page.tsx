@@ -16,11 +16,21 @@ type OperatorContactPeriod = {
   endDate?: string;
 };
 
+type BusOffice = {
+  officeName: string;
+  address?: string;
+  city: string;
+  state: string;
+  zip?: string;
+  phone: string;
+};
+
 type BusRow = {
   _id: string;
   busName: string;
   busNumber: string;
   busImages?: string[];
+  offices?: BusOffice[];
   capacity: number;
   autoRenewCapacity?: boolean;
   availability?: { date?: string }[];
@@ -36,12 +46,12 @@ type OperatorRow = {
   accountDeletionRequestedAt?: string | null;
   accountDeletionExpiresAt?: string | null;
   operatorApprovalStatus?:
-    | "none"
-    | "pending"
-    | "operator_requested"
-    | "company_requested"
-    | "approved"
-    | "rejected";
+  | "none"
+  | "pending"
+  | "operator_requested"
+  | "company_requested"
+  | "approved"
+  | "rejected";
 };
 
 type AssignedOperatorOption = {
@@ -85,6 +95,9 @@ const parseId = (value: unknown): string => {
 };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
+
+const summarizeOfficeLabel = (office: BusOffice, index: number) =>
+  `${office.officeName || `Office ${index + 1}`}${office.city ? ` · ${office.city}` : ""}`;
 
 function AdminBusesPageContent() {
   const { user } = useAppSelector((state) => state.user);
@@ -167,7 +180,13 @@ function AdminBusesPageContent() {
     if (!normalizedQuery) return buses;
 
     return buses.filter((bus) =>
-      [bus.busName, bus.busNumber]
+      [
+        bus.busName,
+        bus.busNumber,
+        ...(Array.isArray(bus.offices)
+          ? bus.offices.flatMap((office) => [office.officeName, office.city, office.state, office.phone])
+          : []),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedQuery),
@@ -278,22 +297,22 @@ function AdminBusesPageContent() {
         if (response.status === 409 && payload?.requiresReschedule) {
           const candidates: ReplacementBusOption[] = Array.isArray(payload?.replacementBusCandidates)
             ? payload.replacementBusCandidates
-                .map((entry: unknown) => ({
-                  id: String((entry as { id?: unknown })?.id ?? ""),
-                  busName: String((entry as { busName?: unknown })?.busName ?? ""),
-                  busNumber: String((entry as { busNumber?: unknown })?.busNumber ?? ""),
-                }))
-                .filter((entry: ReplacementBusOption) => Boolean(entry.id))
+              .map((entry: unknown) => ({
+                id: String((entry as { id?: unknown })?.id ?? ""),
+                busName: String((entry as { busName?: unknown })?.busName ?? ""),
+                busNumber: String((entry as { busNumber?: unknown })?.busNumber ?? ""),
+              }))
+              .filter((entry: ReplacementBusOption) => Boolean(entry.id))
             : [];
           const blockingOrders = Array.isArray(payload?.blockingOrders)
             ? payload.blockingOrders.map((entry: unknown) => ({
-                id: String((entry as { id?: unknown })?.id ?? ""),
-                trackingId: String((entry as { trackingId?: unknown })?.trackingId ?? ""),
-                status: String((entry as { status?: unknown })?.status ?? ""),
-                orderDate: String((entry as { orderDate?: unknown })?.orderDate ?? ""),
-                senderName: String((entry as { senderName?: unknown })?.senderName ?? ""),
-                senderContact: String((entry as { senderContact?: unknown })?.senderContact ?? ""),
-              }))
+              id: String((entry as { id?: unknown })?.id ?? ""),
+              trackingId: String((entry as { trackingId?: unknown })?.trackingId ?? ""),
+              status: String((entry as { status?: unknown })?.status ?? ""),
+              orderDate: String((entry as { orderDate?: unknown })?.orderDate ?? ""),
+              senderName: String((entry as { senderName?: unknown })?.senderName ?? ""),
+              senderContact: String((entry as { senderContact?: unknown })?.senderContact ?? ""),
+            }))
             : [];
 
           setDeleteRescheduleState({
@@ -512,45 +531,51 @@ function AdminBusesPageContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#F6FF6A]">My Buses</h1>
-          <p className="text-sm text-white/70 mt-1">
-            Manage buses here. Operator approval requests remain in Operators module.
+          <h1 className="text-2xl font-bold tracking-tight text-[#E4E67A] xl:text-3xl">Active Fleet</h1>
+          <p className="mt-1.5 text-sm text-white/50">
+            Manage your buses, assign operators, and monitor active routes in real-time.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/addbus")}
-            className="rounded-md border border-[#D5E400] px-3 py-1.5 text-xs text-[#D5E400] hover:bg-[#D5E400]/10"
-          >
-            Add Bus
-          </button>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/addbus")}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D5E400] to-[#E4E67A] px-5 py-3 text-sm font-bold text-black shadow-lg shadow-[#D5E400]/20 transition hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <Icon icon="solar:bus-bold-duotone" className="text-lg" />
+          Add New Bus
+        </button>
+      </div>
+
+      <div className="dashboard-surface flex flex-wrap items-center justify-between gap-4 rounded-3xl p-4 shadow-xl backdrop-blur-xl border border-white/5">
+        <div className="relative w-full sm:w-96">
+          <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-white/40" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by bus name or number..."
+            className="w-full rounded-xl border border-white/10 bg-black/40 py-3 pl-11 pr-4 text-sm text-white/90 outline-none transition focus:border-[#D5E400]/50 focus:bg-black/60 focus:shadow-[0_0_20px_rgba(213,228,0,0.1)]"
+          />
+        </div>
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setViewMode("grid")}
-            className={`rounded-md border px-3 py-1.5 text-xs ${viewMode === "grid" ? "border-[#D5E400] text-[#D5E400]" : "border-white/30 text-white/70"}`}
+            className={`inline-flex items-center justify-center rounded-xl p-2.5 transition ${viewMode === "grid" ? "bg-[#D5E400]/20 text-[#D5E400]" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"}`}
+            aria-label="Grid View"
           >
-            Grid
+            <Icon icon="solar:widget-3-bold-duotone" className="text-xl" />
           </button>
           <button
             type="button"
             onClick={() => setViewMode("list")}
-            className={`rounded-md border px-3 py-1.5 text-xs ${viewMode === "list" ? "border-[#D5E400] text-[#D5E400]" : "border-white/30 text-white/70"}`}
+            className={`inline-flex items-center justify-center rounded-xl p-2.5 transition ${viewMode === "list" ? "bg-[#D5E400]/20 text-[#D5E400]" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"}`}
+            aria-label="List View"
           >
-            List
+            <Icon icon="glyphs:grid-list-bold" className="text-xl" />
           </button>
         </div>
-      </div>
-
-      <div className="dashboard-surface rounded-2xl p-4">
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by bus name or number"
-          className="dashboard-input w-full rounded-xl px-4 py-3 text-base"
-        />
       </div>
 
       {error && (
@@ -588,213 +613,320 @@ function AdminBusesPageContent() {
           ))}
         </div>
       ) : filteredBuses.length === 0 ? (
-        <div className="dashboard-surface-soft rounded-xl p-4 text-white/80">No buses found.</div>
+        <div className="flex h-64 flex-col items-center justify-center rounded-3xl border border-white/5 bg-[#141A14]/60 p-8 text-center backdrop-blur-sm">
+          <Icon icon="solar:bus-line-duotone" className="mb-4 text-5xl text-white/20" />
+          <h3 className="text-lg font-bold text-white/80">No buses found</h3>
+          <p className="mt-2 max-w-sm text-sm text-white/50">
+            We couldn't find any fleet entries matching your criteria. Try adjusting your search filters or adding a new bus.
+          </p>
+        </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredBuses.map((bus) => (
-            <div key={bus._id} className="dashboard-surface-soft rounded-xl p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-[#E4E67A]">{bus.busName}</p>
-                  <p className="text-xs text-white/60 mt-1">{bus.busNumber}</p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {filteredBuses.map((bus) => {
+            const assignedOperatorCount = getAssignedOperators(bus).length;
+            const routeStopCount = bus.pricing?.length ?? 0;
+            return (
+              <div key={bus._id} className="group relative overflow-hidden rounded-3xl border border-white/5 bg-[#141A14]/80 transition hover:border-white/15 hover:shadow-2xl">
+                {/* Visual Header Banner */}
+                <div className="h-24 w-full bg-[linear-gradient(to_right,rgba(213,228,0,0.05),transparent)] relative">
+                  <div className="absolute top-4 right-4 z-10">
+                    {renderActions(bus)}
+                  </div>
+                  <div className="absolute -bottom-6 left-5 flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-[#141A14] bg-[#1A221A] shadow-xl">
+                    <Icon icon="solar:bus-bold-duotone" className="text-2xl text-[#E4E67A]" />
+                  </div>
                 </div>
-                {renderActions(bus)}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {getAssignedOperatorTags(bus).length > 0 ? (
-                  getAssignedOperatorTags(bus).map((operatorName) => (
-                    <span
-                      key={`${bus._id}-${operatorName}`}
-                      className="rounded-full border border-emerald-300/35 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200"
-                    >
-                      {operatorName}
+
+                <div className="p-5 pt-8">
+                  <h3 className="text-xl font-bold tracking-tight text-white/95 line-clamp-1" title={bus.busName}>{bus.busName}</h3>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="inline-flex rounded-md bg-white/5 px-2 py-1 text-xs font-mono font-medium tracking-wider text-white/50">
+                      {bus.busNumber}
                     </span>
-                  ))
-                ) : (
-                  <span className="rounded-full border border-white/20 bg-white/5 px-2 py-0.5 text-[11px] text-white/60">
-                    No assigned operator
-                  </span>
-                )}
+                    <span className="flex items-center gap-1 text-xs text-white/40">
+                      <Icon icon="solar:users-group-two-rounded-bold-duotone" />
+                      {bus.capacity} KG
+                    </span>
+                  </div>
+
+                  {/* Badges Flow */}
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {getAssignedOperatorTags(bus).length > 0 ? (
+                      getAssignedOperatorTags(bus).map((operatorName) => (
+                        <span
+                          key={`${bus._id}-${operatorName}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300"
+                        >
+                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          {operatorName}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                        <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                        No Operator
+                      </span>
+                    )}
+
+                    {bus.autoRenewCapacity && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D5E400]/20 bg-[#D5E400]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#D5E400]">
+                        <Icon icon="solar:refresh-circle-bold-duotone" />
+                        Auto Renew
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Summary Footer */}
+                  <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
+                    <div className="text-center">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Route Stops</p>
+                      <p className="mt-1 font-mono text-base font-bold text-white/90">{routeStopCount}</p>
+                    </div>
+                    <div className="h-8 w-px bg-white/5" />
+                    <div className="text-center">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Offices</p>
+                      <p className="mt-1 font-mono text-base font-bold text-white/90">{bus.offices?.length ?? 0}</p>
+                    </div>
+                    <div className="h-8 w-px bg-white/5" />
+                    <div className="text-center">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Operators</p>
+                      <p className="mt-1 font-mono text-base font-bold text-white/90">{assignedOperatorCount}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-white/75">
-                <p>Capacity: <span className="text-white">{bus.capacity} KG</span></p>
-                <p>Route Points: <span className="text-white">{bus.pricing?.length ?? 0}</span></p>
-                <p>Auto Renew: <span className="text-white">{bus.autoRenewCapacity ? "Yes" : "No"}</span></p>
-                <p>
-                  Operators: <span className="text-white">{getAssignedOperators(bus).length}</span>
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div className="dashboard-surface overflow-hidden rounded-2xl">
+        <div className="dashboard-surface overflow-hidden rounded-3xl border border-white/5 shadow-2xl backdrop-blur-xl">
           <div className="overflow-x-auto">
-          <table className="min-w-[760px] w-full text-sm">
-            <thead className="dashboard-table-head text-left text-white/70">
-              <tr>
-                <th className="px-4 py-3">Bus</th>
-                <th className="px-4 py-3">Number</th>
-                <th className="px-4 py-3">Capacity</th>
-                <th className="px-4 py-3">Route Points</th>
-                <th className="px-4 py-3">Operators</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBuses.map((bus) => (
-                <tr key={bus._id} className="border-t border-white/10 text-white/85">
-                  <td className="px-4 py-3">{bus.busName}</td>
-                  <td className="px-4 py-3">{bus.busNumber}</td>
-                  <td className="px-4 py-3">{bus.capacity} KG</td>
-                  <td className="px-4 py-3">{bus.pricing?.length ?? 0}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex max-w-xs flex-wrap gap-1">
-                      {getAssignedOperatorTags(bus).length > 0 ? (
-                        getAssignedOperatorTags(bus).map((operatorName) => (
-                          <span
-                            key={`${bus._id}-list-${operatorName}`}
-                            className="rounded-full border border-emerald-300/35 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200"
-                          >
-                            {operatorName}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-white/60">No assigned operator</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">{renderActions(bus)}</td>
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-[#1A221A] text-xs font-semibold uppercase tracking-wider text-white/50">
+                <tr>
+                  <th className="px-6 py-4">Fleet Entry</th>
+                  <th className="px-6 py-4">Capacity</th>
+                  <th className="px-6 py-4">Offices</th>
+                  <th className="px-6 py-4">Active Operators</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredBuses.map((bus) => (
+                  <tr key={bus._id} className="transition hover:bg-white/[0.02]">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5">
+                          <Icon icon="solar:bus-bold-duotone" className="text-xl text-[#E4E67A]" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-white/95">{bus.busName}</p>
+                          <p className="font-mono text-xs text-white/40">{bus.busNumber}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 font-mono text-xs font-medium text-white/70">
+                        {bus.capacity} KG
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        {Array.isArray(bus.offices) && bus.offices.length > 0 ? (
+                          bus.offices.slice(0, 2).map((office, index) => (
+                            <span key={`list-office-${index}`} className="text-xs text-white/60">
+                              {summarizeOfficeLabel(office, index)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-white/40">Unassigned</span>
+                        )}
+                        {Array.isArray(bus.offices) && bus.offices.length > 2 && (
+                          <span className="text-[10px] text-white/30">+{bus.offices.length - 2} more</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex max-w-[200px] flex-wrap gap-1.5">
+                        {getAssignedOperatorTags(bus).length > 0 ? (
+                          getAssignedOperatorTags(bus).map((operatorName) => (
+                            <span
+                              key={`${bus._id}-list-${operatorName}`}
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300"
+                            >
+                              {operatorName}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs italic text-white/40">None</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">{renderActions(bus)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
       {assignBus && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="dashboard-surface w-full max-w-xl rounded-2xl p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#E4E67A]">Assign Operator</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeMenusAndModals} />
+          <div className="relative w-full max-w-xl overflow-visible rounded-3xl border border-white/10 bg-[#1A221A] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-5 rounded-t-[23px]">
+              <h2 className="text-xl font-bold text-[#E4E67A]">Assign Operator</h2>
               <button
                 type="button"
                 onClick={closeMenusAndModals}
-                className="rounded-md border border-white/30 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                className="rounded-full p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
               >
-                Close
+                <Icon icon="solar:close-circle-bold-duotone" className="text-2xl" />
               </button>
             </div>
-            <p className="mt-1 text-xs text-white/70">
-              Bus: {assignBus.busName} ({assignBus.busNumber})
-            </p>
 
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label className="text-xs text-white/80 md:col-span-2">
-                Operator
-                <select
-                  value={assignOperatorId}
-                  onChange={(event) => setAssignOperatorId(event.target.value)}
-                  className="mt-2 block w-full rounded-lg bg-black px-3 py-2 text-white/90 outline-none border border-white/20"
-                  disabled={loadingOperators}
-                >
-                  <option value="" className="text-black">Select approved operator</option>
-                  {approvedOperators.map((operator) => (
-                    <option key={operator._id} value={operator._id} className="text-black">
-                      {operator.name || operator.email} ({operator.email})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {scheduledDeletionApprovedCount > 0 ? (
-                <p className="md:col-span-2 text-xs text-amber-300">
-                  {scheduledDeletionApprovedCount} approved operator{scheduledDeletionApprovedCount === 1 ? " is" : "s are"} hidden from assignment because account deletion is scheduled.
-                </p>
-              ) : null}
-              {!loadingOperators && approvedOperators.length === 0 ? (
-                <p className="md:col-span-2 text-xs text-white/60">
-                  No assignable operators are available right now.
-                </p>
-              ) : null}
-
-              <label className="text-xs text-white/80 md:col-span-2">
-                Assignment Date Range
-                <div className="mt-2">
-                  <CustomDateRangePicker
-                    startDate={assignStartDate}
-                    endDate={assignEndDate}
-                    onChange={({ startDate, endDate }) => {
-                      setAssignStartDate(startDate);
-                      setAssignEndDate(endDate);
-                      setAssignDateError("");
-                    }}
-                    minDate={todayISO()}
-                    error={assignDateError}
-                  />
+            <div className="p-6">
+              <div className="mb-6 flex items-center gap-3 rounded-xl bg-white/5 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#D5E400]/20">
+                  <Icon icon="solar:bus-bold-duotone" className="text-xl text-[#E4E67A]" />
                 </div>
-              </label>
-              {assignDateError ? (
-                <p className="md:col-span-2 text-xs text-red-400">{assignDateError}</p>
-              ) : null}
-            </div>
+                <div>
+                  <p className="font-bold text-white/95">{assignBus.busName}</p>
+                  <p className="font-mono text-xs text-white/50">{assignBus.busNumber}</p>
+                </div>
+              </div>
 
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={handleAssignOperator}
-                disabled={assigning}
-                className="rounded-full border border-[#D5E400] px-5 py-2 text-sm font-semibold text-[#D5E400] hover:bg-[#D5E400] hover:text-black disabled:opacity-60"
-              >
-                {assigning ? "Assigning..." : "Assign Operator"}
-              </button>
+              <div className="space-y-5">
+                <label className="block text-sm font-semibold text-white/80">
+                  Select Approved Operator
+                  <select
+                    value={assignOperatorId}
+                    onChange={(event) => setAssignOperatorId(event.target.value)}
+                    className="mt-2 block w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white focus:border-[#D5E400]/50"
+                    disabled={loadingOperators}
+                  >
+                    <option value="">Choose an operator...</option>
+                    {approvedOperators.map((operator) => (
+                      <option key={operator._id} value={operator._id}>
+                        {operator.name || operator.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {scheduledDeletionApprovedCount > 0 ? (
+                  <p className="text-xs text-amber-300">
+                    {scheduledDeletionApprovedCount} approved operator{scheduledDeletionApprovedCount === 1 ? " is" : "s are"} hidden from assignment because account deletion is scheduled.
+                  </p>
+                ) : null}
+                {!loadingOperators && approvedOperators.length === 0 ? (
+                  <p className="text-xs text-white/60">
+                    No assignable operators are available right now.
+                  </p>
+                ) : null}
+
+                <label className="block text-sm font-semibold text-white/80">
+                  Assignment Timeline
+                  <div className="mt-2">
+                    <CustomDateRangePicker
+                      startDate={assignStartDate}
+                      endDate={assignEndDate}
+                      onChange={({ startDate, endDate }) => {
+                        setAssignStartDate(startDate);
+                        setAssignEndDate(endDate);
+                        setAssignDateError("");
+                      }}
+                      minDate={todayISO()}
+                      error={assignDateError}
+                    />
+                  </div>
+                </label>
+                {assignDateError && <p className="text-xs font-semibold text-red-400">{assignDateError}</p>}
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={closeMenusAndModals}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAssignOperator}
+                  disabled={assigning}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#D5E400] to-[#E4E67A] px-6 py-2.5 text-sm font-bold text-black shadow-lg transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                >
+                  {assigning ? "Assigning..." : "Assign to Fleet"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {removeBus && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="dashboard-surface w-full max-w-xl rounded-2xl p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#E4E67A]">Remove Operator</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeMenusAndModals} />
+          <div className="relative w-full max-w-xl overflow-visible rounded-3xl border border-white/10 bg-[#1A221A] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-5 rounded-t-[23px]">
+              <h2 className="text-xl font-bold text-red-400">Revoke Assignment</h2>
               <button
                 type="button"
                 onClick={closeMenusAndModals}
-                className="rounded-md border border-white/30 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                className="rounded-full p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
               >
-                Close
+                <Icon icon="solar:close-circle-bold-duotone" className="text-2xl" />
               </button>
             </div>
-            <p className="mt-1 text-xs text-white/70">
-              Bus: {removeBus.busName} ({removeBus.busNumber})
-            </p>
 
-            <label className="mt-4 block text-xs text-white/80">
-              Assigned Operator
-              <select
-                value={removeOperatorId}
-                onChange={(event) => setRemoveOperatorId(event.target.value)}
-                className="mt-2 block w-full rounded-lg bg-black px-3 py-2 text-white/90 outline-none border border-white/20"
-              >
-                <option value="" className="text-black">Select operator</option>
-                {removeBusAssignedOperators.map((operator) => (
-                  <option key={operator.operatorId} value={operator.operatorId} className="text-black">
-                    {operator.operatorName} {operator.operatorPhone ? `(${operator.operatorPhone})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="p-6">
+              <div className="mb-6 flex items-center gap-3 rounded-xl bg-white/5 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+                  <Icon icon="solar:bus-bold-duotone" className="text-xl text-red-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-white/95">{removeBus.busName}</p>
+                  <p className="font-mono text-xs text-white/50">{removeBus.busNumber}</p>
+                </div>
+              </div>
 
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={handleRemoveOperator}
-                disabled={removing || removeBusAssignedOperators.length === 0}
-                className="rounded-full border border-red-400 px-5 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
-              >
-                {removing ? "Removing..." : "Remove Operator"}
-              </button>
+              <label className="block text-sm font-semibold text-white/80">
+                Target Operator
+                <select
+                  value={removeOperatorId}
+                  onChange={(event) => setRemoveOperatorId(event.target.value)}
+                  className="mt-2 block w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white focus:border-red-500/50"
+                >
+                  <option value="">Select operator to remove</option>
+                  {removeBusAssignedOperators.map((operator) => (
+                    <option key={operator.operatorId} value={operator.operatorId}>
+                      {operator.operatorName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={closeMenusAndModals}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveOperator}
+                  disabled={removing || removeBusAssignedOperators.length === 0}
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-500/10 px-6 py-2.5 text-sm font-bold text-red-400 shadow-lg transition hover:bg-red-500/20 active:scale-[0.98] disabled:opacity-50"
+                >
+                  <Icon icon="solar:trash-bin-trash-bold" />
+                  {removing ? "Revoking..." : "Revoke Access"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -851,9 +983,9 @@ function AdminBusesPageContent() {
                   setDeleteRescheduleState((prev) =>
                     prev
                       ? {
-                          ...prev,
-                          selectedReplacementBusId: event.target.value,
-                        }
+                        ...prev,
+                        selectedReplacementBusId: event.target.value,
+                      }
                       : prev,
                   )
                 }

@@ -51,6 +51,7 @@ function getStatusClasses(status: string): string {
   const normalized = status.toLowerCase();
   if (normalized === "delivered") return "border-green-500/40 bg-green-500/15 text-green-200";
   if (normalized === "in-transit") return "border-blue-500/40 bg-blue-500/15 text-blue-200";
+  if (normalized === "missed_package") return "border-orange-500/40 bg-orange-500/15 text-orange-200";
   if (normalized === "cancelled") return "border-red-500/40 bg-red-500/15 text-red-200";
   return "border-amber-500/40 bg-amber-500/15 text-amber-200";
 }
@@ -246,19 +247,23 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
   };
 
   return (
-    <div className={`rounded-2xl border border-[#4e573f] bg-[#1f251c]/95 p-5 ${className}`}>
-      <div className="flex items-center gap-2">
-        <Icon icon="mdi:package-variant-closed-check" className="text-[#E4E67A] text-xl" />
-        <h3 className="text-lg font-semibold text-[#E4E67A]">{cardTitle}</h3>
+    <div className={`rounded-[2rem] border border-white/10 bg-[linear-gradient(145deg,rgba(20,26,20,0.8),rgba(10,14,10,0.95))] p-6 shadow-2xl backdrop-blur-xl transition-all ${className}`}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#D5E400]/20 to-[#E4E67A]/5 border border-[#D5E400]/20 text-[#D5E400] shadow-[0_0_15px_rgba(213,228,0,0.1)]">
+          <Icon icon="solar:routing-2-bold-duotone" className="text-xl drop-shadow-[0_2px_4px_rgba(213,228,0,0.3)]" />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-white tracking-wide">{cardTitle}</h3>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-white/70">{cardSubtitle}</p>
+      <p className="mt-3 text-sm leading-relaxed text-white/60">{cardSubtitle}</p>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-6 grid gap-4">
         <input
           value={identifier}
           onChange={(event) => setIdentifier(normalizeIdentifierInput(event.target.value))}
           placeholder="Order ID or HAP-XXXXXXXX"
-          className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-[#CDD645]/70"
+          className="w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent px-4 py-3.5 text-sm text-white outline-none transition-all duration-300 focus:border-[#D5E400]/50 focus:bg-white/[0.04] focus:shadow-[0_0_20px_rgba(213,228,0,0.1)]"
         />
         <p className={`text-xs ${identifierNeedsTrackingFormat ? "text-amber-200" : "text-white/55"}`}>
           Tracking format: HAP-XXXXXXXX. Hyphen is added automatically.
@@ -270,7 +275,7 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="Booking email address"
-            className="w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-[#CDD645]/70"
+            className="w-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent px-4 py-3.5 text-sm text-white outline-none transition-all duration-300 focus:border-[#D5E400]/50 focus:bg-white/[0.04] focus:shadow-[0_0_20px_rgba(213,228,0,0.1)]"
           />
         )}
       </div>
@@ -280,7 +285,7 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
           type="button"
           onClick={handleDashboardTrack}
           disabled={isBusy}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#CDD645]/70 bg-[#CDD645]/15 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#CDD645]/25 disabled:opacity-60"
+          className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#D5E400] to-[#E4E67A] px-4 py-3.5 text-sm font-bold tracking-wide text-black transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 shadow-[0_10px_30px_rgba(213,228,0,0.2)]"
         >
           <Icon icon={trackingFromDashboard ? "line-md:loading-loop" : "mdi:magnify"} />
           {trackingFromDashboard ? "Checking..." : "Track Order"}
@@ -291,7 +296,7 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
             type="button"
             onClick={handleRequestCode}
             disabled={isBusy}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#CDD645]/70 bg-[#CDD645]/15 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#CDD645]/25 disabled:opacity-60"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#D5E400] to-[#E4E67A] px-4 py-3.5 text-sm font-bold tracking-wide text-black transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 shadow-[0_10px_30px_rgba(213,228,0,0.2)]"
           >
             <Icon icon={requestingCode ? "line-md:loading-loop" : "mdi:email-send-outline"} />
             {requestingCode ? "Sending..." : "Send Code"}
@@ -304,13 +309,13 @@ export default function OrderTrackingWidget({ mode, className = "" }: OrderTrack
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
                 inputMode="numeric"
                 placeholder="6-digit code"
-                className="w-36 rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-[#CDD645]/70"
+                className="w-32 flex-shrink-0 rounded-2xl border border-white/10 bg-black/40 px-4 py-3.5 text-center text-sm tracking-widest text-white outline-none transition-all duration-300 focus:border-[#D5E400]/50 focus:bg-black/60 focus:shadow-[0_0_20px_rgba(213,228,0,0.1)]"
               />
               <button
                 type="button"
                 onClick={handleVerifyCode}
                 disabled={isBusy}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#5EA8FF]/60 bg-[#5EA8FF]/15 px-4 py-2 text-sm font-semibold text-[#AFD4FF] transition hover:bg-[#5EA8FF]/25 disabled:opacity-60"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-blue-400/30 bg-gradient-to-r from-blue-500/10 to-blue-500/20 px-4 py-3.5 text-sm font-bold text-blue-300 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 shadow-[0_5px_15px_rgba(59,130,246,0.15)]"
               >
                 <Icon icon={verifyingCode ? "line-md:loading-loop" : "mdi:shield-check-outline"} />
                 {verifyingCode ? "Verifying..." : "Verify & Track"}

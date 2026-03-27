@@ -7,6 +7,7 @@ import TravelCompany from "@/app/api/models/travelCompanyModel";
 import User from "@/app/api/models/userModel";
 import "@/app/api/models/busModel";
 import Order from "@/app/api/models/orderModel";
+import OrderFeedback from "@/app/api/models/orderFeedbackModel";
 
 interface AuthPayload {
   id: string;
@@ -52,6 +53,10 @@ interface RecentOrderResponseItem {
   contactLocked: boolean;
   pickupProofImage?: string;
   dropProofImage?: string;
+  feedbackSubmitted?: boolean;
+  feedbackRating?: number | null;
+  feedbackComment?: string;
+  feedbackUpdatedAt?: string | null;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -172,6 +177,23 @@ export async function GET(request: NextRequest) {
     }
 
     const rawOrders = await ordersQuery.lean<UnknownRecord[]>();
+    const orderIds = rawOrders.map((order) => toStringValue(order._id)).filter(Boolean);
+    const feedbackByOrderId = new Map<string, UnknownRecord>();
+
+    if (orderIds.length > 0) {
+      const feedbackEntries = await OrderFeedback.find({
+        orderId: { $in: orderIds },
+        userId: user._id,
+      })
+        .select("_id orderId rating comment updatedAt")
+        .lean<UnknownRecord[]>();
+
+      for (const feedback of feedbackEntries) {
+        const feedbackOrderId = toStringValue(feedback.orderId);
+        if (!feedbackOrderId) continue;
+        feedbackByOrderId.set(feedbackOrderId, feedback);
+      }
+    }
     const travelCompanyIds = Array.from(
       new Set(
         rawOrders
@@ -235,11 +257,15 @@ export async function GET(request: NextRequest) {
         hasContactInfo &&
         normalizedStatus !== "delivered" &&
         normalizedStatus !== "cancelled" &&
+        normalizedStatus !== "missed_package" &&
         new Date() < contactRevealAt;
 
       const busContact: BusContact | null = !contactSource
         ? null
-        : shouldLockContact || normalizedStatus === "delivered" || normalizedStatus === "cancelled"
+        : shouldLockContact ||
+            normalizedStatus === "delivered" ||
+            normalizedStatus === "cancelled" ||
+            normalizedStatus === "missed_package"
           ? {
               ...contactSource,
               contactPersonName: "",
@@ -267,6 +293,7 @@ export async function GET(request: NextRequest) {
               phone: supportPhone,
             }
           : null;
+      const feedback = feedbackByOrderId.get(toStringValue(order._id));
 
       return {
         id: toStringValue(order._id),
@@ -286,6 +313,10 @@ export async function GET(request: NextRequest) {
         contactLocked: shouldLockContact,
         pickupProofImage: toStringValue(order.pickupProofImage),
         dropProofImage: toStringValue(order.dropProofImage),
+        feedbackSubmitted: Boolean(feedback),
+        feedbackRating: feedback ? toNumberValue(feedback.rating) : null,
+        feedbackComment: feedback ? toStringValue(feedback.comment) : "",
+        feedbackUpdatedAt: feedback ? toIsoDate(feedback.updatedAt) : null,
       };
     });
 

@@ -606,16 +606,10 @@ export default function AddPackagePage() {
     if (loading) return <LoadingScreen />;
 
     return (
-        <section className="relative min-h-screen overflow-hidden bg-[#21291d] text-white">
+        <section className="relative min-h-screen overflow-hidden bg-[#141A14] text-white">
             <div className="absolute inset-0 z-0">
-                <Image src={bg} alt="bg" fill className="object-cover opacity-40" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(213,228,0,0.14),transparent_32%),radial-gradient(circle_at_78%_10%,rgba(118,170,120,0.18),transparent_24%),linear-gradient(180deg,rgba(33,42,27,0.58),rgba(21,28,18,0.82)_30%,rgba(16,21,14,0.94)_100%)]" />
-            </div>
-
-            <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-                <div className="absolute -left-10 top-28 h-56 w-56 rounded-full bg-[#d5e400]/10 blur-3xl" />
-                <div className="absolute right-0 top-16 h-64 w-64 rounded-full bg-emerald-300/10 blur-3xl" />
-                <div className="absolute bottom-16 left-1/3 h-48 w-48 rounded-full bg-[#f6ff6a]/8 blur-3xl" />
+                <Image src={bg} alt="bg" fill className="object-cover opacity-20 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-gradient-to-b from-[#141A14]/90 via-[#1A221A]/95 to-[#141A14]" />
             </div>
 
             <ConfirmationModal
@@ -632,10 +626,10 @@ export default function AddPackagePage() {
                 }}
             />
 
-            <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-12 pt-5 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+            <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-3 pb-8 pt-4 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
                 <button
                     type="button"
-                    className="inline-flex w-fit items-center gap-3 rounded-full border border-white/12 bg-white/6 px-4 py-2 text-sm font-semibold text-[#F4F8BF] transition hover:bg-white/10"
+                    className="inline-flex w-fit items-center gap-2 md:gap-3 rounded-full border border-white/12 bg-white/6 px-3 md:px-4 py-1.5 md:py-2 text-[13px] md:text-sm font-semibold text-[#F4F8BF] transition hover:bg-white/10"
                     onClick={handleExitPackagePage}
                 >
                     <Icon icon="famicons:arrow-back-circle-outline" fontSize={26} />
@@ -654,10 +648,10 @@ export default function AddPackagePage() {
                     </p>
                 </div>
 
-                <div className="package-shell mt-8 rounded-[1.9rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+                <div className="package-shell mt-6 sm:mt-8 rounded-[1.6rem] sm:rounded-[1.9rem] px-3.5 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
                     {paymentStatus === 'idle' ? (
                         <>
-                            <div className="mb-8 overflow-hidden rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-3 py-4 sm:px-5 sm:py-5">
+                            <div className="mb-6 sm:mb-8 overflow-hidden rounded-[1.4rem] md:rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-2.5 py-3 sm:px-5 sm:py-5">
                                 <div className="flex items-start">
                                     {[
                                         { step: 1, label: "Route" },
@@ -670,7 +664,7 @@ export default function AddPackagePage() {
                                             <div key={entry.step} className={`flex items-center ${index !== list.length - 1 ? "flex-1" : "flex-none"}`}>
                                                 <div className="flex flex-col items-center">
                                                     <div
-                                                        className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-sm font-bold transition sm:h-12 sm:w-12 ${
+                                                        className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] md:text-sm font-bold transition sm:h-12 sm:w-12 ${
                                                             isComplete
                                                                 ? "border-[#CDD645] bg-[#CDD645]/65 text-[#1f271a]"
                                                                 : isActive
@@ -680,14 +674,14 @@ export default function AddPackagePage() {
                                                     >
                                                         {isComplete ? <Icon icon="mdi:check" className="text-lg" /> : entry.step}
                                                     </div>
-                                                    <p className={`mt-2 text-center text-xs font-semibold uppercase tracking-[0.14em] sm:text-sm ${
+                                                    <p className={`mt-1.5 sm:mt-2 text-center text-[10px] md:text-xs font-semibold uppercase tracking-[0.14em] sm:text-sm ${
                                                         isActive || isComplete ? "text-[#F6FF6A]" : "text-white/55"
                                                     }`}>
                                                         {entry.label}
                                                     </p>
                                                 </div>
                                                 {index !== list.length - 1 ? (
-                                                    <div className="mx-2 mb-6 h-[2px] flex-1 rounded-full bg-[#CDD645]/45 sm:mx-4" />
+                                                    <div className="mx-1.5 mb-5 md:mb-6 h-[2px] flex-1 rounded-full bg-[#CDD645]/45 sm:mx-4" />
                                                 ) : null}
                                             </div>
                                         );
@@ -760,13 +754,13 @@ export default function AddPackagePage() {
                                 )}
                             </div>
 
-                            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-between">
+                            <div className="mt-8 sm:mt-10 flex flex-col gap-3 sm:flex-row sm:justify-between">
                                 <div>
                                     {currentStep > 1 && (
                                         <button
                                             type="button"
                                             onClick={prevStep}
-                                            className="package-panel-soft flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white/75 transition hover:bg-white/10 sm:w-auto"
+                                            className="package-panel-soft flex w-full items-center justify-center gap-2 rounded-xl md:rounded-2xl px-4 py-2.5 md:px-5 md:py-3 text-[13px] md:text-base font-semibold text-white/75 transition hover:bg-white/10 sm:w-auto"
                                         >
                                             <Icon icon={'material-symbols:arrow-back-ios-new-rounded'} /> Back
                                         </button>
@@ -778,7 +772,7 @@ export default function AddPackagePage() {
                                         <button
                                             type="button"
                                             onClick={nextStep}
-                                            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#CDD645] px-5 py-3 font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] sm:w-auto"
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-[#CDD645] px-4 py-2.5 md:px-5 md:py-3 text-[13px] md:text-base font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] sm:w-auto"
                                         >
                                             Next Step <Icon icon={'material-symbols:arrow-back-ios-new-rounded'} className="rotate-180" />
                                         </button>
@@ -787,7 +781,7 @@ export default function AddPackagePage() {
                                             type="button"
                                             onClick={handleSubmit}
                                             disabled={!canProceedToPayment}
-                                            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#CDD645] px-5 py-3 font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-[#CDD645] px-4 py-2.5 md:px-5 md:py-3 text-[13px] md:text-base font-semibold text-black shadow-[0_18px_36px_rgba(205,214,69,0.18)] transition hover:bg-[#dbe86b] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                                         >
                                             {isAdminBookingUser ? "Confirm Booking" : "Proceed & Pay"}
                                         </button>
@@ -836,15 +830,21 @@ export default function AddPackagePage() {
                                         </div>
                                         <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
                                             <span className="text-white/60">Bus Operator</span>
-                                            <span className="font-bold">{orderData.busOperator}</span>
+                                            <span className={`font-bold ${orderData.busOperator ? "text-white" : "text-white/40 italic text-sm"}`}>
+                                                {orderData.busOperator || "Pending Assignment"}
+                                            </span>
                                         </div>
                                         <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
                                             <span className="text-white/60">Bus Number</span>
-                                            <span className="font-bold">{orderData.busNumber}</span>
+                                            <span className={`font-bold ${orderData.busNumber ? "text-white" : "text-white/40"}`}>
+                                                {orderData.busNumber || "--"}
+                                            </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-white/60">Estimated Arrival</span>
-                                            <span className="font-bold text-green-400">{orderData.eta}</span>
+                                            <span className={`font-bold ${orderData.eta ? "text-green-400" : "text-white/40 italic text-sm"}`}>
+                                                {orderData.eta || "Pending Schedule"}
+                                            </span>
                                         </div>
                                     </div>
 

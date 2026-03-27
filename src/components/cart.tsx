@@ -7,11 +7,11 @@ export default function Cart({
 }: any) {
 
     return (
-        <div className="package-panel mt-10 rounded-[1.8rem] p-4 sm:p-6">
+        <div className="package-panel mt-8 sm:mt-10 rounded-[1.6rem] sm:rounded-[1.8rem] p-3.5 sm:p-6">
 
-            <div className="package-badge inline-flex rounded-full px-4 py-2">
-                <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.14em]">
-                    <Icon icon="mynaui:cart" fontSize={18} />
+            <div className="package-badge inline-flex rounded-full px-3 md:px-4 py-1.5 md:py-2">
+                <div className="flex items-center gap-1.5 md:gap-2 text-[13px] md:text-sm font-bold uppercase tracking-[0.14em]">
+                    <Icon icon="mynaui:cart" className="text-base md:text-lg" />
                     <span>CART</span>
                 </div>
             </div>
@@ -25,9 +25,9 @@ export default function Cart({
                 ) : (
                     <div className="space-y-4">
                         {formData.cart.map((item: any, index: number) => (
-                            <div key={index} className="package-panel-soft flex flex-col overflow-hidden rounded-[1.4rem] sm:flex-row">
+                            <div key={index} className="package-panel-soft flex flex-col overflow-hidden rounded-[1.3rem] sm:rounded-[1.4rem] sm:flex-row">
                                 {/* Image */}
-                                <div className="relative mx-3 mt-3 h-28 rounded-xl bg-black/10 sm:mb-3 sm:mr-0 sm:w-28 sm:min-w-28">
+                                <div className="relative mx-3 mt-3 h-24 sm:h-28 rounded-xl bg-black/10 sm:mb-3 sm:mr-0 sm:w-28 sm:min-w-28">
                                     <Image
                                         src={item.packageImage}
                                         alt="Package Preview"
@@ -37,23 +37,23 @@ export default function Cart({
                                 </div>
 
                                 {/* Content */}
-                                <div className="relative flex w-full flex-col gap-4 px-4 pb-4 pt-2 sm:flex-row sm:items-end sm:justify-between sm:py-4">
+                                <div className="relative flex w-full flex-col gap-3 sm:gap-4 px-3.5 pb-3.5 pt-2 sm:px-4 sm:pb-4 sm:flex-row sm:items-end sm:justify-between sm:py-4">
                                     {/* Left Info */}
                                     <div className="pr-0 sm:pr-24">
-                                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                                            <p className="font-semibold text-[#F6FF6A]">
+                                        <div className="mb-1.5 sm:mb-2 flex flex-wrap items-center gap-2">
+                                            <p className="text-[15px] sm:text-base font-semibold text-[#F6FF6A]">
                                                 {item.packageName || "Package"}
                                             </p>
-                                            <span className="package-badge rounded-full px-3 py-1 text-[11px] font-semibold">
+                                            <span className="package-badge rounded-full px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold">
                                                 {item.packageType}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-white/70">
+                                        <p className="text-[13px] sm:text-sm text-white/70">
                                             {item.packageSize} | {item.packageWeight} kg | Qty:{" "}
                                             {item.packageQuantities}
                                         </p>
 
-                                        <p className="mt-1 text-xs text-white/50">
+                                        <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-white/50">
                                             Pickup: {item.pickUpDate}
                                         </p>
                                     </div>

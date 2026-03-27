@@ -6,6 +6,7 @@ import { useAppSelector } from "@/lib/redux/hooks";
 import LoadingScreen from "@/components/LoadingScreen";
 import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/BottomNav";
+import MobileHeader from "@/components/MobileHeader";
 import { defaultRole, roleMenus } from "@/data/roleMenus";
 import type { MenuItem } from "@/data/roleMenus";
 
@@ -97,13 +98,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className={`relative min-h-screen overflow-x-hidden text-white ${shellBackgroundClass}`}>
+    <div className={`relative text-white ${shellBackgroundClass} min-h-screen lg:min-h-[100vh] h-[100dvh] lg:h-auto flex flex-col lg:block overflow-hidden lg:overflow-visible`}>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-24 top-[-8rem] h-80 w-80 rounded-full bg-[#d5e400]/10 blur-3xl" />
         <div className="absolute right-[-8rem] top-28 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
         <div className="absolute bottom-[-6rem] left-1/3 h-80 w-80 rounded-full bg-[#667d3f]/10 blur-3xl" />
       </div>
 
+      {/* Desktop Layout */}
       <div className="relative z-10 hidden min-w-0 lg:flex">
         <Sidebar
           user={user}
@@ -114,19 +116,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
 
         <main className="min-w-0 flex-1 px-4 py-4 pb-24 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          <div className="mx-auto w-full max-w-[1700px] rounded-[2rem] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_30px_80px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-[1700px] rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-4 shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-2xl sm:px-6 sm:py-6 lg:px-8 lg:py-8 transition-all">
             {children}
           </div>
         </main>
       </div>
 
-      <div className="relative z-10 min-h-screen px-4 py-4 pb-24 sm:px-6 sm:py-6 lg:hidden">
-        <main className="mx-auto w-full max-w-[1700px] rounded-[1.75rem] border border-white/10 bg-white/5 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:p-6">
-          {children}
-        </main>
-      </div>
+      {/* Mobile/Tablet App Layout */}
+      <div className="relative z-10 flex h-[100dvh] w-full flex-col lg:hidden no-scrollbar">
+        {/* <MobileHeader /> */}
 
-      <BottomNav menus={effectiveMenus[roleKey] ?? effectiveMenus.user} />
+        <main className="flex-1 overflow-y-auto no-scrollbar pb-[100px] px-3 py-4">
+          <div className="mx-auto w-full max-w-[1700px] rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl sm:p-6 transition-all">
+            {children}
+          </div>
+        </main>
+
+
+        <BottomNav menus={effectiveMenus[roleKey] ?? effectiveMenus.user} />
+      </div>
     </div>
   );
 }

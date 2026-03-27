@@ -12,6 +12,8 @@ import { normalizeIndiaPhone } from "@/lib/phone";
 const JWT_SECRET = process.env.JWT_SECRET!;
 const OPERATOR_ACTIONS = ["mark_in_transit", "mark_delivered"] as const;
 type OperatorAction = (typeof OPERATOR_ACTIONS)[number];
+type IncidentReportType = "customer_not_at_pickup" | "customer_not_at_drop";
+type IncidentReportStatus = "attention_needed" | "office_collection_required";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -40,6 +42,52 @@ type BusDoc = {
   operatorContactPeriods?: OperatorPeriod[];
 };
 
+type OrderReportEntry = {
+  reportType?: unknown;
+  category?: unknown;
+  title?: unknown;
+  description?: unknown;
+  createdBy?: unknown;
+  createdByRole?: unknown;
+  createdAt?: unknown;
+  data?: unknown;
+};
+
+type IncidentReport = {
+  reportType: IncidentReportType;
+  category: string;
+  title: string;
+  description: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: string;
+  data: {
+    note: string;
+    guidance: string;
+    processingStatus: IncidentReportStatus;
+    orderId?: string;
+    busId?: string;
+    officeAction?: string;
+    customerMessage?: string;
+    assignedOffice?: {
+      officeName: string;
+      address?: string;
+      city: string;
+      state: string;
+      zip?: string;
+      phone: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  };
+  type: IncidentReportType;
+  status: IncidentReportStatus;
+  note: string;
+  guidance: string;
+  reportedAt?: string;
+  reportedBy?: string;
+};
+
 type OrderDoc = {
   _id?: unknown;
   user?: unknown;
@@ -61,6 +109,20 @@ type OrderDoc = {
   adminNote?: string;
   operatorNote?: string;
   customerNote?: string;
+  orderReports?: unknown[];
+  incidentReportType?: unknown;
+  incidentReportStatus?: unknown;
+  incidentReportNote?: unknown;
+  incidentReportGuidance?: unknown;
+  incidentReportAt?: unknown;
+  incidentReportBy?: unknown;
+  operatorIncidentType?: unknown;
+  operatorIncidentStatus?: unknown;
+  operatorIncidentNote?: unknown;
+  operatorIncidentGuidance?: unknown;
+  operatorIncidentAt?: unknown;
+  operatorIncidentBy?: unknown;
+  assignedOffice?: unknown;
 };
 
 const toStringValue = (value: unknown, fallback = ""): string => {
@@ -138,6 +200,157 @@ const getBusImage = (bus: unknown): string => {
   return Array.isArray(busImages) ? toStringValue(busImages[0]) : "";
 };
 
+const INCIDENT_NOTE_PATTERN = /^\[report:(customer_not_at_pickup|customer_not_at_drop)\]\s*(.*)$/i;
+
+const INCIDENT_LABELS: Record<IncidentReportType, string> = {
+  customer_not_at_pickup: "Customer not at pickup",
+  customer_not_at_drop: "Customer not at drop",
+};
+
+const INCIDENT_GUIDANCE: Record<IncidentReportType, string> = {
+  customer_not_at_pickup: "Hold the shipment and confirm with the customer before dispatch.",
+  customer_not_at_drop: "Collect the package from office.",
+};
+
+const INCIDENT_STATUS: Record<IncidentReportType, IncidentReportStatus> = {
+  customer_not_at_pickup: "attention_needed",
+  customer_not_at_drop: "office_collection_required",
+};
+
+const getLatestOrderReportEntry = (orderReports: unknown): OrderReportEntry | null => {
+  if (!Array.isArray(orderReports) || orderReports.length === 0) return null;
+
+  for (let index = orderReports.length - 1; index >= 0; index -= 1) {
+    const report = orderReports[index];
+    if (report && typeof report === "object" && !Array.isArray(report)) {
+      return report as OrderReportEntry;
+    }
+  }
+
+  return null;
+};
+
+const normalizeIncidentType = (value: unknown): IncidentReportType | null => {
+  const normalized = toStringValue(value).trim().toLowerCase();
+  if (normalized === "customer_not_at_pickup" || normalized === "customer_not_at_drop") {
+    return normalized;
+  }
+  return null;
+};
+
+const buildIncidentNote = (type: IncidentReportType, extraNote = ""): string => {
+  const trimmedExtraNote = extraNote.trim();
+  const suffix = trimmedExtraNote ? ` ${trimmedExtraNote}` : "";
+  return `[report:${type}] ${INCIDENT_LABELS[type]}. ${INCIDENT_GUIDANCE[type]}${suffix}`.trim();
+};
+
+const parseIncidentReport = (order: OrderDoc): IncidentReport | null => {
+  const reportEntry = getLatestOrderReportEntry(order.orderReports);
+  const explicitType =
+    normalizeIncidentType(reportEntry?.reportType) ||
+    normalizeIncidentType(order.operatorIncidentType) ||
+    normalizeIncidentType(order.incidentReportType);
+  const reportData = reportEntry && typeof reportEntry.data === "object" && reportEntry.data !== null
+    ? (reportEntry.data as UnknownRecord)
+    : {};
+  const noteSource =
+    toStringValue(reportData.note) ||
+    toStringValue(order.operatorIncidentNote) ||
+    toStringValue(order.incidentReportNote) ||
+    toStringValue(order.operatorNote) ||
+    toStringValue(order.adminNote);
+  const noteMatch = noteSource.match(INCIDENT_NOTE_PATTERN);
+  const inferredType = normalizeIncidentType(noteMatch?.[1] ?? "");
+  const type = explicitType || inferredType;
+
+  if (!type) {
+    return null;
+  }
+
+  const guidance =
+    toStringValue(reportData.guidance) ||
+    toStringValue(order.operatorIncidentGuidance || order.incidentReportGuidance) ||
+    INCIDENT_GUIDANCE[type];
+  const rawStatus = toStringValue(
+    reportData.processingStatus || order.operatorIncidentStatus || order.incidentReportStatus,
+  ).toLowerCase();
+  const status = rawStatus === "office_collection_required"
+    ? "office_collection_required"
+    : INCIDENT_STATUS[type];
+  const rawNote = toStringValue(
+    reportData.note ||
+      order.operatorIncidentNote ||
+      order.incidentReportNote ||
+      noteMatch?.[2] ||
+      noteSource,
+  ).trim();
+  const note = rawNote.replace(INCIDENT_NOTE_PATTERN, "$2").trim() || buildIncidentNote(type);
+  const title = toStringValue(reportEntry?.title) || INCIDENT_LABELS[type];
+  const assignedOffice =
+    reportData.assignedOffice && typeof reportData.assignedOffice === "object"
+      ? {
+          officeName: toStringValue((reportData.assignedOffice as UnknownRecord).officeName),
+          address: toStringValue((reportData.assignedOffice as UnknownRecord).address),
+          city: toStringValue((reportData.assignedOffice as UnknownRecord).city),
+          state: toStringValue((reportData.assignedOffice as UnknownRecord).state),
+          zip: toStringValue((reportData.assignedOffice as UnknownRecord).zip),
+          phone: toStringValue((reportData.assignedOffice as UnknownRecord).phone),
+          latitude: toNumberValue((reportData.assignedOffice as UnknownRecord).latitude, Number.NaN),
+          longitude: toNumberValue((reportData.assignedOffice as UnknownRecord).longitude, Number.NaN),
+        }
+      : order.assignedOffice && typeof order.assignedOffice === "object"
+        ? {
+            officeName: toStringValue((order.assignedOffice as UnknownRecord).officeName),
+            address: toStringValue((order.assignedOffice as UnknownRecord).address),
+            city: toStringValue((order.assignedOffice as UnknownRecord).city),
+            state: toStringValue((order.assignedOffice as UnknownRecord).state),
+            zip: toStringValue((order.assignedOffice as UnknownRecord).zip),
+            phone: toStringValue((order.assignedOffice as UnknownRecord).phone),
+            latitude: toNumberValue((order.assignedOffice as UnknownRecord).latitude, Number.NaN),
+            longitude: toNumberValue((order.assignedOffice as UnknownRecord).longitude, Number.NaN),
+          }
+        : null;
+  const customerMessage =
+    toStringValue(reportData.customerMessage) ||
+    (order.assignedOffice && typeof order.assignedOffice === "object"
+      ? toStringValue((order.assignedOffice as UnknownRecord).customerMessage)
+      : "");
+  const officeAction =
+    toStringValue(reportData.officeAction) ||
+    (assignedOffice?.officeName
+      ? `Package held at ${assignedOffice.officeName}, ${assignedOffice.city}.`
+      : "");
+  const description = toStringValue(reportEntry?.description) || customerMessage || INCIDENT_GUIDANCE[type];
+  const createdBy = toStringValue(reportEntry?.createdBy || order.operatorIncidentBy || order.incidentReportBy);
+  const createdByRole = toStringValue(reportEntry?.createdByRole || "operator");
+  const createdAt = toIsoDate(reportEntry?.createdAt || order.operatorIncidentAt || order.incidentReportAt || order.updatedAt);
+
+  return {
+    reportType: type,
+    category: toStringValue(reportEntry?.category, "incident"),
+    title,
+    description,
+    createdBy,
+    createdByRole,
+    createdAt,
+    data: {
+      note,
+      guidance,
+      processingStatus: status,
+      orderId: toStringValue(order._id),
+      officeAction,
+      customerMessage,
+      assignedOffice: assignedOffice?.officeName ? assignedOffice : undefined,
+    },
+    type,
+    status,
+    note,
+    guidance,
+    reportedAt: createdAt,
+    reportedBy: createdBy,
+  };
+};
+
 const isOrderInOperatorPeriods = (
   orderDateValue: unknown,
   operatorId: string,
@@ -182,8 +395,9 @@ const buildOrderItem = (order: OrderDoc, role: "admin" | "operator") => {
   const busRef = assignedBus && Object.keys(assignedBus).length > 0 ? assignedBus : bookingBus;
   const userRef = order.user as UnknownRecord | undefined;
   const allowedActions = role === "operator" ? getOperatorAllowedActions(order.status) : [];
-  const operatorNote = toStringValue(order.operatorNote) || toStringValue(order.adminNote);
   const customerNote = toStringValue(order.customerNote);
+  const report = parseIncidentReport(order);
+  const operatorNote = report?.note || toStringValue(order.operatorNote) || toStringValue(order.adminNote);
 
   return {
     id: toStringValue(order._id),
@@ -200,6 +414,7 @@ const buildOrderItem = (order: OrderDoc, role: "admin" | "operator") => {
     dropProofImage: toStringValue(order.dropProofImage),
     operatorNote,
     customerNote: role === "operator" ? "" : customerNote,
+    report,
     user: {
       id: toStringValue(userRef?._id),
       name: toStringValue(userRef?.name),
@@ -444,6 +659,7 @@ export async function GET(request: NextRequest) {
       rawOrders = rawOrders.filter((order) => {
         const busRef = (order.assignedBus as UnknownRecord | undefined) || (order.bus as UnknownRecord | undefined);
         const userRef = order.user as UnknownRecord | undefined;
+        const report = parseIncidentReport(order);
         const joined = [
           toStringValue(order.trackingId),
           toStringValue(order.status),
@@ -452,6 +668,8 @@ export async function GET(request: NextRequest) {
           toStringValue(busRef?.busNumber),
           toStringValue(userRef?.name),
           toStringValue(userRef?.email),
+          toStringValue(report?.note),
+          toStringValue(report?.guidance),
         ]
           .join(" ")
           .toLowerCase();
@@ -568,7 +786,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const order = await Order.findById(orderId).select(
-      "_id user trackingId assignedBus bus orderDate status pickupProofImage dropProofImage senderInfo receiverInfo adminNote operatorNote customerNote",
+      "_id user trackingId assignedBus bus orderDate status pickupProofImage dropProofImage senderInfo receiverInfo adminNote operatorNote customerNote orderReports incidentReportType incidentReportStatus incidentReportNote incidentReportGuidance incidentReportAt incidentReportBy operatorIncidentType operatorIncidentStatus operatorIncidentNote operatorIncidentGuidance operatorIncidentAt operatorIncidentBy assignedOffice",
     );
     if (!order) {
       return NextResponse.json({ success: false, message: "Order not found." }, { status: 404 });
@@ -778,6 +996,16 @@ export async function PATCH(request: NextRequest) {
             trackingId: toStringValue(order.trackingId),
             orderStatus: toStringValue(order.status),
             orderNote: nextCustomerNote || toStringValue(order.customerNote) || nextOperatorNote || toStringValue(order.operatorNote),
+            packages: Array.isArray(order.packages) ? order.packages.map((pkg: unknown) => {
+              const safePkg = pkg as Record<string, unknown> | null;
+              return {
+                name: String(safePkg?.packageName || safePkg?.description || "Package"),
+                image: String(safePkg?.packageImage || ""),
+                type: String(safePkg?.packageType || "Standard"),
+                weight: String(safePkg?.packageWeight || safePkg?.weightKg || ""),
+                size: String(safePkg?.packageSize || ""),
+              };
+            }) : undefined,
           });
         }
       } catch {

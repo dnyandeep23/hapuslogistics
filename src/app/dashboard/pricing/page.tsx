@@ -9,6 +9,9 @@ import CustomDatePicker from "@/components/CustomDatePicker";
 
 type Summary = {
   totalRevenue: number;
+  grossRevenue: number;
+  totalRefunds: number;
+  netRevenue: number;
   totalOrders: number;
   totalBuses: number;
   totalCompanies: number;
@@ -22,6 +25,9 @@ type AvailableCompany = {
 type CompanyRevenue = {
   companyId: string;
   companyName: string;
+  grossRevenue: number;
+  refundAmount: number;
+  netRevenue: number;
   totalRevenue: number;
   totalOrders: number;
   totalBuses: number;
@@ -41,6 +47,9 @@ type BusRevenue = {
   busNumber: string;
   companyId: string;
   companyName: string;
+  grossRevenue: number;
+  refundAmount: number;
+  netRevenue: number;
   totalRevenue: number;
   totalOrders: number;
   collectedBy: CollectedBySummary[];
@@ -52,7 +61,9 @@ type OrderRevenueRow = {
   status: string;
   createdAt: string;
   orderDate: string;
-  amount: number;
+  grossAmount: number;
+  refundAmount: number;
+  netAmount: number;
   busId: string;
   busName: string;
   busNumber: string;
@@ -78,6 +89,9 @@ type PricingResponse = {
 
 const defaultSummary: Summary = {
   totalRevenue: 0,
+  grossRevenue: 0,
+  totalRefunds: 0,
+  netRevenue: 0,
   totalOrders: 0,
   totalBuses: 0,
   totalCompanies: 0,
@@ -194,7 +208,9 @@ export default function PricingDashboardPage() {
       "Bus Name",
       "Bus Number",
       "Company",
-      "Amount",
+      "Gross Amount",
+      "Refund Amount",
+      "Net Revenue",
       "Collected By",
       "Collector Email",
       "Collected Type",
@@ -213,7 +229,9 @@ export default function PricingDashboardPage() {
           row.busName,
           row.busNumber,
           row.companyName,
-          row.amount.toFixed(2),
+          row.grossAmount.toFixed(2),
+          row.refundAmount.toFixed(2),
+          row.netAmount.toFixed(2),
           row.collectedByName,
           row.collectedByEmail,
           row.collectedByType,
@@ -245,11 +263,53 @@ export default function PricingDashboardPage() {
     doc.text("Hapus Logistics - Pricing Report", 40, 36);
     doc.setFontSize(10);
     doc.text(`Date Range: ${fromDate || "--"} to ${toDate || "--"}`, 40, 54);
-    doc.text(`Total Revenue: ${formatCurrency(summary.totalRevenue)}`, 40, 70);
+    doc.text(`Gross Revenue: ${formatCurrency(summary.grossRevenue)}`, 40, 70);
+    doc.text(`Refunds: ${formatCurrency(summary.totalRefunds)}`, 260, 70);
+    doc.text(`Net Revenue: ${formatCurrency(summary.netRevenue)}`, 430, 70);
+
+    let tableStartY = 110;
+
+    if (topCollectors.length > 0) {
+      doc.setFontSize(12);
+      doc.setTextColor(40, 45, 30);
+      doc.setFont("helvetica", "bold");
+      doc.text("Top Revenue Collectors", 40, 105);
+      
+      const chartX = 40;
+      const chartY = 125;
+      const maxBarWidth = 280;
+      const maxRevenue = Math.max(...topCollectors.map((c) => c.revenue), 1);
+      
+      // Container box
+      doc.setDrawColor(225, 230, 215);
+      doc.setFillColor(250, 252, 246);
+      doc.roundedRect(chartX, chartY - 12, maxBarWidth + 180, (topCollectors.length * 26) + 20, 6, 6, "FD");
+      
+      topCollectors.slice(0, 5).forEach((c, idx) => {
+        const barWidth = (c.revenue / maxRevenue) * maxBarWidth;
+        const barY = chartY + (idx * 26);
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(80, 85, 75);
+        const displayName = c.name.length > 14 ? c.name.slice(0, 14) + "..." : c.name;
+        doc.text(displayName, chartX + 12, barY + 11);
+        
+        doc.setFillColor(213, 228, 0); // #D5E400
+        doc.roundedRect(chartX + 100, barY, Math.max(barWidth, 2), 14, 3, 3, "F");
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(110, 115, 105);
+        doc.text(formatCurrency(c.revenue), chartX + 108 + barWidth, barY + 10);
+      });
+      
+      tableStartY = chartY + (topCollectors.length * 26) + 40;
+    }
 
     autoTable(doc, {
-      startY: 84,
-      head: [["Tracking", "Status", "Date", "Company", "Bus", "Collected By", "Collector Email", "Amount"]],
+      startY: tableStartY,
+      head: [["Tracking", "Status", "Date", "Company", "Bus", "Collected By", "Collector Email", "Gross", "Refunds", "Net"]],
       body: orderRows.map((row) => [
         row.trackingId,
         row.status,
@@ -258,10 +318,13 @@ export default function PricingDashboardPage() {
         `${row.busName} (${row.busNumber})`,
         row.collectedByName,
         row.collectedByEmail || "--",
-        formatCurrency(row.amount),
+        formatCurrency(row.grossAmount),
+        formatCurrency(row.refundAmount),
+        formatCurrency(row.netAmount),
       ]),
-      styles: { fontSize: 8, cellPadding: 4 },
+      styles: { fontSize: 8, cellPadding: 5 },
       headStyles: { fillColor: [45, 60, 35], textColor: 255 },
+      alternateRowStyles: { fillColor: [250, 252, 246] },
     });
 
     doc.save(`pricing-report-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -309,7 +372,7 @@ export default function PricingDashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#E4E67A]">Pricing</h1>
           <p className="mt-1 text-sm text-white/70">
-            Company-wise and bus-wise revenue for the selected filters.
+            Company-wise and bus-wise gross revenue, refunds, and exact net revenue for the selected filters.
           </p>
         </div>
 
@@ -411,7 +474,9 @@ export default function PricingDashboardPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MetricCard label="Total Revenue" value={formatCurrency(summary.totalRevenue)} icon="mdi:cash-multiple" />
+            <MetricCard label="Gross Revenue" value={formatCurrency(summary.grossRevenue)} icon="mdi:cash-plus" />
+            <MetricCard label="Refunds" value={formatCurrency(summary.totalRefunds)} icon="mdi:cash-refund" />
+            <MetricCard label="Net Revenue" value={formatCurrency(summary.netRevenue)} icon="mdi:cash-multiple" />
             <MetricCard label="Total Orders" value={String(summary.totalOrders)} icon="lets-icons:order" />
             <MetricCard label="Total Buses" value={String(summary.totalBuses)} icon="mdi:bus-multiple" />
             <MetricCard label="Total Companies" value={String(summary.totalCompanies)} icon="mdi:office-building-outline" />
@@ -429,7 +494,9 @@ export default function PricingDashboardPage() {
                       <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Buses</th>
                       <th className="px-3 py-2">Orders</th>
-                      <th className="px-3 py-2">Revenue</th>
+                      <th className="px-3 py-2">Gross</th>
+                      <th className="px-3 py-2">Refunds</th>
+                      <th className="px-3 py-2">Net</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,7 +505,9 @@ export default function PricingDashboardPage() {
                         <td className="px-3 py-2">{company.companyName}</td>
                         <td className="px-3 py-2">{company.totalBuses}</td>
                         <td className="px-3 py-2">{company.totalOrders}</td>
-                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(company.totalRevenue)}</td>
+                        <td className="px-3 py-2">{formatCurrency(company.grossRevenue)}</td>
+                        <td className="px-3 py-2 text-rose-200">{formatCurrency(company.refundAmount)}</td>
+                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(company.netRevenue)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -459,7 +528,9 @@ export default function PricingDashboardPage() {
                       <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Bus</th>
                       <th className="px-3 py-2">Orders</th>
-                      <th className="px-3 py-2">Revenue</th>
+                      <th className="px-3 py-2">Gross</th>
+                      <th className="px-3 py-2">Refunds</th>
+                      <th className="px-3 py-2">Net</th>
                       <th className="px-3 py-2">Collected By</th>
                     </tr>
                   </thead>
@@ -469,7 +540,9 @@ export default function PricingDashboardPage() {
                         <td className="px-3 py-2">{bus.companyName}</td>
                         <td className="px-3 py-2">{bus.busName} ({bus.busNumber})</td>
                         <td className="px-3 py-2">{bus.totalOrders}</td>
-                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(bus.totalRevenue)}</td>
+                        <td className="px-3 py-2">{formatCurrency(bus.grossRevenue)}</td>
+                        <td className="px-3 py-2 text-rose-200">{formatCurrency(bus.refundAmount)}</td>
+                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(bus.netRevenue)}</td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1">
                             {bus.collectedBy.slice(0, 4).map((collector) => (
@@ -540,7 +613,9 @@ export default function PricingDashboardPage() {
                       <th className="px-3 py-2">Bus</th>
                       <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Collected By</th>
-                      <th className="px-3 py-2">Amount</th>
+                      <th className="px-3 py-2">Gross</th>
+                      <th className="px-3 py-2">Refunds</th>
+                      <th className="px-3 py-2">Net</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -566,7 +641,9 @@ export default function PricingDashboardPage() {
                             {row.collectedByName}
                           </span>
                         </td>
-                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(row.amount)}</td>
+                        <td className="px-3 py-2">{formatCurrency(row.grossAmount)}</td>
+                        <td className="px-3 py-2 text-rose-200">{formatCurrency(row.refundAmount)}</td>
+                        <td className="px-3 py-2 font-semibold text-[#E4E67A]">{formatCurrency(row.netAmount)}</td>
                       </tr>
                     ))}
                   </tbody>

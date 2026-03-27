@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { dbConnect } from "@/app/api/lib/db";
 import User from "@/app/api/models/userModel";
+import Bus from "@/app/api/models/busModel";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -46,7 +47,44 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .lean();
 
-    return NextResponse.json({ success: true, operators });
+    const operatorIds = operators.map((operator) => String(operator._id)).filter(Boolean);
+    const assignedBuses = operatorIds.length > 0
+      ? await Bus.find({
+          travelCompanyId: admin.travelCompanyId,
+          "operatorContactPeriods.operatorId": { $in: operatorIds },
+        })
+          .select("busName busNumber operatorContactPeriods")
+          .lean<Array<Record<string, unknown>>>()
+      : [];
+
+    const busAssignmentsByOperatorId = new Map<string, Array<{ busId: string; label: string }>>();
+    for (const bus of assignedBuses) {
+      const operatorPeriods = Array.isArray(bus.operatorContactPeriods) ? bus.operatorContactPeriods : [];
+      const busLabel = `${String(bus.busName ?? "Bus").trim() || "Bus"} (${String(bus.busNumber ?? "--").trim() || "--"})`;
+      const busId = String(bus._id ?? "");
+
+      for (const period of operatorPeriods) {
+        if (!period || typeof period !== "object") continue;
+        const operatorId = String((period as { operatorId?: unknown }).operatorId ?? "");
+        if (!operatorId) continue;
+        const existing = busAssignmentsByOperatorId.get(operatorId) ?? [];
+        if (!existing.some((entry) => entry.busId === busId)) {
+          existing.push({ busId, label: busLabel });
+          busAssignmentsByOperatorId.set(operatorId, existing);
+        }
+      }
+    }
+
+    const operatorsWithAssignments = operators.map((operator) => {
+      const assignments = busAssignmentsByOperatorId.get(String(operator._id)) ?? [];
+      return {
+        ...operator,
+        assignedBusCount: assignments.length,
+        assignedBuses: assignments,
+      };
+    });
+
+    return NextResponse.json({ success: true, operators: operatorsWithAssignments });
   } catch (error: unknown) {
     return NextResponse.json(
       {

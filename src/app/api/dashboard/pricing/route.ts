@@ -138,6 +138,9 @@ export async function GET(request: NextRequest) {
           role,
           summary: {
             totalRevenue: 0,
+            grossRevenue: 0,
+            totalRefunds: 0,
+            netRevenue: 0,
             totalOrders: 0,
             totalBuses: 0,
             totalCompanies: 0,
@@ -178,6 +181,9 @@ export async function GET(request: NextRequest) {
           role,
           summary: {
             totalRevenue: 0,
+            grossRevenue: 0,
+            totalRefunds: 0,
+            netRevenue: 0,
             totalOrders: 0,
             totalBuses: 0,
             totalCompanies: 0,
@@ -229,7 +235,6 @@ export async function GET(request: NextRequest) {
 
     const orderQuery: Record<string, unknown> = {
       $or: [{ assignedBus: { $in: busObjectIds } }, { bus: { $in: busObjectIds } }],
-      status: { $ne: "cancelled" },
     };
 
     if (fromDate || toDate) {
@@ -241,7 +246,7 @@ export async function GET(request: NextRequest) {
 
     const orderDocs = await Order.find(orderQuery)
       .select(
-        "_id trackingId status totalAmount assignedBus bus user bookedByAdmin bookedByAdminId createdAt orderDate paymentId",
+        "_id trackingId status totalAmount assignedBus bus user bookedByAdmin bookedByAdminId createdAt orderDate paymentId adjustmentRefundAmount cancellationDetails missedPackageDetails",
       )
       .populate("user", "name email")
       .populate("bookedByAdminId", "name email")
@@ -256,7 +261,9 @@ export async function GET(request: NextRequest) {
         busNumber: string;
         companyId: string;
         companyName: string;
-        totalRevenue: number;
+        grossRevenue: number;
+        refundAmount: number;
+        netRevenue: number;
         totalOrders: number;
         collectedByMap: Map<string, { name: string; email: string; type: string; revenue: number; orders: number }>;
       }
@@ -264,7 +271,15 @@ export async function GET(request: NextRequest) {
 
     const companyRevenueMap = new Map<
       string,
-      { companyId: string; companyName: string; totalRevenue: number; totalOrders: number; busIds: Set<string> }
+      {
+        companyId: string;
+        companyName: string;
+        grossRevenue: number;
+        refundAmount: number;
+        netRevenue: number;
+        totalOrders: number;
+        busIds: Set<string>;
+      }
     >();
 
     const orderRows: Array<{
@@ -273,7 +288,9 @@ export async function GET(request: NextRequest) {
       status: string;
       createdAt: string;
       orderDate: string;
-      amount: number;
+      grossAmount: number;
+      refundAmount: number;
+      netAmount: number;
       busId: string;
       busName: string;
       busNumber: string;
@@ -293,7 +310,18 @@ export async function GET(request: NextRequest) {
       const busMeta = busById.get(busId);
       if (!busMeta) continue;
 
-      const amount = Math.max(0, toNumberValue(order.totalAmount, 0));
+      const grossAmount = Math.max(0, toNumberValue(order.totalAmount, 0));
+      const cancellationRefundAmount =
+        order.cancellationDetails && typeof order.cancellationDetails === "object"
+          ? Math.max(0, toNumberValue((order.cancellationDetails as UnknownRecord).refundAmount, 0))
+          : 0;
+      const missedPackageRefundAmount =
+        order.missedPackageDetails && typeof order.missedPackageDetails === "object"
+          ? Math.max(0, toNumberValue((order.missedPackageDetails as UnknownRecord).refundAmount, 0))
+          : 0;
+      const adjustmentRefundAmount = Math.max(0, toNumberValue(order.adjustmentRefundAmount, 0));
+      const refundAmount = cancellationRefundAmount + missedPackageRefundAmount + adjustmentRefundAmount;
+      const netAmount = grossAmount - refundAmount;
       const companyId = busMeta.travelCompanyId;
       const companyName = companyById.get(companyId) || "Unassigned Company";
 
@@ -317,7 +345,9 @@ export async function GET(request: NextRequest) {
         status: toStringValue(order.status, "pending"),
         createdAt: new Date(order.createdAt ? String(order.createdAt) : Date.now()).toISOString(),
         orderDate: new Date(order.orderDate ? String(order.orderDate) : Date.now()).toISOString(),
-        amount,
+        grossAmount,
+        refundAmount,
+        netAmount,
         busId,
         busName: busMeta.busName,
         busNumber: busMeta.busNumber,
@@ -338,18 +368,22 @@ export async function GET(request: NextRequest) {
           busNumber: busMeta.busNumber,
           companyId,
           companyName,
-          totalRevenue: 0,
+          grossRevenue: 0,
+          refundAmount: 0,
+          netRevenue: 0,
           totalOrders: 0,
           collectedByMap: new Map<string, { name: string; email: string; type: string; revenue: number; orders: number }>(),
         };
 
-      busEntry.totalRevenue += amount;
+      busEntry.grossRevenue += grossAmount;
+      busEntry.refundAmount += refundAmount;
+      busEntry.netRevenue += netAmount;
       busEntry.totalOrders += 1;
       const collectorKey = `${collectedByType}:${collectedByName}:${collectedByEmail}`;
       const collector =
         busEntry.collectedByMap.get(collectorKey) ||
         { name: collectedByName, email: collectedByEmail, type: collectedByType, revenue: 0, orders: 0 };
-      collector.revenue += amount;
+      collector.revenue += netAmount;
       collector.orders += 1;
       busEntry.collectedByMap.set(collectorKey, collector);
       busRevenueMap.set(busId, busEntry);
@@ -359,11 +393,15 @@ export async function GET(request: NextRequest) {
         {
           companyId,
           companyName,
-          totalRevenue: 0,
+          grossRevenue: 0,
+          refundAmount: 0,
+          netRevenue: 0,
           totalOrders: 0,
           busIds: new Set<string>(),
         };
-      companyEntry.totalRevenue += amount;
+      companyEntry.grossRevenue += grossAmount;
+      companyEntry.refundAmount += refundAmount;
+      companyEntry.netRevenue += netAmount;
       companyEntry.totalOrders += 1;
       companyEntry.busIds.add(busId);
       companyRevenueMap.set(companyId, companyEntry);
@@ -376,7 +414,10 @@ export async function GET(request: NextRequest) {
         busNumber: entry.busNumber,
         companyId: entry.companyId,
         companyName: entry.companyName,
-        totalRevenue: entry.totalRevenue,
+        grossRevenue: entry.grossRevenue,
+        refundAmount: entry.refundAmount,
+        netRevenue: entry.netRevenue,
+        totalRevenue: entry.netRevenue,
         totalOrders: entry.totalOrders,
         collectedBy: Array.from(entry.collectedByMap.values())
           .sort((a, b) => b.revenue - a.revenue)
@@ -388,31 +429,39 @@ export async function GET(request: NextRequest) {
             orders: collector.orders,
           })),
       }))
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+      .sort((a, b) => b.netRevenue - a.netRevenue);
 
     const companiesPayload = Array.from(companyRevenueMap.values())
       .map((entry) => ({
         companyId: entry.companyId,
         companyName: entry.companyName,
-        totalRevenue: entry.totalRevenue,
+        grossRevenue: entry.grossRevenue,
+        refundAmount: entry.refundAmount,
+        netRevenue: entry.netRevenue,
+        totalRevenue: entry.netRevenue,
         totalOrders: entry.totalOrders,
         totalBuses: entry.busIds.size,
       }))
-      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+      .sort((a, b) => b.netRevenue - a.netRevenue);
 
     const availableCompanies = Array.from(companyIds).map((companyId) => ({
       companyId,
       companyName: companyById.get(companyId) || "Unassigned Company",
     }));
 
-    const totalRevenue = orderRows.reduce((sum, row) => sum + row.amount, 0);
+    const grossRevenue = orderRows.reduce((sum, row) => sum + row.grossAmount, 0);
+    const totalRefunds = orderRows.reduce((sum, row) => sum + row.refundAmount, 0);
+    const netRevenue = orderRows.reduce((sum, row) => sum + row.netAmount, 0);
 
     return NextResponse.json(
       {
         success: true,
         role,
         summary: {
-          totalRevenue,
+          totalRevenue: netRevenue,
+          grossRevenue,
+          totalRefunds,
+          netRevenue,
           totalOrders: orderRows.length,
           totalBuses: busesPayload.length,
           totalCompanies: new Set(busesPayload.map((entry) => entry.companyId)).size,

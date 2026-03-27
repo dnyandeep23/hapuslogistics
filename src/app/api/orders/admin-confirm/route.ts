@@ -15,6 +15,7 @@ import Bus from "@/app/api/models/busModel";
 import Location from "@/app/api/models/locationModel";
 import Order from "@/app/api/models/orderModel";
 import User from "@/app/api/models/userModel";
+import { buildDefaultRefundPolicySnapshot } from "@/app/api/lib/orderCancellation";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -224,6 +225,7 @@ export async function POST(request: NextRequest) {
       couponDiscount: holdSession.couponDiscount ?? undefined,
       bookedByAdmin: true,
       bookedByAdminId: actor._id,
+      refundPolicySnapshot: buildDefaultRefundPolicySnapshot(),
     });
 
     await order.save({ session: tx });
@@ -243,9 +245,19 @@ export async function POST(request: NextRequest) {
         email: customer.email,
         emailType: "ORDER_CONFIRMED",
         trackingId,
+        packages: Array.isArray(orderPackages) ? orderPackages.map((pkg) => {
+          const safePkg = pkg as Record<string, unknown> | null;
+          return {
+            name: String(safePkg?.packageName || safePkg?.description || "Package"),
+            image: String(safePkg?.packageImage || ""),
+            type: String(safePkg?.packageType || "Standard"),
+            weight: String(safePkg?.packageWeight || safePkg?.weightKg || ""),
+            size: String(safePkg?.packageSize || ""),
+          };
+        }) : undefined,
       });
-    } catch {
-      // Do not fail confirmed bookings due to mail transport errors.
+    } catch (mailError) {
+      console.error("[admin-confirm] Order confirmation email failed to send:", mailError);
     }
 
     return NextResponse.json(

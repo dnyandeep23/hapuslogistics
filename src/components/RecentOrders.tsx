@@ -65,6 +65,14 @@ function getStatusTone(status: string) {
         };
     }
 
+    if (normalized === 'missed package' || normalized === 'missed_package') {
+        return {
+            icon: 'mdi:package-variant-remove',
+            badge: 'bg-orange-500/15 text-orange-200 ring-orange-500/25',
+            accent: 'from-orange-500/18 to-orange-500/0',
+        };
+    }
+
     return {
         icon: 'mdi:clock-outline',
         badge: 'bg-rose-500/15 text-rose-300 ring-rose-500/25',
@@ -127,7 +135,7 @@ export default function RecentOrders() {
                     ? data.map(mapOrder).filter((order): order is Order => Boolean(order))
                     : [];
 
-                setOrders(normalizedOrders);
+                setOrders(normalizedOrders.slice(0, 3));
             } catch (error) {
                 console.error('Error fetching recent orders:', error);
                 addToast('Network issue while loading recent orders.', 'error');
@@ -187,11 +195,18 @@ export default function RecentOrders() {
                     </div>
                 </div>
                 <button
-                    onClick={() => router.push('/dashboard/orders')}
+                    onClick={() => {
+                        const tracker = document.getElementById("dashboard-order-tracker");
+                        if (tracker) {
+                            tracker.scrollIntoView({ behavior: "smooth", block: "start" });
+                        } else {
+                            router.push('/dashboard/orders');
+                        }
+                    }}
                     className="inline-flex items-center gap-2 rounded-full border border-[#F6FF6A]/20 bg-[#F6FF6A]/10 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition-colors hover:bg-[#F6FF6A]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6FF6A]/50"
                 >
-                    View All
-                    <Icon icon="mdi:arrow-right" className="text-base" />
+                    View More
+                    <Icon icon="mdi:arrow-down" className="text-base" />
                 </button>
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

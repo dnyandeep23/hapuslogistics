@@ -199,47 +199,47 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
         : "--/--/----";
 
     return (
-        <div className="space-y-6 text-white sm:space-y-8">
+        <div className="space-y-5 text-white sm:space-y-8">
 
             {/* Header */}
             <div className="max-w-2xl text-[#F6FF6A]">
-                <h2 className="text-2xl font-bold sm:text-3xl">Review & Checkout</h2>
-                <p className="mt-2 text-sm leading-6 text-white/68 sm:text-base">Review your order details and proceed to payment.</p>
+                <h2 className="text-xl font-bold sm:text-3xl">Review & Checkout</h2>
+                <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">Review your order details and proceed to payment.</p>
             </div>
 
             {/* Location Information */}
-            <div className="package-panel relative rounded-[1.6rem] p-4 pt-6 sm:p-5 sm:pt-6">
-                <span className="package-badge absolute top-0 rounded-b-xl px-4 py-1 text-sm font-semibold">
+            <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
+                <span className="package-badge absolute top-0 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
                     Location Information
                 </span>
 
-                <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                    <div className="package-panel-soft flex items-start gap-3 rounded-[1.3rem] p-4">
-                        <Icon icon="streamline-plump:location-pin-solid" className="text-green-400 text-3xl" />
+                <div className="mt-4 md:mt-6 grid gap-3 lg:gap-4 lg:grid-cols-2">
+                    <div className="package-panel-soft flex items-start gap-2 md:gap-3 rounded-[1.3rem] p-3 md:p-4">
+                        <Icon icon="streamline-plump:location-pin-solid" className="text-green-400 text-2xl md:text-3xl" />
                         <div>
-                            <p className="text-sm text-[#F4FF9F]">Pickup Location</p>
-                            <p className="font-bold text-[#e7f868]">{pickUpLoc?.name}</p>
-                            <p className="mt-1 text-sm text-white/65">{pickUpLoc?.address}, {pickUpLoc?.city}, {pickUpLoc?.state} {pickUpLoc?.zip}</p>
+                            <p className="text-xs md:text-sm text-[#F4FF9F]">Pickup Location</p>
+                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{pickUpLoc?.name}</p>
+                            <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">{pickUpLoc?.address}, {pickUpLoc?.city}, {pickUpLoc?.state} {pickUpLoc?.zip}</p>
                         </div>
                     </div>
 
-                    <div className="package-panel-soft flex items-start gap-3 rounded-[1.3rem] p-4">
-                        <Icon icon="streamline-plump:location-pin-solid" className="text-red-400 text-3xl" />
+                    <div className="package-panel-soft flex items-start gap-2 md:gap-3 rounded-[1.3rem] p-3 md:p-4">
+                        <Icon icon="streamline-plump:location-pin-solid" className="text-red-400 text-2xl md:text-3xl" />
                         <div>
-                            <p className="text-sm text-[#F4FF9F]">Drop Location</p>
-                            <p className="font-bold text-[#e7f868]">{dropLoc?.name}</p>
-                            <p className="mt-1 text-sm text-white/65">{dropLoc?.address}, {dropLoc?.city}, {dropLoc?.state} {dropLoc?.zip}</p>
+                            <p className="text-xs md:text-sm text-[#F4FF9F]">Drop Location</p>
+                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{dropLoc?.name}</p>
+                            <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">{dropLoc?.address}, {dropLoc?.city}, {dropLoc?.state} {dropLoc?.zip}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Package Information */}
-            <div className="package-panel relative rounded-[1.6rem] px-4 pb-4 pt-6 sm:px-5 sm:pb-5 sm:pt-6">
-                <span className="package-badge absolute top-0 rounded-b-xl px-4 py-1 text-sm font-semibold">
+            <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] px-3.5 pb-3.5 pt-6 sm:px-5 sm:pb-5 sm:pt-6">
+                <span className="package-badge absolute top-0 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
                     Package Information
                 </span>
-                <div className="package-badge absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full px-3 py-1 text-xs text-white/90 sm:text-sm"> <Icon icon="solar:calendar-linear" className=" text-white text-base" /> <span>Pickup Date {pickupDate}</span>
+                <div className="package-badge absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-1 md:gap-2 rounded-full px-2 md:px-3 py-1 text-[10px] md:text-sm text-white/90"> <Icon icon="solar:calendar-linear" className=" text-white text-sm md:text-base" /> <span>Pickup Date {pickupDate}</span>
                 </div>
 
                 <div className="space-y-3 mt-6">
@@ -259,20 +259,20 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                             <div className="relative flex w-full flex-col gap-3 px-4 pb-4 pt-2 sm:flex-row sm:items-end sm:justify-between sm:py-4">
                                 {/* Left Info */}
                                 <div className="pr-0 sm:pr-24">
-                                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                                        <p className="font-semibold text-[#F6FF6A]">
+                                    <div className="mb-1 md:mb-2 flex flex-wrap items-center gap-2">
+                                        <p className="font-semibold text-sm md:text-base text-[#F6FF6A]">
                                             {item.packageName || "Package"}
                                         </p>
-                                        <span className="package-badge rounded-full px-3 py-1 text-[11px] font-semibold">
+                                        <span className="package-badge rounded-full px-2 md:px-3 py-0.5 md:py-1 text-[10px] md:text-[11px] font-semibold">
                                             {item.packageType}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-white/70">
+                                    <p className="text-xs md:text-sm text-white/70">
                                         {item.packageSize} | {item.packageWeight} kg | Qty:{" "}
                                         {item.packageQuantities}
                                     </p>
 
-                                    <p className="text-xs text-white/50">
+                                    <p className="text-[10px] md:text-xs text-white/50">
                                         Pickup: {item.pickUpDate}
                                     </p>
                                 </div>
@@ -294,17 +294,17 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
             <div className="grid gap-4 lg:grid-cols-2">
 
                 {/* Sender */}
-                <div className="package-panel relative rounded-[1.6rem] p-4 pt-6 sm:p-5 sm:pt-6">
-                    <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-4 py-1 text-sm font-semibold">
+                <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
+                    <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
                         Sender Information
                     </span>
 
-                    <div className="mt-6 space-y-3">
-                        <label className="mb-3 block text-sm font-medium text-white/85">
+                    <div className="mt-4 md:mt-6 space-y-3">
+                        <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
                             Sender name <span className="text-red-400">*</span>
                         </label>
-                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
-                            <Icon icon="heroicons:identification" className="text-[#F0FF73] text-xl" />
+                        <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
+                            <Icon icon="heroicons:identification" className="text-[#F0FF73] text-lg md:text-xl" />
                             <input
                                 placeholder="Sender Name"
                                 value={formData.senderName}
@@ -312,16 +312,16 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     const clean = e.target.value.replace(/[^a-zA-Z\s]/g, "");
                                     setFormData({ ...formData, senderName: clean });
                                 }}
-                                className="w-full text-base bg-transparent outline-none"
+                                className="w-full text-sm md:text-base bg-transparent outline-none"
                             />
                         </div>
-                        {errors.senderName && <p className="text-red-400 text-sm">{errors.senderName}</p>}
+                        {errors.senderName && <p className="text-red-400 text-xs md:text-sm">{errors.senderName}</p>}
 
-                        <label className="mb-3 block text-sm font-medium text-white/85">
+                        <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
                             Sender contact no <span className="text-red-400">*</span>
                         </label>
-                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
-                            <Icon icon="heroicons:phone" className="text-[#F0FF73] text-xl " />
+                        <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
+                            <Icon icon="heroicons:phone" className="text-[#F0FF73] text-lg md:text-xl " />
                             <input
                                 type="tel"
                                 inputMode="numeric"
@@ -330,26 +330,26 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                 onChange={(e) => {
                                     setFormData({ ...formData, senderContact: formatIndiaPhoneInput(e.target.value) });
                                 }}
-                                className="w-full text-base bg-transparent outline-none"
+                                className="w-full text-sm md:text-base bg-transparent outline-none"
                             />
                         </div>
-                        {errors.senderContact && <p className="text-red-400 text-sm">{errors.senderContact}</p>}
+                        {errors.senderContact && <p className="text-red-400 text-xs md:text-sm">{errors.senderContact}</p>}
                     </div>
                 </div>
 
 
                 {/* Receiver */}
-                <div className="package-panel relative rounded-[1.6rem] p-4 pt-6 sm:p-5 sm:pt-6">
-                    <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-4 py-1 text-sm font-semibold">
+                <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
+                    <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
                         Receiver Information
                     </span>
 
-                    <div className="mt-6 space-y-3">
-                        <label className="mb-3 block text-sm font-medium text-white/85">
+                    <div className="mt-4 md:mt-6 space-y-3">
+                        <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
                             Receiver name <span className="text-red-400">*</span>
                         </label>
-                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
-                            <Icon icon="heroicons:identification" className="text-[#F0FF73] text-xl" />
+                        <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
+                            <Icon icon="heroicons:identification" className="text-[#F0FF73] text-lg md:text-xl" />
                             <input
                                 placeholder="Receiver Name"
                                 value={formData.receiverName}
@@ -357,15 +357,15 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     const clean = e.target.value.replace(/[^a-zA-Z\s]/g, "");
                                     setFormData({ ...formData, receiverName: clean });
                                 }}
-                                className="w-full text-base bg-transparent outline-none"
+                                className="w-full text-sm md:text-base bg-transparent outline-none"
                             />
                         </div>
-                        {errors.receiverName && <p className="text-red-400 text-sm">{errors.receiverName}</p>}
-                        <label className="mb-3 block text-sm font-medium text-white/85">
+                        {errors.receiverName && <p className="text-red-400 text-xs md:text-sm">{errors.receiverName}</p>}
+                        <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
                             Receiver contact no <span className="text-red-400">*</span>
                         </label>
-                        <div className="package-input flex items-center gap-2 rounded-2xl px-4 py-3">
-                            <Icon icon="heroicons:phone" className="text-[#F0FF73] text-xl " />
+                        <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
+                            <Icon icon="heroicons:phone" className="text-[#F0FF73] text-lg md:text-xl " />
                             <input
                                 type="tel"
                                 inputMode="numeric"
@@ -374,10 +374,10 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                 onChange={(e) => {
                                     setFormData({ ...formData, receiverContact: formatIndiaPhoneInput(e.target.value) });
                                 }}
-                                className="w-full text-base bg-transparent outline-none"
+                                className="w-full text-sm md:text-base bg-transparent outline-none"
                             />
                         </div>
-                        {errors.receiverContact && <p className="text-red-400 text-sm">{errors.receiverContact}</p>}
+                        {errors.receiverContact && <p className="text-red-400 text-xs md:text-sm">{errors.receiverContact}</p>}
                     </div>
                 </div>
             </div>
@@ -387,8 +387,8 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
                 {/* Coupon */}
                 {shouldShowCouponSection ? (
-                <div className="package-panel flex-1 rounded-[1.6rem] p-4 sm:p-5">
-                    <p className="mb-2 font-semibold">Have a coupon code?</p>
+                <div className="package-panel flex-1 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
+                    <p className="mb-2 text-[13px] md:text-sm font-semibold">Have a coupon code?</p>
                     {couponStatus === 'success' && pricingInfo?.coupon ? (
                         <div>
                             <div className="flex items-center gap-2">
@@ -479,7 +479,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
 
                 {/* Amount */}
-                <div className="package-panel w-full rounded-[1.6rem] p-4 text-right space-y-1 sm:p-5 xl:w-96">
+                <div className="package-panel w-full rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-right space-y-1 sm:p-5 xl:w-96">
                     {isLoadingPrice && (
                         <div className="space-y-2">
                             <Skeleton className="ml-auto h-4 w-44" />

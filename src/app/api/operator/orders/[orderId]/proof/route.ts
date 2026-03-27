@@ -80,7 +80,7 @@ export async function POST(
 
     const formData = await request.formData();
     const proofTypeRaw = String(formData.get("proofType") ?? "").trim().toLowerCase();
-    const proofType = proofTypeRaw === "pickup" || proofTypeRaw === "drop" ? proofTypeRaw : "";
+    const proofType = proofTypeRaw === "pickup" || proofTypeRaw === "drop" || proofTypeRaw === "office_drop" ? proofTypeRaw : "";
     const file = formData.get("image");
 
     if (!proofType) {
@@ -166,7 +166,7 @@ export async function POST(
 
     if (proofType === "pickup") {
       const normalizedStatus = String(order.status ?? "").toLowerCase();
-      if (["cancelled", "delivered"].includes(normalizedStatus)) {
+      if (["cancelled", "delivered", "missed_package"].includes(normalizedStatus)) {
         return NextResponse.json(
           { success: false, message: `Cannot capture pickup proof when order is ${normalizedStatus}.` },
           { status: 400 },
@@ -183,7 +183,7 @@ export async function POST(
       order.pickupProofImage = uploadedProofImageUrl;
       order.pickupProofAt = new Date();
       order.status = "in-transit";
-    } else {
+    } else if (proofType === "drop" || proofType === "office_drop") {
       if (!order.pickupProofImage) {
         return NextResponse.json(
           { success: false, message: "Upload pickup proof before drop proof." },
@@ -207,6 +207,10 @@ export async function POST(
       order.dropProofImage = uploadedProofImageUrl;
       order.dropProofAt = new Date();
       order.status = "delivered";
+      if (proofType === "office_drop") {
+        order.operatorNote = "Delivered to assigned office.";
+        order.adminNoteUpdatedAt = new Date();
+      }
     }
 
     order.operatorVerifiedBy = operator._id;
@@ -216,7 +220,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        message: proofType === "pickup" ? "Pickup verified." : "Drop verified. Order delivered.",
+        message: proofType === "pickup" ? "Pickup verified." : proofType === "office_drop" ? "Office drop verified. Package delivered to office." : "Drop verified. Order delivered.",
         order: {
           id: order._id.toString(),
           status: order.status,

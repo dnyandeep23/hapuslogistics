@@ -1,6 +1,21 @@
 
 import mongoose, { Schema, Document, models } from 'mongoose';
 
+export interface IBusOffice {
+  officeName: string;
+  address?: string;
+  city: string;
+  state: string;
+  zip?: string;
+  phone: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  geoPoint?: {
+    type?: "Point";
+    coordinates?: number[];
+  };
+}
+
 export interface IBus extends Document {
   travelCompanyId: mongoose.Types.ObjectId;
   busName: string;
@@ -18,6 +33,7 @@ export interface IBus extends Document {
     endDate: Date;
     assignedAt: Date;
   }[];
+  offices: IBusOffice[];
   availability: {
     date: Date;
     totalCapacityKg: number;
@@ -76,6 +92,75 @@ const BusSchema: Schema<IBus> = new Schema({
     validate: {
       validator: (value: string[]) => Array.isArray(value) && value.length > 0,
       message: "At least one bus image is required.",
+    },
+  },
+  offices: {
+    type: [
+      {
+        officeName: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        address: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+        city: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        state: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        zip: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+        phone: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        latitude: {
+          type: Number,
+          default: null,
+        },
+        longitude: {
+          type: Number,
+          default: null,
+        },
+        geoPoint: {
+          type: {
+            type: String,
+            enum: ["Point"],
+            default: "Point",
+          },
+          coordinates: {
+            type: [Number],
+            default: undefined,
+          },
+        },
+      },
+    ],
+    default: [],
+    validate: {
+      validator: (value: IBusOffice[]) =>
+        Array.isArray(value) &&
+        value.length >= 1 &&
+        value.every(
+          (office) =>
+            Boolean(office?.officeName?.trim()) &&
+            Boolean(office?.city?.trim()) &&
+            Boolean(office?.state?.trim()) &&
+            Boolean(office?.phone?.trim()),
+        ),
+      message: "At least 1 bus office is required.",
     },
   },
   contactPersonName: {
@@ -242,6 +327,35 @@ const BusSchema: Schema<IBus> = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'BookingSession'
   }]
+});
+
+BusSchema.pre("validate", function syncOfficeGeoPoints() {
+  const offices = Array.isArray(this.get("offices")) ? this.get("offices") : [];
+  const normalizedOffices = offices.map((office: IBusOffice) => {
+    const latitude = Number(office?.latitude);
+    const longitude = Number(office?.longitude);
+
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      return {
+        ...office,
+        latitude,
+        longitude,
+        geoPoint: {
+          type: "Point",
+          coordinates: [longitude, latitude],
+        },
+      };
+    }
+
+    return {
+      ...office,
+      latitude: null,
+      longitude: null,
+      geoPoint: undefined,
+    };
+  });
+
+  this.set("offices", normalizedOffices);
 });
 
 // This line ensures that if the model is already in the cache, we use that instance

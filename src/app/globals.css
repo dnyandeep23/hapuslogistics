@@ -49,39 +49,39 @@ body {
   font-family: var(--font-roboto), system-ui, Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .dashboard-surface {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background:
-    linear-gradient(180deg, rgba(245, 246, 238, 0.1), rgba(20, 28, 17, 0.18) 40%, rgba(10, 14, 10, 0.28));
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #141A14;
 }
 
 .dashboard-surface-soft {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #1A221A;
 }
 
 .dashboard-subsurface {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(180deg, rgba(7, 10, 8, 0.28), rgba(7, 10, 8, 0.18));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .dashboard-input {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background:
-    linear-gradient(180deg, rgba(5, 7, 6, 0.24), rgba(5, 7, 6, 0.16));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0A0D09;
   color: white;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .dashboard-input::placeholder {
@@ -90,9 +90,8 @@ body {
 
 .dashboard-input:focus {
   outline: none;
-  border-color: rgba(213, 228, 0, 0.58);
-  background:
-    linear-gradient(180deg, rgba(7, 10, 8, 0.28), rgba(7, 10, 8, 0.18));
+  border-color: rgba(213, 228, 0, 0.5);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .dashboard-table-head {
@@ -100,39 +99,24 @@ body {
 }
 
 .package-shell {
-  border: 1px solid rgba(244, 248, 191, 0.12);
-  background:
-    linear-gradient(180deg, rgba(246, 250, 213, 0.12), rgba(20, 28, 17, 0.2) 36%, rgba(8, 12, 8, 0.3));
-  box-shadow:
-    0 28px 70px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #141A14;
 }
 
 .package-panel {
-  border: 1px solid rgba(240, 255, 115, 0.18);
-  background:
-    linear-gradient(180deg, rgba(232, 242, 141, 0.12), rgba(255, 255, 255, 0.03));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 18px 40px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #1A221A;
 }
 
 .package-panel-soft {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .package-input {
-  border: 1px solid rgba(240, 255, 115, 0.16);
-  background:
-    linear-gradient(180deg, rgba(8, 11, 8, 0.28), rgba(8, 11, 8, 0.18));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0A0D09;
   color: white;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .package-input::placeholder {
@@ -141,21 +125,45 @@ body {
 
 .package-input:focus {
   outline: none;
-  border-color: rgba(213, 228, 0, 0.58);
-  background:
-    linear-gradient(180deg, rgba(8, 11, 8, 0.3), rgba(8, 11, 8, 0.22));
+  border-color: rgba(213, 228, 0, 0.5);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .package-badge {
-  border: 1px solid rgba(240, 255, 115, 0.2);
-  background: rgba(205, 214, 69, 0.12);
+  border: 1px solid rgba(240, 255, 115, 0.3);
+  background: rgba(205, 214, 69, 0.1);
   color: #f4f8bf;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 input:-webkit-autofill {
   -webkit-text-fill-color: white;
   -webkit-box-shadow: 0 0 0 1000px #000 inset;
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-modalSlideUp {
+  animation: modalSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modalFadeIn {
+  animation: modalFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 

@@ -1,10 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { ToastProvider } from "@/context/ToastContext";
 import ThemeProvider from "../components/ThemeProvider";
-import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { STRINGS } from "../lib/strings";
 import UserProvider from "../components/UserProvider";
@@ -15,6 +14,13 @@ const roboto = Roboto({
   subsets: ["latin"],
   weight: ["300", "400", "500", "700"],
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: STRINGS.appName,

@@ -162,7 +162,7 @@ export default function DashboardPage() {
   const [adminBusFieldErrors, setAdminBusFieldErrors] = useState<AdminBusFieldErrors>({});
   const [adminBuses, setAdminBuses] = useState<AdminBus[]>([]);
   const [loadingAdminBuses, setLoadingAdminBuses] = useState(false);
-  const [showAdminBusForm, setShowAdminBusForm] = useState(false);
+
   const [editingBusId, setEditingBusId] = useState<string | null>(null);
   const [operatorOrdersByStage, setOperatorOrdersByStage] = useState<OperatorOrderBuckets>(EMPTY_OPERATOR_ORDER_BUCKETS);
   const [operatorOrderLoading, setOperatorOrderLoading] = useState(false);
@@ -715,11 +715,9 @@ export default function DashboardPage() {
   const isAdminMissingContactNumber = user?.role === "admin" && !normalizeIndiaPhone(user?.phone);
   const isOperatorRole = user?.role === "operator";
   const isPublicUserRole = user?.role === "user";
-  const dashboardTitle = isAdminRole
-    ? "Operations control that feels active, not crowded."
-    : isOperatorRole
-      ? "A cleaner operator workspace for orders, company context, and support."
-      : "A calmer shipment dashboard with faster actions and clearer signals.";
+  const dashboardTitle = user?.name
+    ? `Hey ${user.name.split(" ")[0]} 👋`
+    : "Hey there 👋";
   const dashboardSubtitle = isAdminRole
     ? "Manage fleet, routes, operators, and support from a stronger visual cockpit."
     : isOperatorRole
@@ -731,9 +729,9 @@ export default function DashboardPage() {
     : isOperatorRole
       ? "solar:shield-user-bold-duotone"
       : "solar:home-smile-bold-duotone";
-  const customerGreeting = user?.name
-    ? `Hey ${user.name.split(" ")[0]} 👋`
-    : "Hey there 👋";
+  // const customerGreeting = user?.name
+  //   ? `Hey ${user.name.split(" ")[0]} 👋`
+  //   : "Hey there 👋";
   const supportSpotlight = isAdminRole
     ? {
       eyebrow: "Support command",
@@ -874,7 +872,6 @@ export default function DashboardPage() {
       await dispatch(fetchUser()).unwrap();
       await loadAdminBuses();
       resetAdminBusForm();
-      if (!isAdminLocked) setShowAdminBusForm(false);
     } catch (error: unknown) {
       setAdminBusError(error instanceof Error ? error.message : "Failed to add bus.");
     } finally {
@@ -882,218 +879,6 @@ export default function DashboardPage() {
     }
   };
 
-  const renderAdminBusForm = ({ locked = false }: { locked?: boolean } = {}) => (
-    <div className="dashboard-surface rounded-2xl p-5 sm:p-7">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-[#E4E67A]">
-            {editingBusId ? "Edit Bus" : locked ? "Add First Bus" : "Add New Bus"}
-          </h1>
-          <p className="text-white/75 text-sm mt-2">
-            Fill in the details below to add a new bus to your fleet.
-          </p>
-        </div>
-        {!locked && showAdminBusForm && (
-          <button
-            type="button"
-            onClick={() => {
-              resetAdminBusForm();
-              setShowAdminBusForm(false);
-            }}
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10"
-          >
-            <Icon icon="solar:close-circle-linear" className="text-base" />
-            Close
-          </button>
-        )}
-      </div>
-
-      <form onSubmit={handleAdminBusSubmit} className="mt-8 space-y-8">
-        {/* Bus Details Section */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Bus Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <label className="text-sm text-white/80">
-              Bus Name
-              <input
-                value={busName}
-                onChange={(event) => setBusName(event.target.value)}
-                placeholder="e.g. 'Volvo Sleeper'"
-                className={`dashboard-input mt-2 w-full rounded-lg border-2 px-4 py-3 text-base transition-all ${adminBusFieldErrors.busName ? "border-red-500" : "border-white/12 focus:border-[#E4E67A]"}`}
-              />
-              {adminBusFieldErrors.busName && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busName}</p>}
-            </label>
-            <label className="text-sm text-white/80">
-              Bus Number
-              <input
-                value={busNumber}
-                onChange={(event) => setBusNumber(formatBusNumberInput(event.target.value))}
-                placeholder="MH-02-BL-2254"
-                className={`dashboard-input mt-2 w-full rounded-lg border-2 px-4 py-3 text-base uppercase transition-all ${adminBusFieldErrors.busNumber ? "border-red-500" : "border-white/12 focus:border-[#E4E67A]"}`}
-              />
-              {adminBusFieldErrors.busNumber && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busNumber}</p>}
-            </label>
-            <label className="text-sm text-white/80">
-              Bus Capacity (KG)
-              <input
-                type="number"
-                min={1}
-                value={capacity}
-                onChange={(event) => setCapacity(Number(event.target.value) || 1)}
-                placeholder="Enter capacity in KG"
-                className={`dashboard-input mt-2 w-full rounded-lg border-2 px-4 py-3 text-base transition-all ${adminBusFieldErrors.capacity ? "border-red-500" : "border-white/12 focus:border-[#E4E67A]"}`}
-              />
-              {adminBusFieldErrors.capacity && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.capacity}</p>}
-            </label>
-          </div>
-        </div>
-
-        {/* Availability Section */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Availability</h3>
-          <label className="text-sm text-white/80">
-            Availability Date Range
-            <div className="mt-2">
-              <CustomDateRangePicker
-                startDate={availabilityStartDate}
-                endDate={availabilityEndDate}
-                onChange={({ startDate, endDate }) => {
-                  setAvailabilityStartDate(startDate);
-                  setAvailabilityEndDate(endDate);
-                }}
-                error={adminBusFieldErrors.availabilityRange}
-                minDate={new Date().toISOString().slice(0, 10)}
-              />
-            </div>
-            {adminBusFieldErrors.availabilityRange && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.availabilityRange}</p>}
-          </label>
-          <div className="dashboard-surface-soft rounded-lg px-4 py-3">
-            <label className="inline-flex items-center gap-3 text-sm text-white/90 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoRenewCapacity}
-                onChange={(event) => setAutoRenewCapacity(event.target.checked)}
-                className="h-4 w-4 accent-[#CDD645]"
-              />
-              Auto-renew capacity for the selected date range.
-            </label>
-            <p className="mt-1 text-xs text-white/55">
-              If checked, this bus will maintain its capacity for new scheduling cycles within these dates.
-            </p>
-          </div>
-        </div>
-
-        {/* Routes Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Routes & Pricing</h3>
-            <button
-              type="button"
-              onClick={addRouteConfig}
-              className="inline-flex items-center gap-2 rounded-full border border-[#D5E400]/60 px-4 py-2 text-sm text-[#E4E67A] transition hover:bg-[#D5E400]/10"
-            >
-              <Icon icon="solar:add-circle-linear" className="text-base" />
-              Add Route
-            </button>
-          </div>
-          <div className="space-y-6">
-            {routeConfigs.map((routeConfig, routeIndex) => (
-              <div key={`route-${routeIndex}`} className="dashboard-subsurface rounded-xl p-4">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <p className="text-lg font-semibold text-[#E4E67A]">Route {routeIndex + 1}</p>
-                  {routeConfigs.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeRouteConfig(routeIndex)}
-                      className="text-sm text-red-400 hover:text-red-300"
-                    >
-                      Remove Route
-                    </button>
-                  )}
-                </div>
-                {/* ... existing route form fields ... */}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bus Image Upload Section */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white border-b border-[#4e573f] pb-2">Bus Image</h3>
-          <div className="flex flex-wrap gap-4 items-center">
-            <div
-              {...getRootProps()}
-              className={`h-32 w-32 rounded-lg border-2 border-dashed cursor-pointer flex items-center justify-center transition-colors ${isDragActive ? "border-[#CDD645] bg-[#1e241b]/60" : "border-white/20 bg-white/5 hover:border-[#CDD645]/70"}`}
-            >
-              <input {...getInputProps()} />
-              <div className="flex flex-col items-center text-white/70 text-center">
-                <Icon icon="solar:camera-add-linear" className="text-2xl mb-1" />
-                <span className="text-xs">{isDragActive ? "Drop Image" : "Add Image"}</span>
-              </div>
-            </div>
-            {busImagePreviews.map((image, index) => (
-              <div key={image.id} className="relative h-32 w-32 rounded-lg overflow-hidden border-2 border-[#4e573f]">
-                <img
-                  src={image.preview}
-                  alt={image.file.name}
-                  className="h-full w-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => setBusImages((prev) => prev.filter((_, fileIndex) => fileIndex !== index))}
-                  className="absolute top-1 right-1 rounded-full bg-black/70 p-1.5 text-red-300 hover:text-red-200"
-                  aria-label={`Remove ${image.file.name}`}
-                >
-                  <Icon icon="solar:trash-bin-trash-linear" className="text-base" />
-                </button>
-              </div>
-            ))}
-            {editingBus && editingBus.busImages?.length > 0 && busImages.length === 0 && (
-              <div className="mt-3">
-                <p className="text-xs text-white/60 mb-2">Existing image:</p>
-                <div className="h-32 w-32 rounded-lg overflow-hidden border-2 border-[#4e573f]">
-                  <img src={editingBus.busImages[0]} alt="Existing bus image" className="h-full w-full object-cover" />
-                </div>
-              </div>
-            )}
-          </div>
-          {adminBusFieldErrors.busImages && <p className="mt-1 text-xs text-red-400">{adminBusFieldErrors.busImages}</p>}
-        </div>
-
-        {/* Form Submission */}
-        <div className="flex items-center justify-end gap-4 pt-4 border-t border-[#4e573f]">
-          <button
-            type="button"
-            onClick={() => {
-              resetAdminBusForm();
-              if (!locked) setShowAdminBusForm(false);
-            }}
-            className="px-6 py-2 rounded-full border border-white/30 text-white/80 font-semibold transition-all duration-300 hover:bg-white/10"
-          >
-            Reset Form
-          </button>
-          <button
-            type="submit"
-            disabled={savingBus || loadingLocations}
-            className="px-8 py-3 rounded-full border border-[#D5E400] text-[#D5E400] font-semibold transition-all duration-300 hover:shadow-2xl hover:shadow-[#D5E400]/60 hover:bg-[#D5E400] hover:text-black disabled:opacity-50"
-          >
-            {savingBus ? (editingBusId ? "Updating Bus..." : "Saving Bus...") : editingBusId ? "Update Bus" : "Add Bus"}
-          </button>
-        </div>
-      </form>
-
-      {adminBusError && (
-        <div className="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
-          {adminBusError}
-        </div>
-      )}
-      {adminBusMessage && (
-        <div className="mt-6 rounded-xl border border-green-500/40 bg-green-500/10 p-4 text-sm text-green-300">
-          {adminBusMessage}
-        </div>
-      )}
-    </div>
-  );
 
   if (isAdminLocked) {
     return (
@@ -1223,30 +1008,24 @@ export default function DashboardPage() {
             buttonLabel={supportSpotlight.buttonLabel}
             onClick={handleSupportClick}
           />
-          {showAdminBusForm ? renderAdminBusForm() : <ServicesSection services={services} />}
+          <ServicesSection services={services} />
         </div>
       </div>
     )
   }
 
   return (
-    <div className='p-4 sm:p-6 lg:p-8 pb-20'>
+    <div className='p-2 sm:p-4 lg:p-8 pb-20'>
       <DashboardHero
         eyebrow={dashboardRoleLabel}
-        title={isPublicUserRole ? customerGreeting : `${dashboardTitle} ${user?.name ? `Welcome back, ${user.name}.` : ""}`.trim()}
+        title={`${dashboardTitle}`}
         description={dashboardSubtitle}
         icon={dashboardRoleIcon}
       />
 
       {isOperatorRole ? (
         <div className="mt-8 space-y-8">
-          <SupportSpotlightCard
-            eyebrow={supportSpotlight.eyebrow}
-            title={supportSpotlight.title}
-            description={supportSpotlight.description}
-            buttonLabel={supportSpotlight.buttonLabel}
-            onClick={handleSupportClick}
-          />
+
           <OperatorActiveOrderCard
             ordersByStage={operatorOrdersByStage}
             loading={operatorOrderLoading}
@@ -1255,6 +1034,13 @@ export default function DashboardPage() {
             showOnlyActive
           />
           <ServicesSection services={services} />
+          <SupportSpotlightCard
+            eyebrow={supportSpotlight.eyebrow}
+            title={supportSpotlight.title}
+            description={supportSpotlight.description}
+            buttonLabel={supportSpotlight.buttonLabel}
+            onClick={handleSupportClick}
+          />
         </div>
       ) : (
         <div className="mt-8 space-y-8">
@@ -1315,16 +1101,16 @@ function DashboardHero({
   icon: string;
 }) {
   return (
-    <section className="relative pb-2">
+    <section className="relative pb-6 border-b border-white/5 mb-8">
       <div className="max-w-4xl">
-        <div className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-lime-100">
-          <Icon icon={icon} className="text-base" />
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#D5E400]/20 bg-[#D5E400]/5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[#D5E400]">
+          <Icon icon={icon} className="text-lg" />
           {eyebrow}
         </div>
-        <h1 className="mt-5 max-w-4xl text-3xl font-semibold tracking-tight text-white sm:text-[3.35rem] sm:leading-[1.05]">
+        <h1 className="mt-6 max-w-4xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
           {title}
         </h1>
-        <p className="mt-4 max-w-2xl text-sm leading-6 text-white/72 sm:text-base">
+        <p className="mt-4 max-w-2xl text-base text-white/50 leading-relaxed">
           {description}
         </p>
       </div>
@@ -1346,24 +1132,24 @@ function SupportSpotlightCard({
   onClick?: () => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-[1.9rem] border border-white/10 bg-[linear-gradient(135deg,rgba(17,28,21,0.96),rgba(26,39,31,0.9),rgba(14,20,16,0.96))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.18)]">
+    <section className="overflow-hidden rounded-[2rem] border border-white/5 bg-[#141A14] p-6 shadow-sm transition-all hover:bg-[#1A221A]">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[#d5e400]/12 text-[#f3fbad]">
-            <Icon icon="solar:headphones-round-sound-bold-duotone" className="text-[1.7rem]" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-[#D5E400]">
+            <Icon icon="solar:headphones-round-sound-bold-duotone" className="text-2xl" />
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{eyebrow}</p>
-            <h2 className="mt-2 text-xl font-semibold text-white">{title}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">{description}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D5E400]/70">{eyebrow}</p>
+            <h2 className="mt-1 text-lg font-bold text-white">{title}</h2>
+            <p className="mt-1 max-w-2xl text-sm text-white/50">{description}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onClick}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-lime-300/25 bg-lime-300/10 px-5 py-3 text-sm font-semibold text-lime-100 transition hover:bg-lime-300/16"
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 active:scale-95"
         >
-          <Icon icon="solar:arrow-right-up-linear" className="text-base" />
+          <Icon icon="solar:arrow-right-up-linear" className="text-base text-[#D5E400]" />
           {buttonLabel}
         </button>
       </div>
@@ -1441,56 +1227,33 @@ function BannerCarousel({ slides }: { slides: string[] }) {
 export function ServicesSection({ services }: { services: Service[] }) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-8">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Dashboard actions</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Move through the dashboard faster</h2>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.14em] text-white/55">
-          <Icon icon="solar:widget-2-bold-duotone" className="text-base text-[#E4E67A]" />
-          {services.length} active lanes
+          <h2 className="text-2xl font-bold tracking-tight text-white mb-1">Quick Actions</h2>
+          <p className="text-sm text-white/50">Common operations available in your workspace.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
         {services.map((service, index) => (
           <button
             key={index}
             type="button"
             onClick={service.onclick}
-            className="group relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-[linear-gradient(180deg,rgba(31,37,28,0.98),rgba(24,30,22,0.94))] p-6 text-left shadow-[0_20px_50px_rgba(0,0,0,0.18)] transition-all duration-300 hover:-translate-y-1 hover:border-lime-300/20 hover:bg-[linear-gradient(180deg,rgba(38,46,33,0.98),rgba(26,34,24,0.94))]"
+            className="group relative flex flex-col items-start justify-between rounded-[2rem] border border-white/5 bg-[#141A14] p-6 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-[#1A221A] active:scale-[0.98]"
           >
-            <div className="pointer-events-none absolute right-[-1.5rem] top-[-1.5rem] h-28 w-28 rounded-full bg-[#d5e400]/8 blur-2xl transition group-hover:bg-[#d5e400]/14" />
-            <div className="relative flex h-full flex-col">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-[1.1rem] bg-[#d5e400]/12 text-[#f3fbad]">
-                  <Icon icon={service.iconKey} className="text-[1.45rem]" />
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-white/50">
-                  <Icon icon="solar:arrow-right-up-linear" className="text-sm" />
-                  {service.actionLabel}
-                </span>
-              </div>
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-[#D5E400] transition-colors group-hover:bg-[#D5E400]/10">
+              <Icon icon={service.iconKey} className="text-2xl" />
+            </div>
 
-              <div className="mt-5">
-                <p className="text-xl font-semibold text-white">{service.title}</p>
-                <p className="mt-2 text-sm leading-6 text-white/62">{service.description}</p>
-              </div>
+            <div className="mb-4">
+              <p className="text-lg font-bold text-white mb-1">{service.title}</p>
+              <p className="text-sm text-white/50 leading-relaxed line-clamp-2">{service.description}</p>
+            </div>
 
-              <div className="mt-6 flex items-end justify-between gap-4">
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-[#E4E67A]">
-                  <Icon icon="solar:cursor-bold-duotone" className="text-base" />
-                  Open lane
-                </div>
-                <div className="relative">
-                  <Image
-                    src={service.icon}
-                    alt={service.title}
-                    width={service.width * 0.72}
-                    className="drop-shadow-[0_16px_28px_rgba(0,0,0,0.35)] transition duration-300 group-hover:scale-[1.03]"
-                  />
-                </div>
-              </div>
+            <div className="mt-auto flex items-center gap-2 text-sm font-semibold text-white/70 group-hover:text-[#D5E400] transition-colors">
+              <span>{service.actionLabel}</span>
+              <Icon icon="solar:arrow-right-linear" className="text-base opacity-0 -ml-2 transition-all group-hover:opacity-100 group-hover:ml-0" />
             </div>
           </button>
         ))}

@@ -7,6 +7,11 @@ export const HEADER_NAV_LINKS = [
     icon: ICONS.home,
   },
   {
+    label: 'About',
+    href: '/about',
+    icon: 'solar:buildings-2-outline',
+  },
+  {
     label: 'Contact',
     href: '/contact',
     icon: ICONS.contact,
@@ -25,4 +30,6 @@ export const HEADER_ACTIONS = [
   },
 ];
 
-export default { HEADER_NAV_LINKS, HEADER_ACTIONS };
+const NAV_DATA = { HEADER_NAV_LINKS, HEADER_ACTIONS };
+
+export default NAV_DATA;

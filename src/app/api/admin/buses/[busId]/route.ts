@@ -40,6 +40,17 @@ type RoutePointInput = {
   durationToNextMinutes: number;
 };
 
+type BusOfficeInput = {
+  officeName: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  phone: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 type BusPricingEntry = {
   pickupLocation?: unknown;
   dropLocation?: unknown;
@@ -343,6 +354,66 @@ const normalizeRoutePoints = (
   return { routePoints: normalizedPoints };
 };
 
+const normalizeBusOffices = (busOfficesRaw: string): { offices?: BusOfficeInput[]; error?: string } => {
+  let parsedOffices: unknown;
+  try {
+    parsedOffices = JSON.parse(busOfficesRaw || "[]");
+  } catch {
+    return { error: "Invalid bus office configuration." };
+  }
+
+  if (!Array.isArray(parsedOffices) || parsedOffices.length < 1) {
+    return { error: "At least 1 bus office is required." };
+  }
+
+  const offices: BusOfficeInput[] = [];
+  for (let index = 0; index < parsedOffices.length; index += 1) {
+    const current = parsedOffices[index];
+    if (!current || typeof current !== "object" || Array.isArray(current)) {
+      return { error: `Bus office ${index + 1} is invalid.` };
+    }
+
+    const office = current as Record<string, unknown>;
+    const officeName = String(office.officeName ?? office.name ?? "").trim();
+    const address = String(office.address ?? "").trim();
+    const city = String(office.city ?? "").trim();
+    const state = String(office.state ?? "").trim();
+    const zip = String(office.zip ?? "").trim();
+    const phone = String(office.phone ?? office.contactNumber ?? "").trim();
+    const latitude = office.latitude === null || office.latitude === undefined || office.latitude === ""
+      ? null
+      : Number(office.latitude);
+    const longitude = office.longitude === null || office.longitude === undefined || office.longitude === ""
+      ? null
+      : Number(office.longitude);
+
+    if (!officeName || !city || !state || !phone) {
+      return {
+        error: `Bus office ${index + 1}: office name, city, state and phone are required.`,
+      };
+    }
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return {
+        error: `Bus office ${index + 1}: map location is required.`,
+      };
+    }
+
+    offices.push({
+      officeName,
+      address,
+      city,
+      state,
+      zip,
+      phone,
+      latitude,
+      longitude,
+    });
+  }
+
+  return { offices };
+};
+
 const parseRoutes = (routesConfigRaw: string, allowedCategoryNames: string[]) => {
   let parsedRoutes: unknown;
   try {
@@ -524,6 +595,7 @@ export async function PATCH(
       formData.get("routePairsConfig") ?? formData.get("routesConfig") ?? "",
     ).trim();
     const routePointsConfigRaw = String(formData.get("routePointsConfig") ?? "").trim();
+    const busOfficesRaw = String(formData.get("busOffices") ?? formData.get("offices") ?? "").trim();
     const packageCatalog = await resolveActivePackageCatalog();
     const allowedCategoryNames = packageCatalog.categories.map((entry) => entry.name);
     if (allowedCategoryNames.length === 0) {
@@ -619,6 +691,15 @@ export async function PATCH(
     }
     const normalizedRoutePoints = routePointsResult.routePoints;
 
+    const busOfficesResult = normalizeBusOffices(busOfficesRaw);
+    if (busOfficesResult.error || !busOfficesResult.offices) {
+      return NextResponse.json(
+        { success: false, message: busOfficesResult.error || "Invalid bus office configuration." },
+        { status: 400 },
+      );
+    }
+    const normalizedBusOffices = busOfficesResult.offices;
+
     const routeSummaryDistanceKm = Number(
       normalizedRoutePoints.reduce((sum, point) => sum + Number(point.distanceToNextKm || 0), 0).toFixed(2),
     );
@@ -709,6 +790,7 @@ export async function PATCH(
     bus.busNumber = busNumber;
     bus.capacity = rawCapacity;
     bus.autoRenewCapacity = autoRenewCapacity;
+    bus.offices = normalizedBusOffices;
     bus.availability = availabilitySlots;
     bus.routePath = normalizedRoutePoints.map((point, index) => ({
       sequence: index + 1,
