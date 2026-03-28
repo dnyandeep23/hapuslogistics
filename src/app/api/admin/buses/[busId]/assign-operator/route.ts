@@ -8,6 +8,19 @@ import Notification from "@/app/api/models/notificationModel";
 import { normalizeIndiaPhone } from "@/lib/phone";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const normalizeDateOnly = (value: Date | string) => {
+  const date = new Date(value);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+};
+
+const rangesOverlap = (leftStart: Date, leftEnd: Date, rightStart: Date, rightEnd: Date) =>
+  leftStart.getTime() <= rightEnd.getTime() && leftEnd.getTime() >= rightStart.getTime();
+
+const rangesTouchOrOverlap = (leftStart: Date, leftEnd: Date, rightStart: Date, rightEnd: Date) =>
+  leftStart.getTime() <= rightEnd.getTime() + DAY_IN_MS && leftEnd.getTime() + DAY_IN_MS >= rightStart.getTime();
 
 const getTokenUserId = (request: NextRequest): string | null => {
   const token = request.cookies.get("token")?.value;
@@ -152,23 +165,84 @@ export async function POST(
       ? bus.operatorContactPeriods
       : [];
 
-    const filteredPeriods = existingPeriods.filter((period) => {
-      const periodStart = new Date(period.startDate);
-      const periodEnd = new Date(period.endDate);
-      periodStart.setUTCHours(0, 0, 0, 0);
-      periodEnd.setUTCHours(0, 0, 0, 0);
-      return periodEnd < startDate || periodStart > endDate;
+    const sameOperatorPeriods = existingPeriods.filter((period) => {
+      const periodOperatorId = String(period.operatorId ?? "");
+      if (periodOperatorId !== operatorId) return false;
+      const periodStart = normalizeDateOnly(period.startDate);
+      const periodEnd = normalizeDateOnly(period.endDate);
+      return rangesTouchOrOverlap(periodStart, periodEnd, startDate, endDate);
     });
 
+    const conflictingPeriods = existingPeriods.filter((period) => {
+      const periodOperatorId = String(period.operatorId ?? "");
+      if (periodOperatorId === operatorId) return false;
+      const periodStart = normalizeDateOnly(period.startDate);
+      const periodEnd = normalizeDateOnly(period.endDate);
+      return rangesOverlap(periodStart, periodEnd, startDate, endDate);
+    });
+
+    const alreadyCovered =
+      conflictingPeriods.length === 0 &&
+      sameOperatorPeriods.some((period) => {
+        const periodStart = normalizeDateOnly(period.startDate);
+        const periodEnd = normalizeDateOnly(period.endDate);
+        return periodStart.getTime() <= startDate.getTime() && periodEnd.getTime() >= endDate.getTime();
+      });
+
+    if (alreadyCovered) {
+      return NextResponse.json(
+        {
+          success: true,
+          alreadyAssigned: true,
+          message: `Operator is already assigned from ${sameOperatorPeriods[0]?.startDate?.toISOString?.().slice(0, 10) ?? startDateRaw} to ${sameOperatorPeriods[0]?.endDate?.toISOString?.().slice(0, 10) ?? endDateRaw}.`,
+          operatorContactPeriods: existingPeriods,
+        },
+        { status: 200 },
+      );
+    }
+
+    const unaffectedPeriods = existingPeriods.filter((period) => {
+      const periodOperatorId = String(period.operatorId ?? "");
+      const periodStart = normalizeDateOnly(period.startDate);
+      const periodEnd = normalizeDateOnly(period.endDate);
+      if (periodOperatorId === operatorId) {
+        return !rangesTouchOrOverlap(periodStart, periodEnd, startDate, endDate);
+      }
+      return !rangesOverlap(periodStart, periodEnd, startDate, endDate);
+    });
+
+    const mergedStart = sameOperatorPeriods.reduce(
+      (earliest, period) => {
+        const periodStart = normalizeDateOnly(period.startDate);
+        return periodStart.getTime() < earliest.getTime() ? periodStart : earliest;
+      },
+      startDate,
+    );
+    const mergedEnd = sameOperatorPeriods.reduce(
+      (latest, period) => {
+        const periodEnd = normalizeDateOnly(period.endDate);
+        return periodEnd.getTime() > latest.getTime() ? periodEnd : latest;
+      },
+      endDate,
+    );
+    const mergedAssignedAt = sameOperatorPeriods.reduce<Date>(
+      (earliest, period) => {
+        const assignedAt = period.assignedAt ? new Date(period.assignedAt) : null;
+        if (!assignedAt || Number.isNaN(assignedAt.getTime())) return earliest;
+        return assignedAt.getTime() < earliest.getTime() ? assignedAt : earliest;
+      },
+      new Date(),
+    );
+
     bus.operatorContactPeriods = [
-      ...filteredPeriods,
+      ...unaffectedPeriods,
       {
         operatorId: operator._id as mongoose.Types.ObjectId,
         operatorName: operator.name || operator.email || "Operator",
         operatorPhone,
-        startDate,
-        endDate,
-        assignedAt: new Date(),
+        startDate: mergedStart,
+        endDate: mergedEnd,
+        assignedAt: mergedAssignedAt,
       },
     ].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
@@ -191,7 +265,10 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        message: "Operator contact assigned for selected period.",
+        message:
+          sameOperatorPeriods.length > 0
+            ? "Operator assignment updated without creating a duplicate period."
+            : "Operator contact assigned for selected period.",
         operatorContactPeriods: bus.operatorContactPeriods,
       },
       { status: 200 },

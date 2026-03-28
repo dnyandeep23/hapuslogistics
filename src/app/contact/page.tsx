@@ -6,24 +6,25 @@ import { Icon } from "@iconify/react";
 import Header from "@/components/Header";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 import contactVector from "@/assets/images/contactVector.png";
+import { STRINGS } from "@/lib/strings";
 
 const contactPoints = [
   {
     label: "Head Office",
-    value: "138/D, Kinny House Room No. 1, 2nd Floor, near Parcel ST Depot, Pune, Maharashtra 411001",
-    href: "https://www.google.com/maps/search/?api=1&query=138%2FD%20Kinny%20House%20Room%20No.%201%202nd%20Floor%20near%20Parcel%20ST%20Depot%20Pune",
+    value: STRINGS.contact.address,
+    href: STRINGS.contact.mapsHref,
     icon: "mdi:map-marker-outline",
   },
   {
     label: "Email",
-    value: "support@hapuslogistics.com",
-    href: "mailto:support@hapuslogistics.com",
+    value: STRINGS.contact.email,
+    href: `mailto:${STRINGS.contact.email}`,
     icon: "mdi:email-outline",
   },
   {
     label: "Call Us",
-    value: "+91 98765 43210",
-    href: "tel:+919876543210",
+    value: STRINGS.contact.phone,
+    href: STRINGS.contact.phoneHref,
     icon: "mdi:phone-outline",
   },
 ] as const;
@@ -60,7 +61,7 @@ export default function ContactPage() {
 
       <section className="relative overflow-hidden pt-24">
         <div className="absolute inset-0">
-          <Image src={contactVector} alt="Contact Hapus Logistics" fill priority className="object-cover object-center opacity-45" />
+          <Image src={contactVector} alt={`Contact ${STRINGS.brand.appName}`} fill priority className="object-cover object-center opacity-45" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,10,8,0.38),rgba(18,23,14,0.72)_45%,rgba(42,49,37,0.96))]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(213,228,0,0.12),transparent_20%),radial-gradient(circle_at_80%_20%,rgba(140,180,90,0.12),transparent_18%)]" />
         </div>
@@ -118,7 +119,7 @@ export default function ContactPage() {
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Business Details</p>
                 <p className="mt-2 text-sm leading-6 text-white/75">
-                  Hapus Logistics Pvt. Ltd.
+                  {STRINGS.brand.appName} Pvt. Ltd.
                   <br />
                   Parcel and bus logistics support for India.
                   <br />
@@ -142,14 +143,14 @@ export default function ContactPage() {
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <a
-                    href="tel:+919876543210"
+                    href={STRINGS.contact.phoneHref}
                     className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/35"
                   >
                     <Icon icon="mdi:phone-outline" className="text-base text-[#E4E67A]" />
                     Call Now
                   </a>
                   <a
-                    href="mailto:support@hapuslogistics.com"
+                    href={`mailto:${STRINGS.contact.email}`}
                     className="inline-flex items-center gap-2 rounded-full border border-[#D5E400]/30 bg-[#D5E400]/10 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#D5E400]/20"
                   >
                     <Icon icon="mdi:email-outline" className="text-base" />
@@ -257,14 +258,14 @@ export default function ContactPage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#11160f]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3">
           <a
-            href="tel:+919876543210"
+            href={STRINGS.contact.phoneHref}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white"
           >
             <Icon icon="mdi:phone-outline" className="text-base text-[#E4E67A]" />
             Call
           </a>
           <a
-            href="mailto:support@hapuslogistics.com"
+            href={`mailto:${STRINGS.contact.email}`}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D5E400]/25 bg-[#D5E400]/12 px-4 py-3 text-sm font-semibold text-[#F6FF6A]"
           >
             <Icon icon="mdi:email-outline" className="text-base" />

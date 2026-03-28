@@ -2460,7 +2460,7 @@ export default function OrderDetailPage() {
                   key={`${report.reportType}-${report.createdAt}-${index}`}
                   className={
                     emergency
-                      ? "relative overflow-hidden rounded-[1.4rem] border border-rose-400/35 bg-[linear-gradient(135deg,rgba(127,29,29,0.58),rgba(68,8,8,0.92))] p-4 shadow-[0_18px_40px_rgba(127,29,29,0.28)]"
+                      ? "relative overflow-hidden rounded-[1.4rem] border border-amber-300/35 bg-[linear-gradient(135deg,rgba(120,53,15,0.72),rgba(69,26,3,0.94))] p-4 shadow-[0_18px_40px_rgba(245,158,11,0.22)]"
                       : "dashboard-surface-soft rounded-xl p-3"
                   }
                 >
@@ -2472,7 +2472,7 @@ export default function OrderDetailPage() {
                       <span
                         className={
                           emergency
-                            ? "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-300/30 bg-rose-950/60 text-rose-100"
+                            ? "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-200/30 bg-amber-950/50 text-amber-50"
                             : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70"
                         }
                       >
@@ -2486,19 +2486,19 @@ export default function OrderDetailPage() {
                             </span>
                           ) : null}
                           {emergency && index === 0 ? (
-                            <span className="rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
+                            <span className="rounded-full border border-amber-100/15 bg-amber-100/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-50/85">
                               Pinned To Top
                             </span>
                           ) : null}
                         </div>
                         <p className="mt-2 text-sm font-semibold text-white">{reportTitle}</p>
-                        <p className={`mt-1 text-xs ${emergency ? "text-rose-100/75" : "text-white/55"}`}>{reportMeta}</p>
+                        <p className={`mt-1 text-xs ${emergency ? "text-amber-50/75" : "text-white/55"}`}>{reportMeta}</p>
                       </div>
                     </div>
                     <span
                       className={
                         emergency
-                          ? "rounded-full border border-rose-300/25 bg-rose-950/45 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-rose-100/85"
+                          ? "rounded-full border border-amber-200/25 bg-amber-950/35 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-amber-50/90"
                           : "rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-white/60"
                       }
                     >
@@ -2509,7 +2509,7 @@ export default function OrderDetailPage() {
                     <p
                       className={`relative mt-3 text-sm leading-relaxed ${
                         emergency
-                          ? "rounded-2xl border border-rose-300/15 bg-black/15 px-4 py-3 text-rose-50"
+                          ? "rounded-2xl border border-amber-200/15 bg-black/15 px-4 py-3 text-amber-50"
                           : "text-white/80"
                       }`}
                     >
@@ -2517,7 +2517,7 @@ export default function OrderDetailPage() {
                     </p>
                   ) : null}
                   {report.data?.refundAmount || report.data?.officeAction || report.data?.policyLabel ? (
-                    <div className={`relative mt-3 grid gap-2 text-xs sm:grid-cols-2 ${emergency ? "text-rose-100/90" : "text-white/65"}`}>
+                    <div className={`relative mt-3 grid gap-2 text-xs sm:grid-cols-2 ${emergency ? "text-amber-50/90" : "text-white/65"}`}>
                       {report.data?.refundAmount ? (
                         <p className={emergency ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2" : ""}>
                           Refund: {formatMoney(toNumberValue(report.data.refundAmount))}

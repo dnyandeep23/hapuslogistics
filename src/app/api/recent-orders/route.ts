@@ -27,6 +27,26 @@ interface SupportContact {
   phone: string;
 }
 
+type IncidentReportType = "customer_not_at_pickup" | "customer_not_at_drop";
+type IncidentReportStatus = "attention_needed" | "office_collection_required";
+
+interface RecentIncidentReport {
+  reportType: IncidentReportType;
+  title: string;
+  description: string;
+  status: IncidentReportStatus;
+  data: {
+    processingStatus: IncidentReportStatus;
+    officeAction?: string;
+    customerMessage?: string;
+    assignedOffice?: {
+      officeName?: string;
+      city?: string;
+      state?: string;
+    };
+  };
+}
+
 interface RecentOrderResponseItem {
   id: string;
   trackingId: string;
@@ -57,6 +77,7 @@ interface RecentOrderResponseItem {
   feedbackRating?: number | null;
   feedbackComment?: string;
   feedbackUpdatedAt?: string | null;
+  report?: RecentIncidentReport | null;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -138,6 +159,79 @@ function mapPackageNames(packagesValue: unknown): { packageCount: number; packag
 function getTravelCompanyIdFromBus(busValue: unknown): string {
   if (!isRecord(busValue)) return "";
   return toStringValue(busValue.travelCompanyId);
+}
+
+const INCIDENT_GUIDANCE: Record<IncidentReportType, string> = {
+  customer_not_at_pickup: "Hold the shipment and confirm with the customer before dispatch.",
+  customer_not_at_drop: "Collect the package from office.",
+};
+
+const INCIDENT_STATUS: Record<IncidentReportType, IncidentReportStatus> = {
+  customer_not_at_pickup: "attention_needed",
+  customer_not_at_drop: "office_collection_required",
+};
+
+function normalizeIncidentType(value: unknown): IncidentReportType | null {
+  const normalized = toStringValue(value).trim().toLowerCase();
+  if (normalized === "customer_not_at_pickup" || normalized === "customer_not_at_drop") {
+    return normalized;
+  }
+  return null;
+}
+
+function getLatestOrderReportEntry(orderReports: unknown): UnknownRecord | null {
+  if (!Array.isArray(orderReports) || orderReports.length === 0) return null;
+  for (let index = orderReports.length - 1; index >= 0; index -= 1) {
+    const report = orderReports[index];
+    if (isRecord(report)) return report;
+  }
+  return null;
+}
+
+function mapAssignedOffice(value: unknown): RecentIncidentReport["data"]["assignedOffice"] | undefined {
+  if (!isRecord(value)) return undefined;
+  const officeName = toStringValue(value.officeName);
+  const city = toStringValue(value.city);
+  const state = toStringValue(value.state);
+  if (!officeName && !city && !state) return undefined;
+  return { officeName, city, state };
+}
+
+function parseIncidentReport(order: UnknownRecord): RecentIncidentReport | null {
+  const reportEntry = getLatestOrderReportEntry(order.orderReports);
+  const reportData = isRecord(reportEntry?.data) ? reportEntry.data : {};
+  const type =
+    normalizeIncidentType(reportEntry?.reportType) ||
+    normalizeIncidentType(order.operatorIncidentType) ||
+    normalizeIncidentType(order.incidentReportType);
+
+  if (!type) return null;
+
+  const assignedOffice = mapAssignedOffice(reportData.assignedOffice) || mapAssignedOffice(order.assignedOffice);
+  const rawStatus = toStringValue(
+    reportData.processingStatus || order.operatorIncidentStatus || order.incidentReportStatus,
+  ).toLowerCase();
+  const status: IncidentReportStatus =
+    rawStatus === "office_collection_required" ? "office_collection_required" : INCIDENT_STATUS[type];
+  const customerMessage =
+    toStringValue(reportData.customerMessage) ||
+    (isRecord(order.assignedOffice) ? toStringValue(order.assignedOffice.customerMessage) : "");
+  const officeAction =
+    toStringValue(reportData.officeAction) ||
+    (assignedOffice?.officeName ? `Package held at ${assignedOffice.officeName}, ${assignedOffice.city}.` : "");
+
+  return {
+    reportType: type,
+    title: toStringValue(reportEntry?.title) || (type === "customer_not_at_drop" ? "Customer not at drop" : "Customer not at pickup"),
+    description: toStringValue(reportEntry?.description) || customerMessage || INCIDENT_GUIDANCE[type],
+    status,
+    data: {
+      processingStatus: status,
+      officeAction,
+      customerMessage,
+      assignedOffice,
+    },
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -317,6 +411,7 @@ export async function GET(request: NextRequest) {
         feedbackRating: feedback ? toNumberValue(feedback.rating) : null,
         feedbackComment: feedback ? toStringValue(feedback.comment) : "",
         feedbackUpdatedAt: feedback ? toIsoDate(feedback.updatedAt) : null,
+        report: parseIncidentReport(order),
       };
     });
 

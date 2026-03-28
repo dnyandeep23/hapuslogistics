@@ -8,6 +8,7 @@ import { Icon } from "@iconify/react";
 import { ThemeContext } from "./ThemeProvider";
 import applogo from "@/assets/images/applogo.png";
 import { HEADER_NAV_LINKS, HEADER_ACTIONS } from "@/data/nav";
+import { STRINGS } from "@/lib/strings";
 
 type AuthAction = "Login" | "Register";
 
@@ -82,10 +83,10 @@ export default function Header() {
           }`}
         >
           <Link href="/" onClick={closeMenus} className="flex items-center gap-3 active:scale-95 transition-transform">
-            <Image src={applogo} alt="Hapus Logistics logo" width={112} height={52} className="h-10 w-auto object-contain" priority />
+            <Image src={applogo} alt={STRINGS.brand.logoAlt} width={112} height={52} className="h-10 w-auto object-contain" priority />
             <div className="hidden sm:block">
-              <p className="text-sm font-semibold tracking-[0.22em] text-[#F6FF6A]">HAPUS</p>
-              <p className="text-xs text-white/55">Modern logistics</p>
+              <p className="text-sm font-semibold tracking-[0.22em] text-[#F6FF6A]">{STRINGS.brand.shortName}</p>
+              <p className="text-xs text-white/55">{STRINGS.brand.appName}</p>
             </div>
           </Link>
 

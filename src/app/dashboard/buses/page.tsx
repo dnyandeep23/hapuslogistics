@@ -60,6 +60,15 @@ type AssignedOperatorOption = {
   operatorPhone: string;
 };
 
+type OperatorAssignmentWindow = {
+  operatorId: string;
+  operatorName: string;
+  operatorPhone: string;
+  startDate: string;
+  endDate: string;
+  status: "active" | "upcoming" | "past";
+};
+
 type DeleteBlockingOrder = {
   id: string;
   trackingId: string;
@@ -98,6 +107,29 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const summarizeOfficeLabel = (office: BusOffice, index: number) =>
   `${office.officeName || `Office ${index + 1}`}${office.city ? ` · ${office.city}` : ""}`;
+
+const parseDateOnly = (value?: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const normalizeDateOnly = (value?: string) => {
+  const date = parseDateOnly(value);
+  return date ? date.toISOString().slice(0, 10) : "";
+};
+
+const formatAssignmentDate = (value?: string) => {
+  const date = parseDateOnly(value);
+  if (!date) return "--";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 function AdminBusesPageContent() {
   const { user } = useAppSelector((state) => state.user);
@@ -213,16 +245,50 @@ function AdminBusesPageContent() {
     [operators],
   );
 
-  const getAssignedOperators = useCallback((bus: BusRow): AssignedOperatorOption[] => {
+  const getOperatorAssignmentWindows = useCallback((bus: BusRow): OperatorAssignmentWindow[] => {
     const periods = Array.isArray(bus.operatorContactPeriods) ? bus.operatorContactPeriods : [];
+    const today = parseDateOnly(todayISO());
+
+    return periods
+      .map((period) => {
+        const operatorId = parseId(period.operatorId);
+        const startDate = normalizeDateOnly(period.startDate);
+        const endDate = normalizeDateOnly(period.endDate);
+        if (!operatorId || !startDate || !endDate || !today) return null;
+
+        let status: OperatorAssignmentWindow["status"] = "past";
+        if (today.toISOString().slice(0, 10) < startDate) status = "upcoming";
+        else if (today.toISOString().slice(0, 10) <= endDate) status = "active";
+
+        return {
+          operatorId,
+          operatorName: period.operatorName || "Operator",
+          operatorPhone: period.operatorPhone || "",
+          startDate,
+          endDate,
+          status,
+        };
+      })
+      .filter((entry): entry is OperatorAssignmentWindow => Boolean(entry))
+      .sort((left, right) => {
+        const statusWeight = { active: 0, upcoming: 1, past: 2 };
+        const statusDelta = statusWeight[left.status] - statusWeight[right.status];
+        if (statusDelta !== 0) return statusDelta;
+        if (left.status === "past" && right.status === "past") {
+          return right.endDate.localeCompare(left.endDate);
+        }
+        return left.startDate.localeCompare(right.startDate);
+      });
+  }, []);
+
+  const getAssignedOperators = useCallback((bus: BusRow): AssignedOperatorOption[] => {
+    const periods = getOperatorAssignmentWindows(bus);
     const map = new Map<string, AssignedOperatorOption>();
 
     for (const period of periods) {
-      const operatorId = parseId(period.operatorId);
-      if (!operatorId) continue;
-      if (!map.has(operatorId)) {
-        map.set(operatorId, {
-          operatorId,
+      if (!map.has(period.operatorId)) {
+        map.set(period.operatorId, {
+          operatorId: period.operatorId,
           operatorName: period.operatorName || "Operator",
           operatorPhone: period.operatorPhone || "",
         });
@@ -230,21 +296,14 @@ function AdminBusesPageContent() {
     }
 
     return Array.from(map.values());
-  }, []);
+  }, [getOperatorAssignmentWindows]);
 
   const getAssignedOperatorTags = useCallback((bus: BusRow): string[] => {
-    const periods = Array.isArray(bus.operatorContactPeriods) ? bus.operatorContactPeriods : [];
+    const periods = getOperatorAssignmentWindows(bus);
     if (!periods.length) return [];
 
-    const now = new Date();
     const activeNames = periods
-      .filter((period) => {
-        const startDate = period.startDate ? new Date(period.startDate) : null;
-        const endDate = period.endDate ? new Date(period.endDate) : null;
-        if (!startDate || !endDate) return false;
-        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return false;
-        return now >= startDate && now <= endDate;
-      })
+      .filter((period) => period.status === "active")
       .map((period) => String(period.operatorName || "").trim())
       .filter(Boolean);
 
@@ -256,7 +315,7 @@ function AdminBusesPageContent() {
       .map((period) => String(period.operatorName || "").trim())
       .filter(Boolean);
     return Array.from(new Set(allNames));
-  }, []);
+  }, [getOperatorAssignmentWindows]);
 
   const closeMenusAndModals = () => {
     setOpenMenuBusId(null);
@@ -375,13 +434,15 @@ function AdminBusesPageContent() {
     setError("");
     setOpenMenuBusId(null);
     setAssignBus(bus);
+    const assignmentWindows = getOperatorAssignmentWindows(bus);
     const shouldPrefill =
       queryOperatorId &&
       approvedOperators.some((operator) => operator._id === queryOperatorId);
-    setAssignOperatorId(shouldPrefill ? queryOperatorId : "");
-    const today = todayISO();
-    setAssignStartDate(today);
-    setAssignEndDate(today);
+    const preferredOperatorId = shouldPrefill ? queryOperatorId : assignmentWindows[0]?.operatorId ?? "";
+    const preferredAssignment = assignmentWindows.find((entry) => entry.operatorId === preferredOperatorId) ?? assignmentWindows[0] ?? null;
+    setAssignOperatorId(preferredOperatorId);
+    setAssignStartDate(preferredAssignment?.startDate || todayISO());
+    setAssignEndDate(preferredAssignment?.endDate || todayISO());
     setAssignDateError("");
   };
 
@@ -528,6 +589,25 @@ function AdminBusesPageContent() {
   if (!isAdmin) return null;
 
   const removeBusAssignedOperators = removeBus ? getAssignedOperators(removeBus) : [];
+  const assignBusAssignmentWindows = assignBus ? getOperatorAssignmentWindows(assignBus) : [];
+  const selectedOperatorAssignments = assignBusAssignmentWindows.filter(
+    (assignment) => assignment.operatorId === assignOperatorId,
+  );
+  const hasConflictingSelectedRange = assignOperatorId
+    ? assignBusAssignmentWindows.some(
+        (assignment) =>
+          assignment.operatorId !== assignOperatorId &&
+          assignment.startDate <= assignEndDate &&
+          assignment.endDate >= assignStartDate,
+      )
+    : false;
+  const selectedOperatorCoveredAssignment =
+    assignOperatorId && assignStartDate && assignEndDate
+      ? selectedOperatorAssignments.find(
+          (assignment) => assignment.startDate <= assignStartDate && assignment.endDate >= assignEndDate,
+        ) ?? null
+      : null;
+  const selectedOperatorAlreadyAssigned = Boolean(selectedOperatorCoveredAssignment) && !hasConflictingSelectedRange;
 
   return (
     <div className="space-y-6">
@@ -617,7 +697,7 @@ function AdminBusesPageContent() {
           <Icon icon="solar:bus-line-duotone" className="mb-4 text-5xl text-white/20" />
           <h3 className="text-lg font-bold text-white/80">No buses found</h3>
           <p className="mt-2 max-w-sm text-sm text-white/50">
-            We couldn't find any fleet entries matching your criteria. Try adjusting your search filters or adding a new bus.
+            We could not find any fleet entries matching your criteria. Try adjusting your search filters or adding a new bus.
           </p>
         </div>
       ) : viewMode === "grid" ? (
@@ -625,6 +705,7 @@ function AdminBusesPageContent() {
           {filteredBuses.map((bus) => {
             const assignedOperatorCount = getAssignedOperators(bus).length;
             const routeStopCount = bus.pricing?.length ?? 0;
+            const operatorAssignmentWindows = getOperatorAssignmentWindows(bus);
             return (
               <div key={bus._id} className="group relative overflow-hidden rounded-3xl border border-white/5 bg-[#141A14]/80 transition hover:border-white/15 hover:shadow-2xl">
                 {/* Visual Header Banner */}
@@ -675,6 +756,40 @@ function AdminBusesPageContent() {
                       </span>
                     )}
                   </div>
+
+                  {operatorAssignmentWindows.length > 0 ? (
+                    <div className="mt-4 space-y-2">
+                      {operatorAssignmentWindows.slice(0, 2).map((assignment) => (
+                        <div
+                          key={`${bus._id}-${assignment.operatorId}-${assignment.startDate}-${assignment.endDate}`}
+                          className="rounded-2xl border border-white/6 bg-black/20 px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-white/85">{assignment.operatorName}</p>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                                assignment.status === "active"
+                                  ? "bg-emerald-400/12 text-emerald-300"
+                                  : assignment.status === "upcoming"
+                                    ? "bg-amber-400/12 text-amber-300"
+                                    : "bg-white/8 text-white/45"
+                              }`}
+                            >
+                              {assignment.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-white/55">
+                            From {formatAssignmentDate(assignment.startDate)} till {formatAssignmentDate(assignment.endDate)}
+                          </p>
+                        </div>
+                      ))}
+                      {operatorAssignmentWindows.length > 2 ? (
+                        <p className="px-1 text-[11px] text-white/35">
+                          +{operatorAssignmentWindows.length - 2} more assignment period{operatorAssignmentWindows.length - 2 === 1 ? "" : "s"}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   {/* Summary Footer */}
                   <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
@@ -747,15 +862,25 @@ function AdminBusesPageContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex max-w-[200px] flex-wrap gap-1.5">
-                        {getAssignedOperatorTags(bus).length > 0 ? (
-                          getAssignedOperatorTags(bus).map((operatorName) => (
-                            <span
-                              key={`${bus._id}-list-${operatorName}`}
-                              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300"
-                            >
-                              {operatorName}
-                            </span>
+                      <div className="flex max-w-[240px] flex-col gap-2">
+                        {getOperatorAssignmentWindows(bus).length > 0 ? (
+                          getOperatorAssignmentWindows(bus).slice(0, 2).map((assignment) => (
+                            <div key={`${bus._id}-list-${assignment.operatorId}-${assignment.startDate}-${assignment.endDate}`}>
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                  assignment.status === "active"
+                                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                                    : assignment.status === "upcoming"
+                                      ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
+                                      : "border-white/10 bg-white/5 text-white/45"
+                                }`}
+                              >
+                                {assignment.operatorName}
+                              </span>
+                              <p className="mt-1 text-[11px] text-white/45">
+                                {formatAssignmentDate(assignment.startDate)} to {formatAssignmentDate(assignment.endDate)}
+                              </p>
+                            </div>
                           ))
                         ) : (
                           <span className="text-xs italic text-white/40">None</span>
@@ -826,6 +951,28 @@ function AdminBusesPageContent() {
                   </p>
                 ) : null}
 
+                {selectedOperatorAssignments[0] ? (
+                  <div className="rounded-2xl border border-[#D5E400]/15 bg-[#D5E400]/6 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D5E400]">
+                      Existing Assignment
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-white/90">
+                      {selectedOperatorAssignments[0].operatorName} is already assigned on this bus
+                    </p>
+                    <p className="mt-1 text-xs text-white/65">
+                      From {formatAssignmentDate(selectedOperatorAssignments[0].startDate)} till {formatAssignmentDate(selectedOperatorAssignments[0].endDate)}
+                    </p>
+                    <p className="mt-2 text-xs text-white/55">
+                      Reassign only if you want to extend or change the coverage period.
+                    </p>
+                    {selectedOperatorAlreadyAssigned ? (
+                      <p className="mt-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-300">
+                        This selected date range is already covered. No need to assign this operator again.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <label className="block text-sm font-semibold text-white/80">
                   Assignment Timeline
                   <div className="mt-2">
@@ -856,10 +1003,10 @@ function AdminBusesPageContent() {
                 <button
                   type="button"
                   onClick={handleAssignOperator}
-                  disabled={assigning}
+                  disabled={assigning || selectedOperatorAlreadyAssigned}
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#D5E400] to-[#E4E67A] px-6 py-2.5 text-sm font-bold text-black shadow-lg transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                 >
-                  {assigning ? "Assigning..." : "Assign to Fleet"}
+                  {assigning ? "Assigning..." : selectedOperatorAlreadyAssigned ? "Already Assigned" : "Assign to Fleet"}
                 </button>
               </div>
             </div>

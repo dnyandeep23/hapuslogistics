@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Icon } from "@iconify/react";
 import applogo from "@/assets/images/applogo.png";
 import { useAppSelector } from "@/lib/redux/hooks";
+import { STRINGS } from "@/lib/strings";
 
 export default function MobileHeader() {
   const { user } = useAppSelector((state) => state.user);
@@ -11,7 +12,7 @@ export default function MobileHeader() {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[linear-gradient(180deg,rgba(20,26,19,0.8),rgba(15,20,14,0.85))] backdrop-blur-xl sticky top-0 z-40 lg:hidden">
       <div className="flex items-center gap-2">
-        <Image src={applogo} alt="Hapus Logistics logo" width={32} height={32} className="h-8 w-auto object-contain" priority />
+        <Image src={applogo} alt={STRINGS.brand.logoAlt} width={32} height={32} className="h-8 w-auto object-contain" priority />
         {/* <span className="text-sm font-semibold tracking-wider text-[#F6FF6A]">HAPUS</span> */}
       </div>
       <div className="flex items-center gap-3">

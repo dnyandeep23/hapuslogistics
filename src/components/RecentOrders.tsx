@@ -13,6 +13,7 @@ interface Order {
     status: string;
     date: string;
     packageImage?: string;
+    collectionTag?: string;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -45,6 +46,23 @@ function titleCase(value: string): string {
         .filter(Boolean)
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
         .join(' ');
+}
+
+function getOfficeCollectionTag(report: unknown): string {
+    if (!isRecord(report)) return '';
+
+    const reportType = toStringValue(report.reportType || report.type).toLowerCase();
+    const reportData = isRecord(report.data) ? report.data : {};
+    const processingStatus = toStringValue(reportData.processingStatus || report.status).toLowerCase();
+    if (reportType !== 'customer_not_at_drop' && processingStatus !== 'office_collection_required') {
+        return '';
+    }
+
+    const assignedOffice = isRecord(reportData.assignedOffice) ? reportData.assignedOffice : null;
+    const officeName = toStringValue(assignedOffice?.officeName);
+    const city = toStringValue(assignedOffice?.city);
+    const location = [officeName, city].filter(Boolean).join(', ');
+    return location ? `Pick up package from ${location}` : 'Pick up package from assigned office';
 }
 
 function getStatusTone(status: string) {
@@ -107,6 +125,7 @@ function mapOrder(raw: unknown): Order | null {
         status,
         date,
         packageImage: toStringValue(raw.packageImage) || undefined,
+        collectionTag: getOfficeCollectionTag(raw.report) || undefined,
     };
 }
 
@@ -248,6 +267,12 @@ export default function RecentOrders() {
                                     </span>
                                 </div>
                             </div>
+                            {order.collectionTag ? (
+                                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">
+                                    <Icon icon="mdi:store-marker-outline" className="text-sm shrink-0" />
+                                    <span className="truncate">{order.collectionTag}</span>
+                                </div>
+                            ) : null}
                             <div className="flex items-center justify-between border-t border-white/5 pt-3 text-xs font-semibold text-[#CDD645]">
                                 <span className="inline-flex items-center gap-1.5">
                                     View package details

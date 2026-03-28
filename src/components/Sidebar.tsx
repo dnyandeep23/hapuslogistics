@@ -7,6 +7,7 @@ import type { MenuItem } from "../data/roleMenus";
 import { User } from "@/types";
 import { useAppDispatch } from "@/lib/redux/hooks";
 import { logoutUser } from "@/lib/redux/userSlice";
+import { STRINGS } from "@/lib/strings";
 
 type Props = {
     user: User | null;
@@ -95,9 +96,9 @@ hover:shadow-2xl hover:shadow-[#E4E67A]`}
                     {isExpanded ? (
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d8e0b1]">
-                                Hapus Travels
+                                {STRINGS.brand.companyName}
                             </p>
-                            <p className="mt-1 text-xs text-white/55">Dashboard workspace</p>
+                            <p className="mt-1 text-xs text-white/55">{STRINGS.brand.dashboardWorkspaceLabel}</p>
                         </div>
                     ) : (<></>
                         // <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E4E67A]">

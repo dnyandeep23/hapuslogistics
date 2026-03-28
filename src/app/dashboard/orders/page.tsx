@@ -39,6 +39,13 @@ interface OrderReport {
     processingStatus?: "attention_needed" | "office_collection_required";
     orderId?: string;
     busId?: string;
+    officeAction?: string;
+    customerMessage?: string;
+    assignedOffice?: {
+      officeName?: string;
+      city?: string;
+      state?: string;
+    };
   };
   type?: "customer_not_at_pickup" | "customer_not_at_drop";
   status?: "attention_needed" | "office_collection_required";
@@ -166,6 +173,14 @@ function toSearchText(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function toStringValue(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return fallback;
+}
+
 function telHref(phone: string): string {
   const normalized = String(phone ?? "").trim().replace(/[^\d+]/g, "");
   return normalized ? `tel:${normalized}` : "";
@@ -203,6 +218,21 @@ function formatDate(isoDate: string): string {
 
 function formatMoney(amount: number): string {
   return `Rs ${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+function getOfficeCollectionTag(report?: OrderReport | null): string {
+  if (!report) return "";
+
+  const reportType = (report.reportType || report.type || "").toLowerCase();
+  const processingStatus = (report.data?.processingStatus || report.status || "").toLowerCase();
+  if (reportType !== "customer_not_at_drop" && processingStatus !== "office_collection_required") {
+    return "";
+  }
+
+  const officeName = toStringValue(report.data?.assignedOffice?.officeName);
+  const city = toStringValue(report.data?.assignedOffice?.city);
+  const location = [officeName, city].filter(Boolean).join(", ");
+  return location ? `Pick up package from ${location}` : "Pick up package from assigned office";
 }
 
 function nearestDateDiff(isoDate: string, referenceMs: number): number {
@@ -891,6 +921,7 @@ export default function OrderPage() {
         hasBusContact && !isDelivered && !isCancelled && !isMissedPackage && !shouldHideUpcomingContact;
       const supportPhone = order.supportContact?.phone || "";
       const supportPhoneHref = telHref(supportPhone);
+      const officeCollectionTag = getOfficeCollectionTag(order.report);
 
       const stepIndex = getStepIndex(order.status);
       const steps = ["Order Placed", "Confirmed", "In Transit", "Delivered"];
@@ -926,6 +957,15 @@ export default function OrderPage() {
               {order.status}
             </span>
           </div>
+
+          {officeCollectionTag ? (
+            <div className="relative mb-5 flex">
+              <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-100 shadow-[0_10px_30px_-20px_rgba(251,191,36,0.8)]">
+                <Icon icon="mdi:store-marker-outline" className="text-sm" />
+                {officeCollectionTag}
+              </span>
+            </div>
+          ) : null}
 
           <div className="relative mb-5 grid gap-3 md:grid-cols-2">
             <div className="rounded-[1.25rem] border border-emerald-300/12 bg-emerald-500/6 p-4">
@@ -1522,7 +1562,9 @@ export default function OrderPage() {
                   </div>
 
                   <div className="space-y-3">
-                    {busGroup.orders.map((order) => (
+                    {busGroup.orders.map((order) => {
+                      const officeCollectionTag = getOfficeCollectionTag(order.report);
+                      return (
                       <article
                         key={order.id}
                         role="button"
@@ -1546,6 +1588,15 @@ export default function OrderPage() {
                             {order.status}
                           </span>
                         </div>
+
+                        {officeCollectionTag ? (
+                          <div className="mt-3 flex">
+                            <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-100 shadow-[0_10px_30px_-20px_rgba(251,191,36,0.8)]">
+                              <Icon icon="mdi:store-marker-outline" className="text-sm" />
+                              {officeCollectionTag}
+                            </span>
+                          </div>
+                        ) : null}
 
                         <div className="relative mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                           <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -1605,7 +1656,8 @@ export default function OrderPage() {
                           </span>
                         </div>
                       </article>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               ))}
