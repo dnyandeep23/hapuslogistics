@@ -196,17 +196,14 @@ export default function RecentOrders() {
                 </div>
                 <button
                     onClick={() => {
-                        const tracker = document.getElementById("dashboard-order-tracker");
-                        if (tracker) {
-                            tracker.scrollIntoView({ behavior: "smooth", block: "start" });
-                        } else {
-                            router.push('/dashboard/orders');
-                        }
+
+                        router.push('/dashboard/orders');
+
                     }}
                     className="inline-flex items-center gap-2 rounded-full border border-[#F6FF6A]/20 bg-[#F6FF6A]/10 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition-colors hover:bg-[#F6FF6A]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6FF6A]/50"
                 >
                     View More
-                    <Icon icon="mdi:arrow-down" className="text-base" />
+                    <Icon icon="mdi:arrow-down" className="text-base -rotate-90" />
                 </button>
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

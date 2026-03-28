@@ -882,7 +882,7 @@ export default function DashboardPage() {
 
   if (isAdminLocked) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 pb-20 text-center">
+      <div className="p-2 sm:p-6 lg:p-8 pb-20 text-center">
         <div className="mx-auto max-w-4xl">
           <div className="overflow-hidden rounded-[2.2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(31,40,29,0.98),rgba(21,29,23,0.96),rgba(15,21,16,0.98))] p-6 text-left shadow-[0_28px_70px_rgba(0,0,0,0.24)] sm:p-8">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
@@ -992,7 +992,7 @@ export default function DashboardPage() {
 
   if (isAdminRole) {
     return (
-      <div className='p-4 sm:p-6 lg:p-8 pb-20'>
+      <div className='p-2 sm:p-6 lg:p-8 pb-20'>
         <DashboardHero
           eyebrow={dashboardRoleLabel}
           title={dashboardTitle}

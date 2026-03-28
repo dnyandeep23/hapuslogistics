@@ -123,11 +123,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Mobile/Tablet App Layout */}
-      <div className="relative z-10 flex h-[100dvh] w-full flex-col lg:hidden no-scrollbar">
+      <div className="relative z-10 flex h-dvh w-full flex-col lg:hidden no-scrollbar">
         {/* <MobileHeader /> */}
 
-        <main className="flex-1 overflow-y-auto no-scrollbar pb-[100px] px-3 py-4">
-          <div className="mx-auto w-full max-w-[1700px] rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl sm:p-6 transition-all">
+        <main className="flex-1 overflow-y-auto no-scrollbar pb-25 px-2 py-4">
+          <div className="mx-auto w-full max-w-425 rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl sm:p-4 transition-all">
             {children}
           </div>
         </main>

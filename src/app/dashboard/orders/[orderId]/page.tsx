@@ -429,6 +429,17 @@ function prettifyReason(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+const EMERGENCY_REPORT_TYPES = new Set(["customer_not_at_drop", "customer_not_at_pickup"]);
+
+function isEmergencyReport(report: Pick<OrderReport, "reportType">): boolean {
+  return EMERGENCY_REPORT_TYPES.has(report.reportType);
+}
+
+function getReportTimestamp(report: Pick<OrderReport, "createdAt">): number {
+  const timestamp = new Date(report.createdAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function getRefundStatusTone(status: string): string {
   const normalized = status.toLowerCase();
   if (normalized === "processed") return "border-emerald-400/35 bg-emerald-500/10 text-emerald-100";
@@ -1408,6 +1419,11 @@ export default function OrderDetailPage() {
   const supportPhoneHref = telHref(supportPhone);
   const statusStepIndex = getStepIndex(order.status);
   const statusSteps = ["Order Placed", "Confirmed", "In Transit", "Delivered"];
+  const orderedReports = [...(order.reports ?? [])].sort((left, right) => {
+    const emergencyDelta = Number(isEmergencyReport(right)) - Number(isEmergencyReport(left));
+    if (emergencyDelta !== 0) return emergencyDelta;
+    return getReportTimestamp(right) - getReportTimestamp(left);
+  });
   const missedRefundBaseAmount = toNumberValue(order.missedPackageDetails?.refundBaseAmount);
   const missedRefundPreviewWaiverAmount = Math.round((missedRefundBaseAmount * missedRefundWaiverPercent / 100) * 100) / 100;
   const missedRefundPreviewAmount = Math.max(
@@ -2423,7 +2439,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {Array.isArray(order.reports) && order.reports.length > 0 ? (
+      {orderedReports.length > 0 ? (
         <div className={`${sectionPanelClass} mt-6`}>
           <DetailSectionHeader
             icon="mdi:clipboard-alert-outline"
@@ -2432,35 +2448,96 @@ export default function OrderDetailPage() {
             description="Reports shared on this order by the operator, customer, or refund actions."
           />
           <div className="space-y-3">
-            {order.reports.map((report, index) => (
-              <div key={`${report.reportType}-${report.createdAt}-${index}`} className="dashboard-surface-soft rounded-xl p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {report.title || prettifyReason(report.category || report.reportType)}
-                    </p>
-                    <p className="mt-1 text-xs text-white/55">
-                      {prettifyReason(report.createdByRole)} | {report.createdAt ? formatDate(report.createdAt) : "--"}
-                    </p>
+            {orderedReports.map((report, index) => {
+              const emergency = isEmergencyReport(report);
+              const reportTitle = report.title || prettifyReason(report.category || report.reportType);
+              const reportMeta = `${prettifyReason(report.createdByRole)} | ${
+                report.createdAt ? formatDate(report.createdAt) : "--"
+              }`;
+
+              return (
+                <div
+                  key={`${report.reportType}-${report.createdAt}-${index}`}
+                  className={
+                    emergency
+                      ? "relative overflow-hidden rounded-[1.4rem] border border-rose-400/35 bg-[linear-gradient(135deg,rgba(127,29,29,0.58),rgba(68,8,8,0.92))] p-4 shadow-[0_18px_40px_rgba(127,29,29,0.28)]"
+                      : "dashboard-surface-soft rounded-xl p-3"
+                  }
+                >
+                  {emergency ? (
+                    <div className="pointer-events-none absolute inset-y-0 right-0 w-40 bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.18),transparent_70%)]" />
+                  ) : null}
+                  <div className="relative flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={
+                          emergency
+                            ? "mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-300/30 bg-rose-950/60 text-rose-100"
+                            : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70"
+                        }
+                      >
+                        <Icon icon={emergency ? "mdi:alert-octagon" : "mdi:file-document-outline"} className="text-lg" />
+                      </span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {emergency ? (
+                            <span className="rounded-full border border-amber-300/35 bg-amber-300/18 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+                              Emergency
+                            </span>
+                          ) : null}
+                          {emergency && index === 0 ? (
+                            <span className="rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
+                              Pinned To Top
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-white">{reportTitle}</p>
+                        <p className={`mt-1 text-xs ${emergency ? "text-rose-100/75" : "text-white/55"}`}>{reportMeta}</p>
+                      </div>
+                    </div>
+                    <span
+                      className={
+                        emergency
+                          ? "rounded-full border border-rose-300/25 bg-rose-950/45 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-rose-100/85"
+                          : "rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-white/60"
+                      }
+                    >
+                      {prettifyReason(report.reportType)}
+                    </span>
                   </div>
-                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-white/60">
-                    {prettifyReason(report.reportType)}
-                  </span>
+                  {report.description ? (
+                    <p
+                      className={`relative mt-3 text-sm leading-relaxed ${
+                        emergency
+                          ? "rounded-2xl border border-rose-300/15 bg-black/15 px-4 py-3 text-rose-50"
+                          : "text-white/80"
+                      }`}
+                    >
+                      {report.description}
+                    </p>
+                  ) : null}
+                  {report.data?.refundAmount || report.data?.officeAction || report.data?.policyLabel ? (
+                    <div className={`relative mt-3 grid gap-2 text-xs sm:grid-cols-2 ${emergency ? "text-rose-100/90" : "text-white/65"}`}>
+                      {report.data?.refundAmount ? (
+                        <p className={emergency ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2" : ""}>
+                          Refund: {formatMoney(toNumberValue(report.data.refundAmount))}
+                        </p>
+                      ) : null}
+                      {report.data?.policyLabel ? (
+                        <p className={emergency ? "rounded-xl border border-white/10 bg-white/5 px-3 py-2" : ""}>
+                          Policy: {toStringValue(report.data.policyLabel)}
+                        </p>
+                      ) : null}
+                      {report.data?.officeAction ? (
+                        <p className={emergency ? "rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 font-semibold text-amber-50 sm:col-span-2" : ""}>
+                          Office Action: {toStringValue(report.data.officeAction)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-                {report.description ? (
-                  <p className="mt-3 text-sm text-white/80">{report.description}</p>
-                ) : null}
-                {report.data?.refundAmount || report.data?.officeAction || report.data?.policyLabel ? (
-                  <div className="mt-3 grid gap-2 text-xs text-white/65 sm:grid-cols-2">
-                    {report.data?.refundAmount ? (
-                      <p>Refund: {formatMoney(toNumberValue(report.data.refundAmount))}</p>
-                    ) : null}
-                    {report.data?.policyLabel ? <p>Policy: {toStringValue(report.data.policyLabel)}</p> : null}
-                    {report.data?.officeAction ? <p>Office Action: {toStringValue(report.data.officeAction)}</p> : null}
-                  </div>
-                ) : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}
