@@ -12,7 +12,7 @@ import Bus from '@/app/api/models/busModel';
 import { buildDefaultRefundPolicySnapshot } from '@/app/api/lib/orderCancellation';
 import { v4 as uuidv4 } from 'uuid';
 import Razorpay from 'razorpay';
-import { sendEmail } from '@/app/api/lib/mailer';
+import { sendOrderConfirmedEmail } from '@/app/api/lib/mailer';
 import { CouponUsageLimitError, reserveCouponUsageForUser } from '@/app/api/lib/couponUsage';
 
 const razorpay = new Razorpay({
@@ -228,20 +228,10 @@ export async function POST(request: NextRequest) {
         ).trim();
         if (orderUserEmail) {
           try {
-            await sendEmail({
+            await sendOrderConfirmedEmail({
               email: orderUserEmail,
-              emailType: "ORDER_CONFIRMED",
               trackingId,
-              packages: Array.isArray(orderPackages) ? orderPackages.map((pkg) => {
-                const safePkg = pkg as Record<string, unknown> | null;
-                return {
-                  name: String(safePkg?.packageName || safePkg?.description || "Package"),
-                  image: String(safePkg?.packageImage || ""),
-                  type: String(safePkg?.packageType || "Standard"),
-                  weight: String(safePkg?.packageWeight || safePkg?.weightKg || ""),
-                  size: String(safePkg?.packageSize || ""),
-                };
-              }) : undefined,
+              packages: orderPackages,
             });
           } catch (mailError) {
             console.error("[payment-callback] Order confirmation email failed to send:", mailError);

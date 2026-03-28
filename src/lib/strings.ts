@@ -17,7 +17,7 @@ export const STRINGS = {
     phoneHref: "tel:+919876543210",
     address: "Shop No.1, Ramu Niwas, Near W.E. Highway, Khar (East), Mumbai, Maharashtra - 400051",
     mapsHref:
-      "https://www.google.com/maps/search/?api=1&query=138%2FD%20Kinny%20House%20Room%20No.%201%202nd%20Floor%20near%20Parcel%20ST%20Depot%20Pune",
+      "https://maps.app.goo.gl/1eSyoApWJZsjTSoq7",
   },
   homeTitle: "Move parcels easily — Hapus Logistics",
   homeSubtitle: "Ship, track, and deliver across locations reliably.",

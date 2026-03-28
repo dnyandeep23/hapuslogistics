@@ -65,6 +65,16 @@ type EmailContent = {
   businessAddress: string;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+export type OrderEmailPackage = {
+  name: string;
+  image: string;
+  type: string;
+  weight?: string;
+  size?: string;
+};
+
 // These remain as hardcoded fallbacks if DB fetch fails
 const FALLBACK_APP_NAME = "Hapus Logistics";
 const DOMAIN = process.env.DOMAIN?.replace(/\/$/, "") || "https://hapuslogistics.com";
@@ -107,6 +117,23 @@ const formatDisplay = (value?: string, fallback = "Not specified"): string => {
 
 const formatOrderStatus = (value?: string): string =>
   formatDisplay(value, "Pending").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+
+export const mapOrderPackagesForEmail = (packages: unknown): OrderEmailPackage[] | undefined => {
+  if (!Array.isArray(packages)) return undefined;
+
+  const mapped = packages.map((pkg) => {
+    const safePkg = (pkg && typeof pkg === "object" ? pkg : {}) as UnknownRecord;
+    return {
+      name: String(safePkg.packageName || safePkg.description || "Package"),
+      image: String(safePkg.packageImage || ""),
+      type: String(safePkg.packageType || "Standard"),
+      weight: String(safePkg.packageWeight || safePkg.weightKg || ""),
+      size: String(safePkg.packageSize || ""),
+    };
+  });
+
+  return mapped.length > 0 ? mapped : undefined;
+};
 
 const toTextLines = (content: EmailContent): string => {
   const lines = [
@@ -705,3 +732,15 @@ export const sendEmail = async (payload: SendEmailPayload) => {
     throw new Error(error instanceof Error ? error.message : "Failed to send email.");
   }
 };
+
+export const sendOrderConfirmedEmail = async (payload: {
+  email: string;
+  trackingId?: string;
+  packages?: unknown;
+}) =>
+  sendEmail({
+    email: payload.email,
+    emailType: "ORDER_CONFIRMED",
+    trackingId: payload.trackingId,
+    packages: mapOrderPackagesForEmail(payload.packages),
+  });

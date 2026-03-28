@@ -8,7 +8,7 @@ import {
   isDataImageUrl,
   uploadImageDataUrl,
 } from "@/app/api/lib/cloudinary";
-import { sendEmail } from "@/app/api/lib/mailer";
+import { sendOrderConfirmedEmail } from "@/app/api/lib/mailer";
 import { CouponUsageLimitError, reserveCouponUsageForUser } from "@/app/api/lib/couponUsage";
 import BookingSession from "@/app/api/models/bookingSessionModel";
 import Bus from "@/app/api/models/busModel";
@@ -241,20 +241,10 @@ export async function POST(request: NextRequest) {
     transactionCommitted = true;
 
     try {
-      await sendEmail({
+      await sendOrderConfirmedEmail({
         email: customer.email,
-        emailType: "ORDER_CONFIRMED",
         trackingId,
-        packages: Array.isArray(orderPackages) ? orderPackages.map((pkg) => {
-          const safePkg = pkg as Record<string, unknown> | null;
-          return {
-            name: String(safePkg?.packageName || safePkg?.description || "Package"),
-            image: String(safePkg?.packageImage || ""),
-            type: String(safePkg?.packageType || "Standard"),
-            weight: String(safePkg?.packageWeight || safePkg?.weightKg || ""),
-            size: String(safePkg?.packageSize || ""),
-          };
-        }) : undefined,
+        packages: orderPackages,
       });
     } catch (mailError) {
       console.error("[admin-confirm] Order confirmation email failed to send:", mailError);
