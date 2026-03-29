@@ -41,15 +41,14 @@ export async function POST(request: NextRequest) {
     const role = normalizeRole(incomingRole) ?? "user";
     const normalizedName = normalizeName(typeof name === "string" ? name : "");
     const normalizedEmail = normalizeEmail(typeof email === "string" ? email : "");
+    const normalizedPassword = typeof password === "string" ? password : "";
     const companyName =
       typeof incomingCompanyName === "string" ? incomingCompanyName.trim() : "";
     const companyId =
       typeof incomingCompanyId === "string" ? incomingCompanyId.trim() : "";
     const nameError = getNameValidationMessage(normalizedName);
     const emailError = getEmailValidationMessage(normalizedEmail);
-    const passwordError = getPasswordValidationMessage(
-      typeof password === "string" ? password : "",
-    );
+    const passwordError = getPasswordValidationMessage(normalizedPassword);
 
     if (emailError || passwordError) {
       return NextResponse.json(
@@ -87,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     // Hash password
     const salt = await bcryptjs.genSalt(10);
-    const hashedPassword = await bcryptjs.hash(password, salt);
+    const hashedPassword = await bcryptjs.hash(normalizedPassword, salt);
     const authProviderSchemaInstance = User.schema.path("authProvider")?.instance;
     let pendingTravelCompanyId: string | undefined;
     let operatorCompanyOwnerUserId: string | undefined;

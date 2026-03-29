@@ -40,10 +40,9 @@ export async function POST(request: NextRequest) {
     const role = normalizedRole === "operator" ? "operator" : "user";
     const isAdminLogin = Boolean(adminLogin);
     const normalizedEmail = normalizeEmail(typeof email === "string" ? email : "");
+    const normalizedPassword = typeof password === "string" ? password : "";
     const emailError = getEmailValidationMessage(normalizedEmail);
-    const passwordError = getPasswordValidationMessage(
-      typeof password === "string" ? password : "",
-    );
+    const passwordError = getPasswordValidationMessage(normalizedPassword);
 
     if (emailError || passwordError) {
       return NextResponse.json(
@@ -117,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if password is correct
-    const validPassword = await bcryptjs.compare(password, user.password);
+    const validPassword = await bcryptjs.compare(normalizedPassword, user.password);
 
     if (!validPassword) {
       return NextResponse.json(
