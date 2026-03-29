@@ -6,7 +6,6 @@ import myPackageImg from "@/assets/images/mypackage.png";
 import addPackageImg from "@/assets/images/addpackage.png";
 import trackPackageImg from "@/assets/images/trackpackage.png";
 import { useRouter } from 'next/navigation'
-import ContinueOrderPrompt from '@/components/ContinueOrderPrompt'
 import RecentOrders from '@/components/RecentOrders';
 import OrderTrackingWidget from '@/components/OrderTrackingWidget';
 import { resetPackageState } from '@/lib/redux/packageSlice';
@@ -1070,9 +1069,6 @@ export default function DashboardPage() {
           <div className="flex flex-col">
             <div className="min-w-0">
               <RecentOrders />
-            </div>
-            <div className="min-w-0">
-              <ContinueOrderPrompt />
             </div>
           </div>
         </div>
