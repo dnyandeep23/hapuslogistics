@@ -1,10 +1,11 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from "react";
-import Loginvector from "@/assets/images/loginvector.png";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import loginVector from "@/assets/images/loginvector.png";
 import googleVector from "@/assets/images/googleVector.png";
 import {
   loginUser,
@@ -12,34 +13,89 @@ import {
   resendVerificationEmail,
   verifyAdminOtp,
 } from "@/services/auth";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/context/ToastContext";
 import NotificationBox from "@/components/NotificationBox";
 import { getErrorMessage, normalizeAuthQueryError } from "@/lib/authError";
+import AuthShell from "@/components/AuthShell";
+import {
+  GENERIC_AUTH_ERROR_MESSAGE,
+  getEmailValidationMessage,
+  getOtpValidationMessage,
+  getPasswordValidationMessage,
+  normalizeEmail,
+} from "@/lib/authFlow";
 
 type AuthStep = "credentials" | "otp";
 
-function LoginPageContent() {
+function AdminLoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { addToast } = useToast();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<AuthStep>("credentials");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [touched, setTouched] = useState<{
+    email?: boolean;
+    password?: boolean;
+    otp?: boolean;
+  }>({});
   const [notification, setNotification] = useState({
     message: "",
     type: "" as "success" | "warning" | "error" | "",
     showResend: false,
   });
-  const [errors, setErrors] = useState<{
-    email?: string;
-    password?: string;
-    otp?: string;
-  }>({});
+
+  const errors = useMemo(() => {
+    const nextErrors: {
+      email?: string;
+      password?: string;
+      otp?: string;
+    } = {};
+
+    if (step === "credentials") {
+      if (submitAttempted || touched.email) {
+        const emailMessage = getEmailValidationMessage(email);
+        if (emailMessage) {
+          nextErrors.email = emailMessage;
+        }
+      }
+
+      if (submitAttempted || touched.password) {
+        const passwordMessage = getPasswordValidationMessage(password);
+        if (passwordMessage) {
+          nextErrors.password = passwordMessage;
+        }
+      }
+    }
+
+    if (step === "otp" && (submitAttempted || touched.otp)) {
+      const otpMessage = getOtpValidationMessage(otpCode, 6);
+      if (otpMessage) {
+        nextErrors.otp = otpMessage;
+      }
+    }
+
+    return nextErrors;
+  }, [
+    email,
+    otpCode,
+    password,
+    step,
+    submitAttempted,
+    touched.email,
+    touched.otp,
+    touched.password,
+  ]);
+
+  const isSubmitDisabled =
+    loading ||
+    (step === "credentials"
+      ? !email.trim() || !password.trim() || Boolean(errors.email || errors.password)
+      : !otpCode.trim() || Boolean(errors.otp));
 
   useEffect(() => {
     const registered = searchParams.get("registered");
@@ -82,51 +138,21 @@ function LoginPageContent() {
     }
   }, [searchParams, addToast]);
 
-  const validateCredentials = () => {
-    const newErrors: typeof errors = {};
-    if (!email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = "Enter a valid email address";
-    }
-
-    if (!password) newErrors.password = "Password is required";
-    else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateOtp = () => {
-    const newErrors: typeof errors = {};
-    if (!otpCode) {
-      newErrors.otp = "Access code is required";
-    } else if (!/^\d{6}$/.test(otpCode)) {
-      newErrors.otp = "Access code must be 6 digits";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleResendVerification = async () => {
-    if (!email) {
-      addToast(
-        "Please enter the email address of the unverified account.",
-        "error",
-      );
+    const normalizedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(normalizedEmail);
+
+    if (emailError) {
+      setTouched((currentValue) => ({ ...currentValue, email: true }));
+      setSubmitAttempted(true);
       return;
     }
 
     try {
-      const response = await resendVerificationEmail(email);
+      const response = await resendVerificationEmail(normalizedEmail);
       addToast(response.message || "Verification email sent successfully.", "success");
     } catch (error: unknown) {
-      addToast(
-        getErrorMessage(error, "Failed to resend verification email."),
-        "error",
-      );
+      addToast(getErrorMessage(error, "Failed to resend verification email."), "error");
     }
   };
 
@@ -151,14 +177,25 @@ function LoginPageContent() {
   };
 
   const submitCredentials = async () => {
-    if (!validateCredentials()) return;
+    setSubmitAttempted(true);
+    setTouched((currentValue) => ({
+      ...currentValue,
+      email: true,
+      password: true,
+    }));
+
+    const normalizedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(normalizedEmail);
+    const passwordError = getPasswordValidationMessage(password);
+
+    if (emailError || passwordError) return;
 
     setLoading(true);
     setNotification({ message: "", type: "", showResend: false });
 
     try {
       const response = (await loginUser({
-        email,
+        email: normalizedEmail,
         password,
         adminLogin: true,
       })) as {
@@ -170,6 +207,8 @@ function LoginPageContent() {
         setStep("otp");
         setPassword("");
         setOtpCode("");
+        setSubmitAttempted(false);
+        setTouched({});
         setNotification({
           message:
             response.message ||
@@ -182,12 +221,11 @@ function LoginPageContent() {
 
       router.push("/dashboard");
     } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error, "Login failed. Please try again.");
+      const errorMessage = getErrorMessage(error, GENERIC_AUTH_ERROR_MESSAGE);
 
       if (errorMessage.includes("Account not verified")) {
         setNotification({
-          message:
-            "This account is not verified. A new verification email has been sent.",
+          message: "This account is not verified. A new verification email has been sent.",
           type: "warning",
           showResend: true,
         });
@@ -204,7 +242,11 @@ function LoginPageContent() {
   };
 
   const submitOtp = async () => {
-    if (!validateOtp()) return;
+    setSubmitAttempted(true);
+    setTouched((currentValue) => ({ ...currentValue, otp: true }));
+
+    const otpError = getOtpValidationMessage(otpCode, 6);
+    if (otpError) return;
 
     setLoading(true);
     setNotification({ message: "", type: "", showResend: false });
@@ -214,7 +256,7 @@ function LoginPageContent() {
       router.push("/dashboard");
     } catch (error: unknown) {
       setNotification({
-        message: getErrorMessage(error, "Access code verification failed."),
+        message: getErrorMessage(error, GENERIC_AUTH_ERROR_MESSAGE),
         type: "error",
         showResend: false,
       });
@@ -225,285 +267,302 @@ function LoginPageContent() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (step === "otp") {
       await submitOtp();
       return;
     }
+
     await submitCredentials();
   };
 
+  const shellTitle =
+    step === "otp" ? "Verify admin access with your code" : "Secure admin login";
+  const shellDescription =
+    step === "otp"
+      ? "The code flow is optimized for quick verification on smaller screens and still keeps the full login context on desktop."
+      : "Admins get a balanced login workspace with clearer prompts, safer error handling, and a quick path to one-time access.";
+
   return (
-    <section>
-      <div className="relative h-[120vh] md:h-screen flex flex-col  md:justify-end py-12 px-6 md:py-20 md:px-20 text-white">
-        <Link
-          href="/"
-          className="
-  absolute 
-  top-2 right-2
-  sm:top-3 sm:right-3
-  md:top-4 md:right-4
-  z-50
-"
-        >
-          <div
-            className="
-    flex gap-2 items-center
-    bg-gray-600/60 hover:bg-gray-700
-    cursor-pointer
-    px-2 py-1 text-sm
-    sm:px-3 sm:py-1.5 sm:text-sm
-    md:px-4 md:py-2 md:text-base
-    rounded-lg text-white
-  "
-          >
-            <Icon icon="solar:home-2-broken" className="text-sm md:text-base" />
-            <span className="">Return to Home</span>
-          </div>
-        </Link>
+    <AuthShell
+      badge="Admin portal"
+      title={shellTitle}
+      description={shellDescription}
+      supportLine="Use your admin email and password, or switch to the one-time access code when prompted."
+      highlights={
+        step === "otp"
+          ? ["One-time code", "Resend access", "Protected route"]
+          : ["Credentials", "Google sign-in", "Protected route"]
+      }
+      artwork={loginVector}
+      artworkAlt="Admin login background artwork"
+    >
+      <div className="space-y-5 sm:space-y-6">
+        <NotificationBox
+          message={notification.message}
+          type={notification.type}
+          showResend={notification.showResend}
+          onResend={handleResendVerification}
+        />
 
-        <div className="absolute bg-[#25421E] top-0 left-0 w-[95%] md:w-[75%] h-[50%] rounded-br-[60%] md:h-full lg:h-full"></div>
-        <div className="absolute inset-0 h-full w-full md:w-[70%] lg:w-[70%] flex flex-col">
-          <Image
-            src={Loginvector}
-            alt="vector image"
-            className="object-cover"
-          ></Image>
-        </div>
-        <div
-          className=" top-[55%] w-[90%] translate-y-46 md:relative left-auto md:top-auto md:translate-y-0 md:ml-6 md:w-auto"
-        >
-          <div className="flex   items-center gap-4 md:gap-8">
-            <p className="z-50 relative text-6xl md:text-9xl font-bold">
-              Hapus
-            </p>
-            <p className="z-50 mt-4 text text-center relative text-lg md:text-2xl font-medium line-clamp-2">
-              Travels & <br /> Logistics
-            </p>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/42">
+                Admin access
+              </p>
+              <p className="text-[2.1rem] font-black leading-[0.92] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
+                {step === "otp" ? "Verify access code" : "Admin login"}
+              </p>
+              <p className="max-w-xl text-sm leading-6 text-white/62 sm:text-[1.05rem] sm:leading-7">
+                {step === "otp"
+                  ? "Enter the 6-digit code sent to your email to complete the secure sign-in."
+                  : "Enter your admin email and password to continue to the dashboard."}
+              </p>
+            </div>
+            <div className="rounded-full border border-[#D5E400]/18 bg-[#D5E400]/10 px-4 py-3 text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F6FF6A]/75">
+                Admin
+              </p>
+              <p className="text-sm font-semibold text-[#F6FF6A]">
+                {step === "otp" ? "OTP" : "Login"}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="z-50 text-sm md:text-base relative mt-3 md:mt-12 text-white/80">
-              Log in with confidence — your luggage is in safe hands with Hapus
-              Logistics.
-            </p>
+
+          <div className="rounded-[1.25rem] border border-white/8 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white/70">
+            {step === "otp"
+              ? "The code flow is optimized for quick verification on smaller screens and still keeps the full login context on desktop."
+              : "Admins get a balanced login workspace with clearer prompts, safer error handling, and a quick path to one-time access."}
           </div>
         </div>
 
-        <div
-          className="
-    absolute
-    left-1/2 top-[65%] -translate-x-1/2 -translate-y-1/2
-    px-7 py-6
-    bg-black/40
-    rounded-[10%]
-    md:rounded-[8%]
-    flex flex-col
-    max-w-md w-[90%]
-
-    md:left-auto md:top-auto md:translate-x-0 md:translate-y-0
-    md:right-20 md:bottom-20
-    md:px-10 md:py-8
-  "
-        >
-          <div className="pb-3 md:pb-4">
-            <NotificationBox
-              message={notification.message}
-              type={notification.type}
-              showResend={notification.showResend}
-              onResend={handleResendVerification}
-            />
-          </div>
-
-          <p className="text-white font-bold text-2xl md:text-3xl mb-6">
-            {step === "otp" ? "Verify Admin Access" : "Admin Login"}
-          </p>
-
-          <form onSubmit={submit} className="flex flex-col gap-4">
-            {step === "credentials" ? (
-              <>
-                <div className="flex flex-col">
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          {step === "credentials" ? (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
+                  Email address
+                </label>
+                <div
+                  className={`flex items-center rounded-[1rem] border px-4 transition-all ${
+                    errors.email
+                      ? "border-red-500/70 bg-red-500/10"
+                      : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/35 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
+                  }`}
+                >
+                  <Icon icon="solar:letter-bold-duotone" className="text-lg text-white/38" />
                   <input
                     type="email"
-                    placeholder="Email"
+                    placeholder="name@example.com"
                     value={email}
+                    autoComplete="email"
+                    inputMode="email"
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby="admin-login-email-error"
+                    onBlur={() =>
+                      setTouched((currentValue) => ({ ...currentValue, email: true }))
+                    }
                     onChange={(e) => {
                       setEmail(e.target.value);
-                      setErrors((prev) => ({ ...prev, email: undefined }));
+                      setNotification({ message: "", type: "", showResend: false });
                     }}
-                    className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300
-      ${errors.email ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
+                    className="w-full bg-transparent py-4 text-base text-white placeholder:text-white/35 focus:outline-none"
                   />
-                  <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.email ? "opacity-100" : "opacity-0"}`}>
-                    {errors.email || " "}
-                  </span>
                 </div>
+                <span
+                  id="admin-login-email-error"
+                  className={`block text-sm text-red-400 transition-all duration-300 ${
+                    errors.email ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {errors.email || " "}
+                </span>
+              </div>
 
-                <div className="flex flex-col relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setErrors((prev) => ({ ...prev, password: undefined }));
-                    }}
-                    className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300
-      ${errors.password ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
-                  />
-
-                  <div
-                    className="absolute right-8 md:right-6 top-[40%] md:top-1/2 -translate-y-1/2 cursor-pointer"
-                    onClick={() => {
-                      setShowPassword((v) => !v);
-                      setTimeout(() => setShowPassword((v) => !v), 1000);
-                    }}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
+                    Password
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A] transition hover:text-[#fff37a]"
                   >
-                    <Icon
-                      icon="streamline:eye-optic-remix"
-                      width={18}
-                      className={`absolute text-white/60 transition-all duration-300 ${showPassword ? "opacity-100" : "opacity-0"}`}
-                    />
-                    <Icon
-                      icon="ri:eye-close-fill"
-                      width={18}
-                      className={`absolute text-white/60 transition-all duration-300 ${showPassword ? "opacity-0" : "opacity-100"}`}
-                    />
-                  </div>
-
-                  <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.password ? "opacity-100" : "opacity-0"}`}>
-                    {errors.password || " "}
-                  </span>
-                </div>
-
-                <div className="flex  justify-end items-center gap-2   text-xs md:text-sm text-white/80 mt-2">
-                  <Link href="/forgot-password" className="text-[#D5E400] underline cursor-pointer">
-                    Forgot Password?
+                    Forgot password?
                   </Link>
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="flex flex-col">
+                <div
+                  className={`flex items-center rounded-[1rem] border px-4 transition-all ${
+                    errors.password
+                      ? "border-red-500/70 bg-red-500/10"
+                      : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/35 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
+                  }`}
+                >
+                  <Icon icon="solar:lock-password-bold-duotone" className="text-lg text-white/38" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    autoComplete="current-password"
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby="admin-login-password-error"
+                    onBlur={() =>
+                      setTouched((currentValue) => ({ ...currentValue, password: true }))
+                    }
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setNotification({ message: "", type: "", showResend: false });
+                    }}
+                    className="w-full bg-transparent py-4 text-base text-white placeholder:text-white/35 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    className="text-white/50 transition hover:text-white"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <Icon
+                      icon={showPassword ? "ri:eye-close-fill" : "streamline:eye-optic-remix"}
+                      width={18}
+                    />
+                  </button>
+                </div>
+                <span
+                  id="admin-login-password-error"
+                  className={`block text-sm text-red-400 transition-all duration-300 ${
+                    errors.password ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {errors.password || " "}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
+                  One-time access code
+                </label>
+                <div
+                  className={`flex items-center rounded-[1rem] border px-4 transition-all ${
+                    errors.otp
+                      ? "border-red-500/70 bg-red-500/10"
+                      : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/35 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
+                  }`}
+                >
+                  <Icon icon="solar:key-bold-duotone" className="text-lg text-white/38" />
                   <input
                     type="text"
                     placeholder="6-digit access code"
                     inputMode="numeric"
                     maxLength={6}
                     value={otpCode}
+                    aria-invalid={Boolean(errors.otp)}
+                    aria-describedby="admin-login-otp-error"
+                    onBlur={() =>
+                      setTouched((currentValue) => ({ ...currentValue, otp: true }))
+                    }
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, "").slice(0, 6);
                       setOtpCode(value);
-                      setErrors((prev) => ({ ...prev, otp: undefined }));
-                    }}
-                    className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300 tracking-[0.3em]
-      ${errors.otp ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
-                  />
-                  <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.otp ? "opacity-100" : "opacity-0"}`}>
-                    {errors.otp || " "}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center text-xs md:text-sm text-white/80">
-                  <button
-                    type="button"
-                    className="text-[#D5E400] underline cursor-pointer"
-                    onClick={() => {
-                      setStep("credentials");
                       setNotification({ message: "", type: "", showResend: false });
-                      setErrors({});
                     }}
-                  >
-                    Back to password login
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 text-[#D5E400] underline cursor-pointer disabled:opacity-50"
-                    onClick={handleResendAdminOtp}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Icon icon="line-md:loading-loop" className="text-base" />
-                        Please wait...
-                      </>
-                    ) : (
-                      "Resend Access Code"
-                    )}
-                  </button>
+                    className="w-full bg-transparent py-4 text-base tracking-[0.32em] text-white placeholder:text-white/35 focus:outline-none"
+                  />
                 </div>
-              </>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="
-      self-end mt-4 md:mt-6
-      px-6 md:px-8 py-2
-      rounded-full border border-[#D5E400]
-      text-[#D5E400] font-semibold
-      transition-all duration-300
-      hover:shadow-2xl hover:shadow-[#D5E400]/60
-      hover:bg-[#D5E400] hover:text-black
-      disabled:opacity-50
-    "
-            >
-              {loading
-                ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Icon icon="line-md:loading-loop" className="text-lg" />
-                    {step === "otp" ? "Verifying..." : "Logging in..."}
-                  </span>
-                )
-                : step === "otp"
-                  ? "Verify Access"
-                  : "Login"}
-            </button>
-          </form>
-
-          {step === "credentials" && (
-            <>
-              <div className="flex items-center gap-3 mt-4 text-white/80">
-                <div className="w-full h-0.5 bg-white/40"></div>
-                <span>or</span>
-                <div className="w-full h-0.5 bg-white/40"></div>
+                <span
+                  id="admin-login-otp-error"
+                  className={`block text-sm text-red-400 transition-all duration-300 ${
+                    errors.otp ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {errors.otp || " "}
+                </span>
               </div>
 
-              <Link
-                href="/api/auth/google/login?portal=admin&intent=login"
-                className="
-    relative flex mt-4 mx-auto
-    bg-[#404811]/60
-    px-10 md:px-24 py-3
-    rounded-full
-    cursor-pointer justify-center
-    group
-    hover:bg-linear-120 from-[#637501] to-[#9cb800]
-    hover:shadow-2xl hover:shadow-[#9cb800]/60
-  "
-              >
-                <Image
-                  src={googleVector}
-                  width={32}
-                  alt="Google logo"
-                  className="absolute left-2 top-0 bottom-0 my-auto group-hover:bg-green-950/40 p-2 rounded-full"
-                />
-                <span className="text-sm ml-4 md:ml-0 md:text-base">Sign in with Google</span>
-              </Link>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/75 md:text-sm">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 font-semibold text-[#F6FF6A] transition hover:text-[#fff37a]"
+                  onClick={() => {
+                    setStep("credentials");
+                    setSubmitAttempted(false);
+                    setNotification({ message: "", type: "", showResend: false });
+                    setTouched({});
+                  }}
+                >
+                  <Icon icon="solar:arrow-left-broken" className="text-sm" />
+                  Back to password login
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 font-semibold text-[#F6FF6A] transition hover:text-[#fff37a] disabled:opacity-50"
+                  onClick={handleResendAdminOtp}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Icon icon="line-md:loading-loop" className="text-base" />
+                      Please wait...
+                    </>
+                  ) : (
+                    "Resend Access Code"
+                  )}
+                </button>
+              </div>
             </>
           )}
-        </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D5E400] bg-transparent px-6 py-3.5 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-[0_18px_40px_-24px_rgba(213,228,0,0.75)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Icon icon="line-md:loading-loop" className="text-lg" />
+                {step === "otp" ? "Verifying..." : "Logging in..."}
+              </>
+            ) : step === "otp" ? (
+              "Verify Access"
+            ) : (
+              "Login"
+            )}
+          </button>
+        </form>
+
+        {step === "credentials" ? (
+          <>
+            <div className="flex items-center gap-3 text-white/65">
+              <div className="h-px w-full bg-white/12" />
+              <span className="text-xs font-semibold uppercase tracking-[0.22em]">or</span>
+              <div className="h-px w-full bg-white/12" />
+            </div>
+
+            <Link
+              href="/api/auth/google/login?portal=admin&intent=login"
+              className="relative flex items-center justify-center gap-3 rounded-full border border-[#9CB800]/20 bg-[#5b5f09] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#70750a] hover:shadow-[0_20px_40px_-24px_rgba(156,184,0,0.55)]"
+            >
+              <Image
+                src={googleVector}
+                width={24}
+                alt="Google logo"
+                className="absolute bottom-0 left-4 top-0 my-auto rounded-full bg-black/15 p-1"
+              />
+              <span className="ml-6">Continue with Google</span>
+            </Link>
+          </>
+        ) : null}
       </div>
-    </section>
+    </AuthShell>
   );
 }
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   return (
-    <Suspense fallback={<section className="min-h-screen bg-[#25421E]" />}>
-      <LoginPageContent />
+    <Suspense fallback={<section className="min-h-screen bg-[#0A0D09]" />}>
+      <AdminLoginPageContent />
     </Suspense>
   );
 }

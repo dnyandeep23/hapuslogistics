@@ -1,16 +1,23 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from "react";
-import Loginvector from "@/assets/images/loginvector.png";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
-import googleVector from "@/assets/images/googleVector.png";
-import { loginUser, resendVerificationEmail } from "@/services/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useToast } from "@/context/ToastContext";
+import googleVector from "@/assets/images/googleVector.png";
+import loginVector from "@/assets/images/loginvector.png";
+import AuthShell from "@/components/AuthShell";
 import NotificationBox from "@/components/NotificationBox";
+import { useToast } from "@/context/ToastContext";
 import { getErrorMessage, normalizeAuthQueryError } from "@/lib/authError";
+import {
+  GENERIC_AUTH_ERROR_MESSAGE,
+  getEmailValidationMessage,
+  getPasswordValidationMessage,
+  normalizeEmail,
+} from "@/lib/authFlow";
+import { loginUser, resendVerificationEmail } from "@/services/auth";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -20,15 +27,42 @@ function LoginPageContent() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>(
+    {},
+  );
   const [notification, setNotification] = useState({
     message: "",
     type: "" as "success" | "warning" | "error" | "",
     showResend: false,
   });
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {},
-  );
   const role = "operator" as const;
+
+  const errors = useMemo(() => {
+    const nextErrors: { email?: string; password?: string } = {};
+
+    if (submitAttempted || touched.email) {
+      const emailMessage = getEmailValidationMessage(email);
+      if (emailMessage) {
+        nextErrors.email = emailMessage;
+      }
+    }
+
+    if (submitAttempted || touched.password) {
+      const passwordMessage = getPasswordValidationMessage(password);
+      if (passwordMessage) {
+        nextErrors.password = passwordMessage;
+      }
+    }
+
+    return nextErrors;
+  }, [email, password, submitAttempted, touched.email, touched.password]);
+
+  const isSubmitDisabled =
+    loading ||
+    !email.trim() ||
+    !password.trim() ||
+    Boolean(errors.email || errors.password);
 
   useEffect(() => {
     const registered = searchParams.get("registered");
@@ -70,29 +104,22 @@ function LoginPageContent() {
     }
   }, [searchParams, addToast]);
 
-  const validate = () => {
-    const newErrors: typeof errors = {};
-    if (!email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(email))
-      newErrors.email = "Enter a valid email address";
-    if (!password) newErrors.password = "Password is required";
-    else if (password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleResend = async () => {
-    if (!email) {
-      addToast(
-        "Please enter the email address of the unverified account.",
-        "error",
-      );
+    const normalizedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(normalizedEmail);
+
+    if (emailError) {
+      setTouched((currentValue) => ({ ...currentValue, email: true }));
+      setSubmitAttempted(true);
       return;
     }
+
     try {
-      const response = await resendVerificationEmail(email);
-      addToast(response.message || "Verification email sent successfully.", "success");
+      const response = await resendVerificationEmail(normalizedEmail);
+      addToast(
+        response.message || "Verification email sent successfully.",
+        "success",
+      );
     } catch (error: unknown) {
       addToast(
         getErrorMessage(error, "Failed to resend verification email."),
@@ -103,26 +130,43 @@ function LoginPageContent() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (loading) return;
+
+    setSubmitAttempted(true);
+    setTouched({ email: true, password: true });
+
+    const normalizedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(normalizedEmail);
+    const passwordError = getPasswordValidationMessage(password);
+
+    if (emailError || passwordError) return;
+
     setLoading(true);
     setNotification({ message: "", type: "", showResend: false });
 
     try {
-      const response = (await loginUser({ email, password, role })) as {
+      const response = (await loginUser({
+        email: normalizedEmail,
+        password,
+        role,
+      })) as {
         accountDeletionCancelled?: boolean;
         requirePasswordChange?: boolean;
       };
+
       if (response.accountDeletionCancelled) {
         addToast("Your scheduled account deletion has been cancelled.", "success");
       }
+
       if (response.requirePasswordChange) {
         addToast("Update your temporary password before continuing.", "warning");
         router.push("/dashboard/profile?forcePasswordChange=true");
         return;
       }
+
       router.push("/dashboard");
     } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error, "Login failed. Please try again.");
+      const errorMessage = getErrorMessage(error, GENERIC_AUTH_ERROR_MESSAGE);
 
       if (errorMessage.includes("Account not verified")) {
         setNotification({
@@ -144,224 +188,206 @@ function LoginPageContent() {
   };
 
   return (
-    <section>
-      <div className="relative h-[120vh] md:h-screen flex flex-col  md:justify-end py-12 px-6 md:py-20 md:px-20 text-white">
-        <Link
-          href="/"
-          className="
-  absolute 
-  top-2 right-2
-  sm:top-3 sm:right-3
-  md:top-4 md:right-4
-  z-50
-"
-        >
-          <div
-            className="
-    flex gap-2 items-center
-    bg-gray-600/60 hover:bg-gray-700
-    cursor-pointer
-    px-2 py-1 text-sm
-    sm:px-3 sm:py-1.5 sm:text-sm
-    md:px-4 md:py-2 md:text-base
-    rounded-lg text-white
-  "
-          >
-            <Icon icon="solar:home-2-broken" className="text-sm md:text-base" />
-            <span className="">Return to Home</span>
-          </div>
-        </Link>
+    <AuthShell
+      badge="Operator portal"
+      title="Log in to manage pickup and delivery operations"
+      description="Operators get a modern, touch-friendly login that keeps routing, tracking, and account recovery easy to reach."
+      supportLine="Use the operator credentials issued by your company."
+      highlights={["Operations", "Route updates", "Fast access"]}
+      artwork={loginVector}
+      artworkAlt="Operator login background artwork"
+    >
+      <div className="space-y-5 sm:space-y-6">
+        <NotificationBox
+          message={notification.message}
+          type={notification.type}
+          showResend={notification.showResend}
+          onResend={handleResend}
+        />
 
-        <div className="absolute bg-[#25421E] top-0 left-0 w-[95%] md:w-[75%] h-[50%] rounded-br-[60%] md:h-full lg:h-full"></div>
-        <div className="absolute inset-0 h-full w-full md:w-[70%] lg:w-[70%] flex flex-col">
-          <Image
-            src={Loginvector}
-            alt="vector image"
-            className="object-cover"
-          ></Image>
-        </div>
-        <div
-          className=" top-[55%] w-[90%] translate-y-46 md:relative left-auto md:top-auto md:translate-y-0 md:ml-6 md:w-auto"
-        >
-          <div className="flex   items-center gap-4 md:gap-8">
-            <p className="z-50 relative text-6xl md:text-9xl font-bold">
-              Hapus
-            </p>
-            <p className="z-50 mt-4 text text-center relative text-lg md:text-2xl font-medium line-clamp-2">
-              Travels & <br /> Logistics
-            </p>
-          </div>
-          <div>
-            <p className="z-50 text-sm md:text-base relative mt-3 md:mt-12 text-white/80">
-              Log in with confidence — your luggage is in safe hands with Hapus
-              Logistics.
-            </p>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/42">
+                Operator access
+              </p>
+              <p className="text-[2.1rem] font-black leading-[0.92] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
+                Operator Login
+              </p>
+              <p className="max-w-xl text-sm leading-6 text-white/62 sm:text-[1.05rem] sm:leading-7">
+                Enter your company email and password to continue.
+              </p>
+            </div>
+            <div className="rounded-full border border-[#D5E400]/18 bg-[#D5E400]/10 px-4 py-3 text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F6FF6A]/75">
+                Operator
+              </p>
+              <p className="text-sm font-semibold text-[#F6FF6A]">Login</p>
+            </div>
           </div>
         </div>
 
-        <div
-          className="
-    absolute
-    left-1/2 top-[65%] -translate-x-1/2 -translate-y-1/2
-    px-7 py-6
-    bg-black/40
-    rounded-[10%]
-    md:rounded-[8%]
-    flex flex-col
-    max-w-md w-[90%]
-
-    md:left-auto md:top-auto md:translate-x-0 md:translate-y-0
-    md:right-20 md:bottom-20
-    md:px-10 md:py-8
-  "
-        >
-          <div className="pb-3 md:pb-4">
-            <NotificationBox
-              message={notification.message}
-              type={notification.type}
-              showResend={notification.showResend}
-              onResend={handleResend}
-            />
-          </div>
-
-          <p className="text-white font-bold text-2xl md:text-3xl mb-6">Operator Login</p>
-
-          <form onSubmit={submit} className="flex flex-col gap-4">
-
-            {/* Email */}
-            <div className="flex flex-col">
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="operator-login-email"
+              className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45"
+            >
+              Email
+            </label>
+            <div
+              className={`flex items-center gap-3 rounded-[1rem] border border-white/10 bg-black/70 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.14)] transition ${
+                errors.email
+                  ? "border-red-500/60 bg-red-500/10"
+                  : "focus-within:border-[#D5E400]/40"
+              }`}
+            >
+              <Icon icon="solar:letter-bold-duotone" className="text-lg text-white/38" />
               <input
+                id="operator-login-email"
                 type="email"
-                placeholder="Email"
+                placeholder="name@company.com"
                 value={email}
+                autoComplete="email"
+                inputMode="email"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby="operator-login-email-error"
+                onBlur={() =>
+                  setTouched((currentValue) => ({ ...currentValue, email: true }))
+                }
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setErrors((prev) => ({ ...prev, email: undefined }));
+                  setNotification({ message: "", type: "", showResend: false });
                 }}
-                className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300
-      ${errors.email ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
+                className="w-full bg-transparent py-4 text-base text-white placeholder:text-white/40 focus:outline-none"
               />
-              <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.email ? "opacity-100" : "opacity-0"}`}>
-                {errors.email || " "}
-              </span>
             </div>
+            <span
+              id="operator-login-email-error"
+              className={`block text-sm text-red-400 transition-all duration-300 ${
+                errors.email ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {errors.email || " "}
+            </span>
+          </div>
 
-            {/* Password */}
-            <div className="flex flex-col relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setErrors((prev) => ({ ...prev, password: undefined }));
-                }}
-                className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300
-      ${errors.password ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
-              />
-
-              <div
-                className="absolute right-8 md:right-6 top-[40%] md:top-1/2 -translate-y-1/2 cursor-pointer"
-                onClick={() => {
-                  setShowPassword((v) => !v);
-                  setTimeout(() => setShowPassword((v) => !v), 1000);
-                }}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <label
+                htmlFor="operator-login-password"
+                className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45"
               >
-                <Icon
-                  icon="streamline:eye-optic-remix"
-                  width={18}
-                  className={`absolute text-white/60 transition-all duration-300 ${showPassword ? "opacity-100" : "opacity-0"}`}
-                />
-                <Icon
-                  icon="ri:eye-close-fill"
-                  width={18}
-                  className={`absolute text-white/60 transition-all duration-300 ${showPassword ? "opacity-0" : "opacity-100"}`}
-                />
-              </div>
-
-              <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.password ? "opacity-100" : "opacity-0"}`}>
-                {errors.password || " "}
-              </span>
-            </div>
-
-            {/* Links */}
-            <div className="flex  justify-between items-center gap-2   text-xs md:text-sm text-white/80 mt-2">
-              <span className="w-1/2 md:w-full">
-                Don&apos;t have an account?{" "}
-                <Link href="/operator/register" className="text-[#D5E400] underline cursor-pointer">
-                  Sign Up
-                </Link>
-              </span>
-              <Link href="/forgot-password" className="text-[#D5E400] underline cursor-pointer">
+                Password
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A] transition hover:text-[#fff37a]"
+              >
                 Forgot Password?
               </Link>
             </div>
-
-            {/* Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="
-      self-end mt-4 md:mt-6
-      px-6 md:px-8 py-2
-      rounded-full border border-[#D5E400]
-      text-[#D5E400] font-semibold
-      transition-all duration-300
-      hover:shadow-2xl hover:shadow-[#D5E400]/60
-      hover:bg-[#D5E400] hover:text-black
-      disabled:opacity-50
-    "
+            <div
+              className={`relative rounded-[1rem] border border-white/10 bg-black/70 px-4 pr-14 shadow-[inset_0_-1px_0_rgba(255,255,255,0.14)] transition ${
+                errors.password
+                  ? "border-red-500/60 bg-red-500/10"
+                  : "focus-within:border-[#D5E400]/40"
+              }`}
             >
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <Icon icon="line-md:loading-loop" className="text-lg" />
-                  Logging in...
-                </span>
-              ) : "Login"}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mt-4 text-white/80">
-            <div className="w-full h-0.5 bg-white/40"></div>
-            <span>or</span>
-            <div className="w-full h-0.5 bg-white/40"></div>
+              <Icon icon="solar:lock-password-bold-duotone" className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-white/38" />
+              <input
+                id="operator-login-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                autoComplete="current-password"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby="operator-login-password-error"
+                onBlur={() =>
+                  setTouched((currentValue) => ({ ...currentValue, password: true }))
+                }
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setNotification({ message: "", type: "", showResend: false });
+                }}
+                className="w-full bg-transparent py-4 pl-8 text-base text-white placeholder:text-white/40 focus:outline-none"
+              />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/55 transition hover:text-white"
+                onClick={() => setShowPassword((currentValue) => !currentValue)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <Icon
+                  icon={showPassword ? "ri:eye-close-fill" : "streamline:eye-optic-remix"}
+                  width={18}
+                />
+              </button>
+            </div>
+            <span
+              id="operator-login-password-error"
+              className={`block text-sm text-red-400 transition-all duration-300 ${
+                errors.password ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {errors.password || " "}
+            </span>
           </div>
 
-          {/* Google Button */}
-          <Link
-            href="/api/auth/google/login?role=operator&intent=login"
-            className="
-    relative flex mt-4 mx-auto
-    bg-[#404811]/60
-    px-10 md:px-24 py-3
-    rounded-full
-    cursor-pointer justify-center
-    group
-    hover:bg-linear-120 from-[#637501] to-[#9cb800]
-    hover:shadow-2xl hover:shadow-[#9cb800]/60
-  "
-          >
-            <Image
-              src={googleVector}
-              width={32}
-              alt="Google logo"
-              className="absolute left-2 top-0 bottom-0 my-auto group-hover:bg-green-950/40 p-2 rounded-full"
-            />
-            <span className="text-sm ml-4 md:ml-0 md:text-base">Sign in with Google</span>
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-white/75">
+            <span>
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/operator/register"
+                className="font-semibold text-[#F6FF6A] underline underline-offset-4 transition hover:text-[#fff37a]"
+              >
+                Sign Up
+              </Link>
+            </span>
+          </div>
 
+          <button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D5E400] bg-transparent px-6 py-3.5 text-base font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-[0_18px_40px_-24px_rgba(213,228,0,0.75)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Icon icon="line-md:loading-loop" className="text-lg" />
+                Logging in...
+              </>
+            ) : (
+              "Login"
+            )}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-4 py-1 text-white/65">
+          <div className="h-px w-full bg-white/15" />
+          <span className="text-xs uppercase tracking-[0.22em]">or</span>
+          <div className="h-px w-full bg-white/15" />
         </div>
+
+        <Link
+          href="/api/auth/google/login?role=operator&intent=login"
+          className="relative flex items-center justify-center gap-3 rounded-full border border-[#6e7400]/40 bg-[#5b5f09] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#70750a] hover:shadow-[0_20px_40px_-24px_rgba(156,184,0,0.55)]"
+        >
+          <Image
+            src={googleVector}
+            width={24}
+            alt="Google logo"
+            className="absolute left-4 top-0 bottom-0 my-auto rounded-full bg-black/15 p-1"
+          />
+          <span className="ml-6">Sign in with Google</span>
+        </Link>
       </div>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<section className="min-h-screen bg-[#25421E]" />}>
+    <Suspense fallback={<section className="min-h-screen bg-[#0A0D09]" />}>
       <LoginPageContent />
     </Suspense>
   );

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import Razorpay from "razorpay";
 import { dbConnect } from "@/app/api/lib/db";
+import { createRazorpayClient, getServerRazorpayKeyId } from "@/app/api/lib/razorpayServer";
 import { validateRazorpaySignature } from "@/app/api/lib/razorpay";
 import User from "@/app/api/models/userModel";
 import Order from "@/app/api/models/orderModel";
@@ -24,17 +24,13 @@ function toNumberValue(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
-
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ orderId: string }> },
 ) {
   try {
     await dbConnect();
+    const razorpay = createRazorpayClient();
 
     const token = request.cookies.get("token")?.value;
     if (!token) {
@@ -88,7 +84,7 @@ export async function POST(
         razorpayOrderId: razorpayOrder.id,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
-        keyId: process.env.RAZORPAY_KEY_ID || "",
+        keyId: getServerRazorpayKeyId(),
       },
       { status: 200 },
     );

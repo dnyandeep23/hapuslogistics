@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/lib/redux/hooks";
 import Skeleton from "@/components/Skeleton";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type AdminLocation = {
   _id: string;
@@ -52,6 +53,7 @@ const makeEmptyForm = () => ({
 export default function AdminLocationsPage() {
   const { user } = useAppSelector((state) => state.user);
   const router = useRouter();
+  const { isMobile, isTablet } = useResponsiveMode();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingLocationId, setDeletingLocationId] = useState("");
@@ -346,17 +348,17 @@ export default function AdminLocationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className={`flex gap-4 ${isMobile ? "flex-col" : "flex-col sm:flex-row sm:items-center sm:justify-between"}`}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#E4E67A] xl:text-3xl">Active Locations</h1>
-          <p className="mt-1.5 text-sm text-white/50">
+          <h1 className={`font-bold tracking-tight text-[#E4E67A] ${isMobile ? "text-2xl" : "text-2xl xl:text-3xl"}`}>Active Locations</h1>
+          <p className={`mt-1.5 text-white/50 ${isMobile ? "text-sm leading-6" : "text-sm"}`}>
             Define service regions and geographical coordinates.
           </p>
         </div>
         <button
           type="button"
           onClick={handleOpenAddLocation}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#CDD645] px-5 py-3 text-sm font-bold text-black shadow-lg shadow-[#CDD645]/20 transition hover:bg-[#E4E67A]"
+          className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#CDD645] px-5 py-3 text-sm font-bold text-black shadow-lg shadow-[#CDD645]/20 transition hover:bg-[#E4E67A] ${isMobile ? "w-full" : ""}`}
         >
           <Icon icon="solar:map-point-add-bold-duotone" className="text-lg" />
           Add Location
@@ -384,6 +386,12 @@ export default function AdminLocationsPage() {
           This cannot be undone. If the location is still used by a bus route, deletion will be blocked.
         </p>
       </ConfirmationModal>
+
+      {message && (
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          {message}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6">
         <div className="dashboard-surface rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
@@ -419,7 +427,7 @@ export default function AdminLocationsPage() {
               No locations found.
             </div>
           ) : (
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={`mt-6 grid grid-cols-1 gap-4 ${isMobile ? "" : isTablet ? "sm:grid-cols-2 lg:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"}`}>
               {filteredLocations.map((location) => {
                 const latitude = Number(location.latitude);
                 const longitude = Number(location.longitude);
@@ -480,7 +488,7 @@ export default function AdminLocationsPage() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => !saving && setIsAdding(false)}
           />
-          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#1A221A] shadow-2xl flex flex-col max-h-[90vh]">
+          <div className={`relative flex max-h-[90vh] w-full overflow-hidden rounded-3xl border border-white/10 bg-[#1A221A] shadow-2xl ${isMobile ? "max-w-[calc(100vw-1rem)] flex-col" : "max-w-2xl flex-col"}`}>
             <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-5">
               <h2 className="text-xl font-bold text-[#E4E67A]">{editingLocationId ? "Edit Location" : "New Location"}</h2>
               <button

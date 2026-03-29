@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type RoutePreviewPoint = {
   id: string;
@@ -26,23 +27,32 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-function FitRouteBounds({ points }: { points: Array<[number, number]> }) {
+function FitRouteBounds({
+  points,
+  padding = [32, 32],
+  singlePointZoom = 11,
+}: {
+  points: Array<[number, number]>;
+  padding?: [number, number];
+  singlePointZoom?: number;
+}) {
   const map = useMap();
 
   useEffect(() => {
     if (points.length === 0) return;
     if (points.length === 1) {
-      map.setView(points[0], 13);
+      map.setView(points[0], singlePointZoom);
       return;
     }
     const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [32, 32] });
-  }, [map, points]);
+    map.fitBounds(bounds, { padding });
+  }, [map, points, padding, singlePointZoom]);
 
   return null;
 }
 
 export default function RoutePreviewMap({ points, routeGeometry = [], heightClassName = "h-72" }: Props) {
+  const { isMobile, isTablet } = useResponsiveMode();
   const markerPositions = points.map((point) => [point.latitude, point.longitude] as [number, number]);
   const routePathPositions = routeGeometry
     .map((point) => [Number(point.latitude), Number(point.longitude)] as [number, number])
@@ -50,12 +60,21 @@ export default function RoutePreviewMap({ points, routeGeometry = [], heightClas
   const polylinePositions = routePathPositions.length >= 2 ? routePathPositions : markerPositions;
   const hasPoints = markerPositions.length > 0;
   const defaultCenter: [number, number] = hasPoints ? markerPositions[0] : [20.5937, 78.9629];
-  const defaultZoom = hasPoints ? 7 : 5;
+  // Responsive zoom: slightly wider on mobile, tighter on desktop for easier route reading.
+  const defaultZoom = hasPoints
+    ? (isMobile ? 4.5 : isTablet ? 6 : 8.5)
+    : (isMobile ? 4 : 6);
+  const fitPadding: [number, number] = isMobile ? [18, 18] : [32, 32];
+  const singlePointZoom = isMobile ? 10 : isTablet ? 11 : 12;
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-white/15 ${heightClassName}`}>
       <MapContainer center={defaultCenter} zoom={defaultZoom} className="h-full w-full" scrollWheelZoom>
-        <FitRouteBounds points={polylinePositions.length > 0 ? polylinePositions : markerPositions} />
+        <FitRouteBounds
+          points={polylinePositions.length > 0 ? polylinePositions : markerPositions}
+          padding={fitPadding}
+          singlePointZoom={singlePointZoom}
+        />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

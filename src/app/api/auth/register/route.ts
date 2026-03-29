@@ -9,6 +9,13 @@ import {
   normalizeRole,
   serializeAuthProvidersForSchema,
 } from "@/app/api/lib/authHelpers";
+import {
+  getEmailValidationMessage,
+  getNameValidationMessage,
+  getPasswordValidationMessage,
+  normalizeEmail,
+  normalizeName,
+} from "@/lib/authFlow";
 
 // dbConnect to the database
 dbConnect();
@@ -32,23 +39,28 @@ export async function POST(request: NextRequest) {
       companyId?: unknown;
     };
     const role = normalizeRole(incomingRole) ?? "user";
-    const normalizedName = typeof name === "string" ? name.trim() : "";
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedName = normalizeName(typeof name === "string" ? name : "");
+    const normalizedEmail = normalizeEmail(typeof email === "string" ? email : "");
     const companyName =
       typeof incomingCompanyName === "string" ? incomingCompanyName.trim() : "";
     const companyId =
       typeof incomingCompanyId === "string" ? incomingCompanyId.trim() : "";
+    const nameError = getNameValidationMessage(normalizedName);
+    const emailError = getEmailValidationMessage(normalizedEmail);
+    const passwordError = getPasswordValidationMessage(
+      typeof password === "string" ? password : "",
+    );
 
-    if (!normalizedEmail || !password) {
+    if (emailError || passwordError) {
       return NextResponse.json(
-        { success: false, message: "Email and password are required." },
+        { success: false, message: emailError ?? passwordError },
         { status: 400 },
       );
     }
 
-    if (role !== "admin" && !normalizedName) {
+    if (role !== "admin" && nameError) {
       return NextResponse.json(
-        { success: false, message: "Name is required." },
+        { success: false, message: nameError },
         { status: 400 },
       );
     }

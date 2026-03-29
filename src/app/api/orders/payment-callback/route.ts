@@ -11,14 +11,9 @@ import Location from '@/app/api/models/locationModel';
 import Bus from '@/app/api/models/busModel';
 import { buildDefaultRefundPolicySnapshot } from '@/app/api/lib/orderCancellation';
 import { v4 as uuidv4 } from 'uuid';
-import Razorpay from 'razorpay';
+import { createRazorpayClient, getServerRazorpayKeySecret } from '@/app/api/lib/razorpayServer';
 import { sendOrderConfirmedEmail } from '@/app/api/lib/mailer';
 import { CouponUsageLimitError, reserveCouponUsageForUser } from '@/app/api/lib/couponUsage';
-
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID!,
-    key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
 
 class ApiError extends Error {
     status: number;
@@ -41,7 +36,7 @@ function getUtcDayRange(date: Date) {
 function verifyRazorpaySignature(orderId: string, paymentId: string, signature: string): boolean {
     const body = `${orderId}|${paymentId}`;
     const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+        .createHmac('sha256', getServerRazorpayKeySecret())
         .update(body.toString())
         .digest('hex');
     return expectedSignature === signature;
@@ -86,6 +81,7 @@ export async function POST(request: NextRequest) {
 
     try {
         await dbConnect();
+        const razorpay = createRazorpayClient();
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await request.json();
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {

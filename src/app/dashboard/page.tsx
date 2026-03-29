@@ -16,6 +16,7 @@ import { Icon } from "@iconify/react";
 import { fetchUser } from '@/lib/redux/userSlice';
 import { useDropzone } from 'react-dropzone';
 import CustomDateRangePicker from '@/components/CustomDateRangePicker';
+import { useResponsiveMode } from '@/hooks/useResponsiveMode';
 import OperatorActiveOrderCard, {
   type OperatorActiveOrder,
   type OperatorOrderBuckets,
@@ -134,6 +135,7 @@ const formatBusNumberInput = (value: string) => {
 };
 
 export default function DashboardPage() {
+  const { isMobile, isTablet } = useResponsiveMode();
   const { user } = useAppSelector((state) => state.user)
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -882,7 +884,7 @@ export default function DashboardPage() {
 
   if (isAdminLocked) {
     return (
-      <div className="p-2 sm:p-6 lg:p-8 pb-20 text-center">
+      <div className={`${isMobile ? "p-1.5 pb-24" : isTablet ? "p-4 pb-28" : "p-2 sm:p-6 lg:p-8 pb-20"} text-center`}>
         <div className="mx-auto max-w-4xl">
           <div className="overflow-hidden rounded-[2.2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(31,40,29,0.98),rgba(21,29,23,0.96),rgba(15,21,16,0.98))] p-6 text-left shadow-[0_28px_70px_rgba(0,0,0,0.24)] sm:p-8">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
@@ -992,7 +994,7 @@ export default function DashboardPage() {
 
   if (isAdminRole) {
     return (
-      <div className='p-2 sm:p-6 lg:p-8 pb-20'>
+      <div className={isMobile ? 'p-1.5 pb-24' : isTablet ? 'p-3 pb-28' : 'p-2 sm:p-6 lg:p-8 pb-20'}>
         <DashboardHero
           eyebrow={dashboardRoleLabel}
           title={dashboardTitle}
@@ -1015,7 +1017,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className='p-2 sm:p-4 lg:p-8 pb-20'>
+    <div className={isMobile ? 'p-1.5 pb-24' : isTablet ? 'p-3 pb-28' : 'p-2 sm:p-4 lg:p-8 pb-20'}>
       <DashboardHero
         eyebrow={dashboardRoleLabel}
         title={`${dashboardTitle}`}
@@ -1100,19 +1102,30 @@ function DashboardHero({
   description: string;
   icon: string;
 }) {
+  const { isMobile, isTablet } = useResponsiveMode();
+
   return (
-    <section className="relative pb-6 border-b border-white/5 mb-8">
-      <div className="max-w-4xl">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#D5E400]/20 bg-[#D5E400]/5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[#D5E400]">
+    <section className={`relative border-b border-white/5 ${isMobile ? "mb-5 pb-4" : isTablet ? "mb-6 pb-5" : "mb-8 pb-6"}`}>
+      <div className={`max-w-4xl ${isTablet ? "grid gap-4 md:grid-cols-[1fr_auto] md:items-end" : ""}`}>
+        <div>
+        <div className={`inline-flex items-center gap-2 rounded-full border border-[#D5E400]/20 bg-[#D5E400]/5 ${isMobile ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-xs"} font-bold uppercase tracking-widest text-[#D5E400]`}>
           <Icon icon={icon} className="text-lg" />
           {eyebrow}
         </div>
-        <h1 className="mt-6 max-w-4xl text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+        <h1 className={`max-w-4xl font-extrabold tracking-tight text-white ${isMobile ? "mt-4 text-[1.9rem] leading-[1.05]" : isTablet ? "mt-5 text-[2.5rem] leading-[1.02]" : "mt-6 text-4xl sm:text-5xl"}`}>
           {title}
         </h1>
-        <p className="mt-4 max-w-2xl text-base text-white/50 leading-relaxed">
+        <p className={`max-w-2xl text-white/50 ${isMobile ? "mt-3 text-sm leading-6" : "mt-4 text-base leading-relaxed"}`}>
           {description}
         </p>
+        </div>
+        {isTablet ? (
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">Device mode</p>
+            <p className="mt-1 text-sm font-semibold text-[#F6FF6A]">Tablet workspace</p>
+            <p className="mt-1 text-xs text-white/60">Balanced density with split cards and faster scanning.</p>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -1225,39 +1238,62 @@ function BannerCarousel({ slides }: { slides: string[] }) {
 }
 
 export function ServicesSection({ services }: { services: Service[] }) {
+  const { isMobile, isTablet } = useResponsiveMode();
+  const visibleServices = isMobile ? services.slice(0, 2) : services;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-8">
+    <div className={`${isMobile ? "space-y-4" : "space-y-6"}`}>
+      <div className={`mb-8 flex flex-col gap-2 ${isMobile ? "" : "sm:flex-row sm:items-end sm:justify-between"}`}>
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white mb-1">Quick Actions</h2>
-          <p className="text-sm text-white/50">Common operations available in your workspace.</p>
+          <p className="text-sm text-white/50">
+            {isMobile
+              ? "Essential actions for smaller screens."
+              : isTablet
+                ? "Balanced shortcuts for touch-first dashboards."
+                : "Common operations available in your workspace."}
+          </p>
         </div>
+        {isMobile ? (
+          <p className="text-xs text-white/42">Open more actions from the bottom navigation.</p>
+        ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
-        {services.map((service, index) => (
+      <div className={`grid ${isMobile ? "grid-cols-1 gap-3" : isTablet ? "grid-cols-2 gap-4" : "grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3"}`}>
+        {visibleServices.map((service, index) => (
           <button
             key={index}
             type="button"
             onClick={service.onclick}
-            className="group relative flex flex-col items-start justify-between rounded-[2rem] border border-white/5 bg-[#141A14] p-6 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-[#1A221A] active:scale-[0.98]"
+            className={`group relative flex flex-col items-start justify-between border border-white/5 bg-[#141A14] text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-[#1A221A] active:scale-[0.98] ${
+              isMobile ? "rounded-[1.5rem] p-4" : isTablet ? "rounded-[1.75rem] p-5" : "rounded-[2rem] p-6"
+            }`}
           >
-            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-[#D5E400] transition-colors group-hover:bg-[#D5E400]/10">
-              <Icon icon={service.iconKey} className="text-2xl" />
+            <div className={`mb-6 flex items-center justify-center rounded-full bg-white/5 text-[#D5E400] transition-colors group-hover:bg-[#D5E400]/10 ${
+              isMobile ? "h-11 w-11" : "h-14 w-14"
+            }`}>
+              <Icon icon={service.iconKey} className={isMobile ? "text-xl" : "text-2xl"} />
             </div>
 
-            <div className="mb-4">
-              <p className="text-lg font-bold text-white mb-1">{service.title}</p>
-              <p className="text-sm text-white/50 leading-relaxed line-clamp-2">{service.description}</p>
+            <div className={isMobile ? "mb-3" : "mb-4"}>
+              <p className={`${isMobile ? "text-base" : "text-lg"} mb-1 font-bold text-white`}>{service.title}</p>
+              <p className={`text-white/50 leading-relaxed ${isMobile ? "text-xs line-clamp-2" : isTablet ? "text-sm line-clamp-2" : "text-sm line-clamp-2"}`}>
+                {isMobile ? service.description.split(".")[0] : service.description}
+              </p>
             </div>
 
-            <div className="mt-auto flex items-center gap-2 text-sm font-semibold text-white/70 group-hover:text-[#D5E400] transition-colors">
+            <div className={`mt-auto flex items-center gap-2 font-semibold text-white/70 transition-colors group-hover:text-[#D5E400] ${isMobile ? "text-xs" : "text-sm"}`}>
               <span>{service.actionLabel}</span>
               <Icon icon="solar:arrow-right-linear" className="text-base opacity-0 -ml-2 transition-all group-hover:opacity-100 group-hover:ml-0" />
             </div>
           </button>
         ))}
       </div>
+      {isMobile && services.length > visibleServices.length ? (
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/60">
+          More role actions are available from the dashboard sections and bottom navigation.
+        </div>
+      ) : null}
     </div>
   );
 }

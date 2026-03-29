@@ -3,6 +3,7 @@ import User from "@/app/api/models/userModel";
 import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/app/api/lib/mailer";
 import { normalizeAuthProviders } from "@/app/api/lib/authHelpers";
+import { getEmailValidationMessage, normalizeEmail } from "@/lib/authFlow";
 
 dbConnect();
 
@@ -19,9 +20,16 @@ const generateSecurityCode = (length: number): string => {
 export async function POST(request: NextRequest) {
   try {
     const reqBody = await request.json();
-    const { email } = reqBody;
+    const normalizedEmail = normalizeEmail(
+      typeof reqBody?.email === "string" ? reqBody.email : "",
+    );
+    const emailError = getEmailValidationMessage(normalizedEmail);
 
-    const user = await User.findOne({ email });
+    if (emailError) {
+      return NextResponse.json({ success: false, message: emailError }, { status: 400 });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return NextResponse.json({ success: false, message: "User not found" }, { status: 404 });
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Send password reset email with the security code
     await sendEmail({
-      email,
+      email: normalizedEmail,
       emailType: "RESET",
       securityCode,
     });

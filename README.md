@@ -117,9 +117,9 @@ Create a `.env.local` file at project root.
 | `EMAIL_PORT` | Yes | SMTP port |
 | `EMAIL_USER` | Yes | SMTP username |
 | `EMAIL_PASS` | Yes | SMTP password/app password |
-| `RAZORPAY_KEY_ID` | Yes | Server-side Razorpay key ID |
+| `RAZORPAY_KEY_ID` | Yes | Server-side Razorpay key ID and checkout bootstrap key returned to the client |
 | `RAZORPAY_KEY_SECRET` | Yes | Server-side Razorpay key secret |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Yes | Client-side Razorpay key ID |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | No | Optional legacy client-side Razorpay key ID |
 | `GOOGLE_CLIENT_ID` | Optional | Google OAuth login |
 | `GOOGLE_CLIENT_SECRET` | Optional | Google OAuth login |
 | `GOOGLE_OAUTH_REDIRECT_URI` | Optional | OAuth callback URL |
@@ -185,7 +185,7 @@ Note: There is no dedicated `test` script configured in `package.json` at the mo
   - verify `DATABASE_URL`
   - check MongoDB network access and credentials
 - If payments fail:
-  - verify `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`
+  - verify `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
 - If image uploads fail:
   - verify Cloudinary env variables and upload folder permissions
 - If tracking OTP emails are not delivered:

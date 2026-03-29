@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import { useAppSelector } from "@/lib/redux/hooks";
 import Skeleton from "@/components/Skeleton";
 import CustomDatePicker from "@/components/CustomDatePicker";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type Summary = {
   totalRevenue: number;
@@ -658,13 +659,15 @@ export default function PricingDashboardPage() {
 }
 
 function MetricCard({ label, value, icon }: { label: string; value: string; icon: string }) {
+  const { isMobile } = useResponsiveMode();
+
   return (
-    <div className="dashboard-surface-soft rounded-xl p-3">
+    <div className={`dashboard-surface-soft rounded-xl ${isMobile ? "p-3" : "p-3"}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-white/55">{label}</p>
-        <Icon icon={icon} className="text-lg text-[#E4E67A]" />
+        <p className={`uppercase tracking-wide text-white/55 ${isMobile ? "text-[10px]" : "text-xs"}`}>{label}</p>
+        <Icon icon={icon} className={`${isMobile ? "text-base" : "text-lg"} text-[#E4E67A]`} />
       </div>
-      <p className="mt-2 text-lg font-semibold text-white">{value}</p>
+      <p className={`mt-2 font-semibold text-white ${isMobile ? "text-base" : "text-lg"}`}>{value}</p>
     </div>
   );
 }

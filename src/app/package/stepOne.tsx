@@ -2,6 +2,14 @@
 import { Icon } from "@iconify/react";
 import { Location } from "@/services/logistics";
 import CustomSelect from "@/components/CustomSelect";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+
+type StepOneFormData = {
+    pickupLocationId: string;
+    dropLocationId: string;
+};
+
+type StepOneErrors = Record<string, string>;
 
 export default function StepOne({
     formData,
@@ -12,14 +20,16 @@ export default function StepOne({
     isLoadingPickup,
     isLoadingDrop,
 }: {
-    formData: { pickupLocationId: string; dropLocationId: string };
-    setFormData: (data: any) => void;
-    errors: any;
+    formData: StepOneFormData;
+    setFormData: (data: StepOneFormData) => void;
+    errors: StepOneErrors;
     pickupLocations: Location[];
     dropLocations: Location[];
     isLoadingPickup: boolean;
     isLoadingDrop: boolean;
 }) {
+    const { isMobile, isTablet, isDesktop } = useResponsiveMode();
+
     const handlePickupChange = (pickupId: string) => {
         setFormData({ ...formData, pickupLocationId: pickupId, dropLocationId: "" });
     };
@@ -32,10 +42,14 @@ export default function StepOne({
         <div className="space-y-5 sm:space-y-8">
             <div className="max-w-2xl text-[#F6FF6A]">
                 <h2 className="text-xl sm:text-3xl font-bold">
-                    Select Pickup & Drop location
+                    {isMobile ? "Choose the route" : "Select Pickup & Drop location"}
                 </h2>
                 <p className="mt-1.5 sm:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">
-                    Choose where your package will be picked up and delivered.
+                    {isMobile
+                        ? "Start with the route only. Package details come in the next step."
+                        : isTablet
+                            ? "Choose the route first, then continue with package information."
+                            : "Choose where your package will be picked up and delivered."}
                 </p>
             </div>
 
@@ -89,15 +103,27 @@ export default function StepOne({
                 </div>
             </div>
 
-            <div className="package-panel-soft grid gap-3 sm:gap-4 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-[13px] sm:text-sm text-white/68 sm:grid-cols-2 sm:p-5">
+            <div className={`package-panel-soft grid gap-3 sm:gap-4 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-[13px] sm:text-sm text-white/68 sm:p-5 ${isDesktop ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 <div>
                     <p className="font-semibold text-[#F6FF6A]">Pickup first</p>
                     <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">Drop options are filtered after you choose a pickup point.</p>
                 </div>
                 <div>
-                    <p className="font-semibold text-[#F6FF6A]">Mobile-friendly flow</p>
-                    <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">The selectors now stack comfortably on phones and sit side by side on tablets and desktops.</p>
+                    <p className="font-semibold text-[#F6FF6A]">{isMobile ? "Phone-first" : isTablet ? "Tablet balance" : "Desktop context"}</p>
+                    <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">
+                        {isMobile
+                            ? "Only the essential route selectors stay visible on smaller screens."
+                            : isTablet
+                                ? "Tablet keeps route controls side by side for faster scanning."
+                                : "Desktop leaves more room for route context and the next booking steps."}
+                    </p>
                 </div>
+                {isDesktop ? (
+                    <div>
+                        <p className="font-semibold text-[#F6FF6A]">Next step</p>
+                        <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">Once the route is fixed, weight, size, and review details can expand safely.</p>
+                    </div>
+                ) : null}
             </div>
         </div>
     );

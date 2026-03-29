@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import DropzoneUpload from "../../components/DropzoneUpload";
 import Cart from "../../components/cart";
 import CustomDatePicker from "@/components/CustomDatePicker";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 import {
   DEFAULT_PACKAGE_CATEGORIES,
   DEFAULT_PACKAGE_SIZES,
@@ -21,6 +22,25 @@ type PackageSizeOption = {
   desc: string;
   scale: number;
 };
+
+type PackageDraft = {
+  packageName: string;
+  packageType: string;
+  otherPackageType: string;
+  packageSize: string;
+  packageWeight: number | "";
+  packageQuantities: number;
+  packageImage: string | File;
+  pickUpDate: string;
+};
+
+type PackageFormData = {
+  cart: Array<PackageDraft & Record<string, unknown>>;
+  pickupLocationId: string;
+  dropLocationId: string;
+};
+
+type PackageErrors = Record<string, string>;
 
 const getScaleByIndex = (index: number, total: number) => {
   const safeTotal = Math.max(1, total);
@@ -55,8 +75,8 @@ export function PackageSizeSelector({
   setCurrentPackage,
   packageSizes,
 }: {
-  currentPackage: Record<string, unknown>;
-  setCurrentPackage: (next: Record<string, unknown>) => void;
+  currentPackage: PackageDraft;
+  setCurrentPackage: (next: PackageDraft) => void;
   packageSizes: PackageSizeOption[];
 }) {
   const safePackageSizes = packageSizes.length > 0 ? packageSizes : fallbackPackageSizes;
@@ -144,7 +164,23 @@ export default function StepTwo({
   isUploadingPackageImage,
   packageCategories,
   packageSizes,
-}: any) {
+}: {
+  formData: PackageFormData;
+  setFormData: (next: PackageFormData) => void;
+  currentPackage: PackageDraft;
+  setCurrentPackage: (next: PackageDraft) => void;
+  errors: PackageErrors;
+  handleAddToCart: () => void;
+  handleClearForm: () => void;
+  editIndex: number | null;
+  handleEdit: (index: number) => void;
+  handleDelete: (index: number) => void;
+  handleFileDrop: (file: File) => Promise<void>;
+  isUploadingPackageImage: boolean;
+  packageCategories: PackageCategoryConfig[];
+  packageSizes: PackageSizeConfig[];
+}) {
+  const { isMobile, isTablet, isDesktop } = useResponsiveMode();
   const safePackageTypes: PackageTypeOption[] =
     Array.isArray(packageCategories) && packageCategories.length > 0
       ? packageCategories.map((entry: PackageCategoryConfig, index: number) => ({
@@ -189,9 +225,9 @@ export default function StepTwo({
 
   const handleAddToCartClick = () => {
     if (hasDateConflict) {
-      setFormData({
+        setFormData({
         ...formData,
-        cart: formData.cart.map((item: any) => ({
+        cart: formData.cart.map((item) => ({
           ...item,
           pickUpDate: currentPackage.pickUpDate,
         })),
@@ -203,8 +239,14 @@ export default function StepTwo({
   return (
     <div className="space-y-5 text-[#f7fac7] sm:space-y-8">
       <div className="max-w-2xl text-[#F6FF6A]">
-        <h2 className="text-xl font-bold sm:text-3xl">Package Details</h2>
-        <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">Provide details of the package you want to send.</p>
+        <h2 className="text-xl font-bold sm:text-3xl">{isMobile ? "Describe the package" : "Package Details"}</h2>
+        <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">
+          {isMobile
+            ? "Phone view focuses on only the fields you need right now."
+            : isTablet
+              ? "Tablet keeps package controls visible without overloading the form."
+              : "Provide details of the package you want to send."}
+        </p>
       </div>
 
       <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
@@ -270,14 +312,14 @@ export default function StepTwo({
         </div>
       )}
 
-      <div className="mt-2 flex flex-col gap-6 xl:flex-row">
+      <div className={`mt-2 flex flex-col gap-6 ${isDesktop ? "xl:flex-row" : ""}`}>
         <PackageSizeSelector
           currentPackage={currentPackage}
           setCurrentPackage={setCurrentPackage}
           packageSizes={safePackageSizes}
         />
 
-        <div className="package-panel-soft flex w-full flex-col gap-3.5 md:gap-5 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 xl:w-1/3">
+        <div className={`package-panel-soft flex w-full flex-col gap-3.5 md:gap-5 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 ${isDesktop ? "xl:w-1/3" : ""}`}>
           <div>
             <label className="text-[13px] md:text-sm font-medium text-white/85">
               Enter weight <span className="text-red-400 ">*</span>
@@ -371,7 +413,7 @@ export default function StepTwo({
           </div>
         </div>
 
-        <div className="package-panel-soft flex w-full flex-col rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 xl:w-1/3">
+        <div className={`package-panel-soft flex w-full flex-col rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 ${isDesktop ? "xl:w-1/3" : ""}`}>
           <label className="mb-1.5 md:mb-3 text-[13px] md:text-sm font-medium text-white/85">
             Upload package image <span className="text-red-400">*</span>
           </label>
@@ -397,7 +439,7 @@ export default function StepTwo({
         </div>
       </div>
 
-      <div className="mt-8 md:mt-10 flex flex-col justify-end gap-3 sm:flex-row">
+      <div className={`mt-8 md:mt-10 flex flex-col justify-end gap-3 ${isMobile ? "" : "sm:flex-row"}`}>
         <button
           type="button"
           onClick={handleClearForm}

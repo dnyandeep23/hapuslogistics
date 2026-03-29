@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Header from "@/components/Header";
+import PublicAppShell from "@/components/PublicAppShell";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions | Hapus Logistics",
@@ -52,10 +52,8 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(205,214,69,0.14),transparent_28%),linear-gradient(180deg,#11160f_0%,#1a2017_42%,#0e120c_100%)] text-white">
-      <Header />
-
-      <section className="mx-auto max-w-6xl px-4 pb-16 pt-28 sm:px-6 lg:px-8">
+    <PublicAppShell className="bg-[radial-gradient(circle_at_top,rgba(205,214,69,0.14),transparent_28%),linear-gradient(180deg,#11160f_0%,#1a2017_42%,#0e120c_100%)]">
+      <section className="mx-auto max-w-6xl px-4 pb-10 pt-24 sm:px-6 sm:pb-14 lg:px-8 lg:pt-28">
         <div className="dashboard-surface rounded-[2rem] p-6 sm:p-8">
           <div className="max-w-3xl">
             <span className="inline-flex rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
@@ -101,6 +99,6 @@ export default function TermsPage() {
           </div>
         </div>
       </section>
-    </main>
+    </PublicAppShell>
   );
 }

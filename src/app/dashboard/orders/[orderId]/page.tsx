@@ -7,12 +7,21 @@ import Image from "next/image";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
 import { downloadOrderInvoice } from "@/lib/orderInvoice";
+import { appendRedirectParam } from "@/lib/authFlow";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
 import CustomDatePicker from "@/components/CustomDatePicker";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 import { formatIndiaPhoneInput, getIndiaPhoneDigits, normalizeIndiaPhone } from "@/lib/phone";
+import {
+  getRazorpayConstructor,
+  loadRazorpayCheckoutScript,
+  requireRazorpayKeyId,
+  type RazorpayCheckoutOptions,
+  type RazorpayHandlerResponse,
+} from "@/lib/razorpay";
 
 interface OrderPackage extends Record<string, unknown> {
   id: string;
@@ -598,53 +607,11 @@ function telHref(phone: string): string {
   return normalized ? `tel:${normalized}` : "";
 }
 
-type RazorpayHandlerResponse = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayCheckoutOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  handler: (response: RazorpayHandlerResponse) => void | Promise<void>;
-  prefill?: {
-    name?: string;
-    email?: string;
-    contact?: string;
-  };
-  theme?: {
-    color?: string;
-  };
-  modal?: {
-    ondismiss?: () => void;
-  };
-};
-
-type RazorpayCheckoutInstance = {
-  open: () => void;
-  on?: (
-    event: string,
-    handler: (response: { error?: { description?: string; reason?: string; step?: string } }) => void,
-  ) => void;
-};
-
-type RazorpayConstructor = new (options: RazorpayCheckoutOptions) => RazorpayCheckoutInstance;
-
-function getRazorpayConstructor(): RazorpayConstructor | null {
-  if (typeof window === "undefined") return null;
-  const globalWindow = window as unknown as { Razorpay?: RazorpayConstructor };
-  return globalWindow.Razorpay ?? null;
-}
-
 export default function OrderDetailPage() {
   const dispatch = useAppDispatch();
   const params = useParams<{ orderId: string }>();
   const router = useRouter();
+  const { isMobile, isTablet } = useResponsiveMode();
   const { addToast } = useToast();
   const { user } = useAppSelector((state) => state.user);
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -778,7 +745,7 @@ export default function OrderDetailPage() {
         const message = toStringValue(data?.error, "Failed to load order details");
         if (response.status === 401) {
           addToast("Please login to continue.", "warning");
-          router.push("/login");
+          router.push(appendRedirectParam("/login", `/dashboard/orders/${orderId}`));
         } else {
           addToast(message, "error");
         }
@@ -1085,20 +1052,6 @@ export default function OrderDetailPage() {
     setPackageDrafts((prev) => prev.filter((_, pkgIndex) => pkgIndex !== index));
   };
 
-  const loadRazorpayScript = async () => {
-    if (typeof window === "undefined") return false;
-    if (getRazorpayConstructor()) return true;
-
-    return new Promise<boolean>((resolve) => {
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
   const payAdjustmentAmount = async () => {
     if (!order || !isOrderOwner) return;
     if (toNumberValue(order.adjustmentPendingAmount) <= 0) {
@@ -1106,7 +1059,7 @@ export default function OrderDetailPage() {
       return;
     }
 
-    const isRazorpayLoaded = await loadRazorpayScript();
+    const isRazorpayLoaded = await loadRazorpayCheckoutScript();
     if (!isRazorpayLoaded) {
       addToast("Razorpay checkout failed to load.", "error");
       return;
@@ -1124,7 +1077,7 @@ export default function OrderDetailPage() {
       }
 
       const options: RazorpayCheckoutOptions = {
-        key: toStringValue(createPayload.keyId),
+        key: requireRazorpayKeyId(createPayload.keyId),
         amount: toNumberValue(createPayload.amount),
         currency: toStringValue(createPayload.currency, "INR"),
         name: "Hapus Logistics",
@@ -1419,6 +1372,19 @@ export default function OrderDetailPage() {
   const supportPhoneHref = telHref(supportPhone);
   const statusStepIndex = getStepIndex(order.status);
   const statusSteps = ["Order Placed", "Confirmed", "In Transit", "Delivered"];
+  const heroDescription = isMobile
+    ? "Fast shipment summary first, with contacts, proofs, and refund details just below."
+    : isTablet
+      ? "Balanced shipment view with the key booking details, status, contacts, and proof history."
+      : "Full package details, shipment status, notes, proofs, contacts, and refund information in one place for every role.";
+  const heroEyebrow = isMobile ? "Order snapshot" : isTablet ? "Detailed shipment view" : "Complete order view";
+  const heroMetrics = [
+    { label: "Order Date", value: formatDate(order.orderDate) },
+    { label: "Created", value: formatDate(order.createdAt) },
+    { label: "Total Value", value: formatMoney(order.totalAmount) },
+    { label: "Load Summary", value: `${order.packageCount} package(s) • ${order.totalWeightKg} kg` },
+  ];
+  const visibleHeroMetrics = isMobile ? heroMetrics.filter((metric) => metric.label !== "Created") : heroMetrics;
   const orderedReports = [...(order.reports ?? [])].sort((left, right) => {
     const emergencyDelta = Number(isEmergencyReport(right)) - Number(isEmergencyReport(left));
     if (emergencyDelta !== 0) return emergencyDelta;
@@ -1432,10 +1398,10 @@ export default function OrderDetailPage() {
   );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className={isMobile ? "p-3 pb-24" : isTablet ? "p-5 pb-28" : "p-4 sm:p-6 lg:p-8"}>
       <section className={heroPanelClass}>
         <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-[radial-gradient(circle_at_center,rgba(205,214,69,0.16),transparent_70%)]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
+        <div className={`relative flex gap-4 ${isMobile ? "flex-col" : "flex-wrap items-start justify-between"}`}>
           <div className="max-w-3xl">
             <button
               type="button"
@@ -1447,19 +1413,19 @@ export default function OrderDetailPage() {
             </button>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[#CDD645]/25 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
-                Complete order view
+                {heroEyebrow}
               </span>
               <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
             </div>
-            <h1 className="mt-3 text-3xl font-bold text-white">
+            <h1 className={`mt-3 font-bold text-white ${isMobile ? "text-2xl leading-tight" : "text-3xl"}`}>
               {order.pickupLocation.name || "--"} to {order.dropLocation.name || "--"}
             </h1>
             <p className="mt-2 text-sm text-white/68">
-              Full package details, shipment status, notes, proofs, contacts, and refund information in one place for every role.
+              {heroDescription}
             </p>
           </div>
           <span
-            className={`inline-flex rounded-full border px-4 py-2 text-sm font-semibold capitalize backdrop-blur-sm ${getStatusBadge(
+            className={`inline-flex rounded-full border px-4 py-2 text-sm font-semibold capitalize backdrop-blur-sm ${isMobile ? "self-start" : ""} ${getStatusBadge(
               order.status,
             )}`}
           >
@@ -1467,69 +1433,84 @@ export default function OrderDetailPage() {
           </span>
         </div>
 
-        <div className="relative mt-5 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className={`relative mt-5 grid gap-3 ${isMobile ? "" : "lg:grid-cols-[1.2fr_0.8fr]"}`}>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Shipment progress</p>
               <span className="text-xs text-[#DDE98D]">Live order snapshot</span>
             </div>
             {statusStepIndex >= 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {statusSteps.map((step, idx) => {
-                  const active = statusStepIndex >= idx;
-                  return (
-                    <div key={step} className="flex flex-col items-center gap-2">
-                      <div className={`h-2 w-full rounded-full ${active ? "bg-[#CDD645]" : "bg-white/15"}`} />
-                      <p className={`text-[11px] text-center ${active ? "text-white" : "text-white/45"}`}>
-                        {step}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+              isMobile ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {statusSteps.map((step, idx) => {
+                    const active = statusStepIndex >= idx;
+                    return (
+                      <div
+                        key={step}
+                        className={`rounded-2xl border px-3 py-3 ${
+                          active ? "border-[#CDD645]/30 bg-[#CDD645]/10" : "border-white/10 bg-black/15"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${
+                              active ? "bg-[#CDD645] text-[#1D1F16]" : "bg-white/10 text-white/60"
+                            }`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <p className={`text-xs font-medium ${active ? "text-white" : "text-white/55"}`}>{step}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {statusSteps.map((step, idx) => {
+                    const active = statusStepIndex >= idx;
+                    return (
+                      <div key={step} className="flex flex-col items-center gap-2">
+                        <div className={`h-2 w-full rounded-full ${active ? "bg-[#CDD645]" : "bg-white/15"}`} />
+                        <p className={`text-[11px] text-center ${active ? "text-white" : "text-white/45"}`}>
+                          {step}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             ) : (
               <div className="rounded-2xl border border-dashed border-white/12 bg-black/15 px-4 py-5 text-sm text-white/68">
                 This order is in a final exception state. See the refund and report sections below for the complete timeline.
               </div>
             )}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
-            <div className={infoTileClass}>
-              <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">Order Date</p>
-              <p className="mt-2 text-sm font-semibold text-white">{formatDate(order.orderDate)}</p>
-            </div>
-            <div className={infoTileClass}>
-              <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">Created</p>
-              <p className="mt-2 text-sm font-semibold text-white">{formatDate(order.createdAt)}</p>
-            </div>
-            <div className={infoTileClass}>
-              <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">Total Value</p>
-              <p className="mt-2 text-sm font-semibold text-white">{formatMoney(order.totalAmount)}</p>
-            </div>
-            <div className={infoTileClass}>
-              <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">Load Summary</p>
-              <p className="mt-2 text-sm font-semibold text-white">
-                {order.packageCount} package(s) • {order.totalWeightKg} kg
-              </p>
-            </div>
+          <div className={`grid gap-3 ${isMobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-2"}`}>
+            {visibleHeroMetrics.map((metric) => (
+              <div key={metric.label} className={`${infoTileClass} ${isMobile && metric.label === "Load Summary" ? "col-span-2" : ""}`}>
+                <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">{metric.label}</p>
+                <p className="mt-2 text-sm font-semibold text-white">{metric.value}</p>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="relative mt-5 flex flex-wrap items-center gap-2">
+        <div className={`relative mt-5 flex flex-wrap gap-2 ${isMobile ? "items-stretch" : "items-center"}`}>
           {isOrderOwner ? (
             supportPhoneHref ? (
               <a
                 href={supportPhoneHref}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
+                className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] ${isMobile ? "w-full justify-center text-sm" : "text-xs"}`}
               >
                 <Icon icon="mdi:lifebuoy" className="text-sm" />
-                Contact Support: {supportPhone}
+                {isMobile ? "Contact Support" : `Contact Support: ${supportPhone}`}
               </a>
             ) : (
               <button
                 type="button"
                 onClick={() => router.push(`/dashboard/support?orderId=${order.id}`)}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-xs font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
+                className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] ${isMobile ? "w-full justify-center text-sm" : "text-xs"}`}
               >
                 <Icon icon="mdi:lifebuoy" className="text-sm" />
                 Contact Support
@@ -1540,22 +1521,22 @@ export default function OrderDetailPage() {
             type="button"
             onClick={handleDownloadInvoice}
             disabled={downloadingInvoice}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24] disabled:cursor-not-allowed disabled:opacity-60"
+            className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24] disabled:cursor-not-allowed disabled:opacity-60 ${isMobile ? "w-full justify-center" : ""}`}
           >
             <Icon
               icon={downloadingInvoice ? "line-md:loading-loop" : "mdi:file-document-outline"}
               className="text-base"
             />
-            {downloadingInvoice ? "Preparing Invoice..." : "Download Invoice"}
+            {downloadingInvoice ? "Preparing Invoice..." : isMobile ? "Invoice" : "Download Invoice"}
           </button>
           {isAdminView && canEditAsAdmin && !adminEditMode ? (
             <button
               type="button"
               onClick={() => setAdminEditMode(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-semibold text-[#F6FF6A] hover:bg-[#2D3A24]"
+              className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] ${isMobile ? "w-full justify-center" : ""}`}
             >
               <Icon icon="mdi:pencil-outline" className="text-base" />
-              Enable Update Mode
+              {isMobile ? "Edit Order" : "Enable Update Mode"}
             </button>
           ) : null}
           {isAdminView && adminEditMode ? (
@@ -1563,10 +1544,10 @@ export default function OrderDetailPage() {
               type="button"
               onClick={saveContactChanges}
               disabled={savingContacts}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] disabled:opacity-60"
+              className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] disabled:opacity-60 ${isMobile ? "w-full justify-center" : ""}`}
             >
               <Icon icon={savingContacts ? "line-md:loading-loop" : "mdi:content-save-outline"} className="text-base" />
-              {savingContacts ? "Saving..." : "Save Details"}
+              {savingContacts ? "Saving..." : isMobile ? "Save Changes" : "Save Details"}
             </button>
           ) : null}
           {isAdminView && adminEditMode ? (
@@ -1576,7 +1557,7 @@ export default function OrderDetailPage() {
                 setAdminEditMode(false);
                 applyOrderToState(order);
               }}
-              className="dashboard-surface-soft inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/85 hover:bg-white/10"
+              className={`dashboard-surface-soft inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/85 hover:bg-white/10 ${isMobile ? "w-full justify-center" : ""}`}
             >
               <Icon icon="mdi:close-circle-outline" className="text-base" />
               Cancel Update

@@ -17,6 +17,12 @@ import {
   signAuthToken,
   signPendingAdminToken,
 } from "@/app/api/lib/authHelpers";
+import {
+  getEmailValidationMessage,
+  INVALID_CREDENTIALS_MESSAGE,
+  getPasswordValidationMessage,
+  normalizeEmail,
+} from "@/lib/authFlow";
 
 // dbConnect to the database
 dbConnect();
@@ -33,12 +39,17 @@ export async function POST(request: NextRequest) {
     const normalizedRole = normalizeRole(incomingRole);
     const role = normalizedRole === "operator" ? "operator" : "user";
     const isAdminLogin = Boolean(adminLogin);
+    const normalizedEmail = normalizeEmail(typeof email === "string" ? email : "");
+    const emailError = getEmailValidationMessage(normalizedEmail);
+    const passwordError = getPasswordValidationMessage(
+      typeof password === "string" ? password : "",
+    );
 
-    if (!email || !password) {
+    if (emailError || passwordError) {
       return NextResponse.json(
         {
           success: false,
-          message: "Email and password are required.",
+          message: emailError ?? passwordError,
         },
         { status: 400 },
       );
@@ -46,16 +57,14 @@ export async function POST(request: NextRequest) {
 
     // Fetch user INCLUDING password (because it is select:false in schema)
     const user = isAdminLogin
-      ? await User.findOne({ email }).select("+password")
-      : await User.findOne({ email, role }).select("+password");
+      ? await User.findOne({ email: normalizedEmail }).select("+password")
+      : await User.findOne({ email: normalizedEmail, role }).select("+password");
 
     if (!user) {
       return NextResponse.json(
         {
           success: false,
-          message: isAdminLogin
-            ? "No admin account found for this email."
-            : "No user exists for the selected role. Please sign up to continue.",
+          message: INVALID_CREDENTIALS_MESSAGE,
         },
         { status: 400 }
       );
@@ -114,7 +123,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Please check your email, password, and role.",
+          message: INVALID_CREDENTIALS_MESSAGE,
         },
         { status: 400 }
       );
@@ -124,7 +133,7 @@ export async function POST(request: NextRequest) {
     if (!user.isVerified) {
       // Resend verification email
       const verifyEmailResult = await sendEmail({
-        email,
+        email: normalizedEmail,
         emailType: "VERIFY",
         userId: user._id.toString(),
       });

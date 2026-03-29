@@ -35,6 +35,12 @@ import {
 } from "@/lib/redux/packageSlice";
 import { AppDispatch } from "@/lib/redux/store";
 import LoadingScreen from "@/components/LoadingScreen";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+import {
+    getRazorpayConstructor,
+    loadRazorpayCheckoutScript,
+    requireRazorpayKeyId,
+} from "@/lib/razorpay";
 import {
     DEFAULT_PACKAGE_CATEGORIES,
     DEFAULT_PACKAGE_SIZES,
@@ -45,12 +51,14 @@ import {
     type PackageCategoryConfig,
     type PackageSizeConfig,
 } from "@/lib/packageCatalog";
+import { appendRedirectParam } from "@/lib/authFlow";
 import { getIndiaPhoneDigits, isValidIndiaPhone } from "@/lib/phone";
 
 export default function AddPackagePage() {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { addToast } = useToast();
+    const { isMobile, isTablet } = useResponsiveMode();
     const packageState = useSelector(selectPackage);
     const { user, loading } = useSelector((state: any) => state.user)
     const { formData, currentPackage, editIndex, currentStep } = packageState;
@@ -127,7 +135,7 @@ export default function AddPackagePage() {
         // After the initial load, if there's no user, redirect to login.
         if (!loading && !user) {
             addToast("You must be logged in to create a package.", "error");
-            router.push('/login');
+            router.push(appendRedirectParam("/login", "/package"));
         }
     }, [user, loading, router, addToast]);
 
@@ -201,9 +209,11 @@ export default function AddPackagePage() {
 
     useEffect(() => {
         if (currentStep === 2 && editIndex === null && formData.cart.length > 0) {
-            dispatch(setCurrentPackage({ ...currentPackage, pickUpDate: formData.cart[0].pickUpDate }));
+            const firstCartDate = formData.cart[0].pickUpDate;
+            if (currentPackage.pickUpDate === firstCartDate) return;
+            dispatch(setCurrentPackage({ ...currentPackage, pickUpDate: firstCartDate }));
         }
-    }, [currentStep, editIndex, formData.cart, dispatch]);
+    }, [currentStep, currentPackage, editIndex, formData.cart, dispatch]);
 
     useEffect(() => {
         if (!Array.isArray(packageSizes) || packageSizes.length === 0) return;
@@ -417,20 +427,6 @@ export default function AddPackagePage() {
         setErrors({});
     };
 
-    const loadRazorpayScript = () => {
-        return new Promise((resolve) => {
-            const script = document.createElement('script');
-            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-            script.onload = () => {
-                resolve(true);
-            };
-            script.onerror = () => {
-                resolve(false);
-            };
-            document.body.appendChild(script);
-        });
-    };
-
     const handleSubmit = async () => {
         if (!validateStep()) {
             return;
@@ -438,7 +434,7 @@ export default function AddPackagePage() {
 
         if (!user) {
             addToast("You must be logged in to proceed.", "error");
-            router.push('/login');
+            router.push(appendRedirectParam("/login", "/package"));
             return;
         }
 
@@ -463,7 +459,7 @@ export default function AddPackagePage() {
         }
 
         setPaymentStatus('processing');
-        const isLoaded = await loadRazorpayScript();
+        const isLoaded = await loadRazorpayCheckoutScript();
         if (!isLoaded) {
             addToast("Failed to load payment gateway. Please check your connection.", 'error');
             setPaymentStatus('idle');
@@ -490,10 +486,10 @@ export default function AddPackagePage() {
                 },
             };
 
-            const { sessionId, razorpayOrderId, amount } = await createBookingSession(sessionPayload);
+            const { sessionId, razorpayOrderId, amount, keyId } = await createBookingSession(sessionPayload);
 
             const options = {
-                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+                key: requireRazorpayKeyId(keyId),
                 amount: amount,
                 currency: "INR",
                 name: "Hapus Logistics",
@@ -537,7 +533,12 @@ export default function AddPackagePage() {
                 }
             };
 
-            const rzp = new (window as any).Razorpay(options);
+            const Razorpay = getRazorpayConstructor();
+            if (!Razorpay) {
+                throw new Error("Razorpay checkout failed to initialize.");
+            }
+
+            const rzp = new Razorpay(options);
             rzp.on('payment.failed', async (failure: any) => {
                 try {
                     await markBookingSessionFailed(sessionId, {
@@ -605,6 +606,26 @@ export default function AddPackagePage() {
 
     if (loading) return <LoadingScreen />;
 
+    const shellPaddingClass = isMobile
+        ? "px-2.5 pb-6 pt-3"
+        : isTablet
+            ? "px-4 pb-10 pt-4"
+            : "px-3 pb-8 pt-4 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8";
+    const shellInnerClass = isMobile
+        ? "rounded-[1.35rem] px-3 py-4"
+        : isTablet
+            ? "rounded-[1.75rem] px-4 py-5"
+            : "rounded-[1.6rem] px-3.5 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8";
+    const heroTitle = isMobile ? "Package" : "Add Your Package";
+    const heroDescription = isMobile
+        ? "Route first. Then package details, then review."
+        : isTablet
+            ? "A balanced booking flow with route, package, and review kept clear at each step."
+            : "Keep the same shipment flow, but with a cleaner gradient shell and better spacing for mobile, tablet, and desktop.";
+    const stepLabels = isMobile
+        ? ["Route", "Pack", "Review"]
+        : ["Route", "Package", "Review"];
+
     return (
         <section className="relative min-h-screen overflow-hidden bg-[#141A14] text-white">
             <div className="absolute inset-0 z-0">
@@ -626,37 +647,37 @@ export default function AddPackagePage() {
                 }}
             />
 
-            <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-3 pb-8 pt-4 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+            <div className={`relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col ${shellPaddingClass}`}>
                 <button
                     type="button"
-                    className="inline-flex w-fit items-center gap-2 md:gap-3 rounded-full border border-white/12 bg-white/6 px-3 md:px-4 py-1.5 md:py-2 text-[13px] md:text-sm font-semibold text-[#F4F8BF] transition hover:bg-white/10"
+                    className={`inline-flex w-fit items-center gap-2 md:gap-3 rounded-full border border-white/12 bg-white/6 px-3 md:px-4 py-1.5 md:py-2 text-[13px] md:text-sm font-semibold text-[#F4F8BF] transition hover:bg-white/10 ${isMobile ? "shadow-[0_10px_28px_-20px_rgba(0,0,0,0.7)]" : ""}`}
                     onClick={handleExitPackagePage}
                 >
                     <Icon icon="famicons:arrow-back-circle-outline" fontSize={26} />
                     Back
                 </button>
 
-                <div className="mt-8 max-w-3xl">
+                <div className={`mt-8 max-w-3xl ${isMobile ? "mt-6" : isTablet ? "mt-7" : ""}`}>
                     <div className="package-badge inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
                         Booking Flow
                     </div>
-                    <h1 className="mt-3 text-3xl font-bold text-[#F6FF6A] sm:text-4xl">
-                        Add Your Package
+                    <h1 className={`mt-3 font-bold text-[#F6FF6A] ${isMobile ? "text-2xl" : "text-3xl sm:text-4xl"}`}>
+                        {heroTitle}
                     </h1>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70 sm:text-base">
-                        Keep the same shipment flow, but with a cleaner gradient shell and better spacing for mobile, tablet, and desktop.
+                    <p className={`mt-2 max-w-2xl leading-6 text-white/70 ${isMobile ? "text-sm" : "text-base"}`}>
+                        {heroDescription}
                     </p>
                 </div>
 
-                <div className="package-shell mt-6 sm:mt-8 rounded-[1.6rem] sm:rounded-[1.9rem] px-3.5 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+                <div className={`package-shell mt-6 sm:mt-8 ${shellInnerClass}`}>
                     {paymentStatus === 'idle' ? (
                         <>
-                            <div className="mb-6 sm:mb-8 overflow-hidden rounded-[1.4rem] md:rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-2.5 py-3 sm:px-5 sm:py-5">
+                            <div className="mb-6 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-2.5 py-3 sm:mb-8 sm:px-5 sm:py-5">
                                 <div className="flex items-start">
                                     {[
-                                        { step: 1, label: "Route" },
-                                        { step: 2, label: "Package" },
-                                        { step: 3, label: "Review" },
+                                        { step: 1, label: stepLabels[0] },
+                                        { step: 2, label: stepLabels[1] },
+                                        { step: 3, label: stepLabels[2] },
                                     ].map((entry, index, list) => {
                                         const isComplete = currentStep > entry.step;
                                         const isActive = currentStep === entry.step;
@@ -664,7 +685,7 @@ export default function AddPackagePage() {
                                             <div key={entry.step} className={`flex items-center ${index !== list.length - 1 ? "flex-1" : "flex-none"}`}>
                                                 <div className="flex flex-col items-center">
                                                     <div
-                                                        className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] md:text-sm font-bold transition sm:h-12 sm:w-12 ${
+                                                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] md:text-sm font-bold transition sm:h-12 sm:w-12 ${
                                                             isComplete
                                                                 ? "border-[#CDD645] bg-[#CDD645]/65 text-[#1f271a]"
                                                                 : isActive
@@ -674,7 +695,7 @@ export default function AddPackagePage() {
                                                     >
                                                         {isComplete ? <Icon icon="mdi:check" className="text-lg" /> : entry.step}
                                                     </div>
-                                                    <p className={`mt-1.5 sm:mt-2 text-center text-[10px] md:text-xs font-semibold uppercase tracking-[0.14em] sm:text-sm ${
+                                                    <p className={`mt-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] sm:mt-2 md:text-xs sm:text-sm ${
                                                         isActive || isComplete ? "text-[#F6FF6A]" : "text-white/55"
                                                     }`}>
                                                         {entry.label}
@@ -754,8 +775,8 @@ export default function AddPackagePage() {
                                 )}
                             </div>
 
-                            <div className="mt-8 sm:mt-10 flex flex-col gap-3 sm:flex-row sm:justify-between">
-                                <div>
+                            <div className={`mt-8 flex flex-col gap-3 ${isTablet ? "sm:flex-row sm:justify-between" : "sm:flex-row sm:justify-between"} sm:mt-10`}>
+                                <div className={isMobile ? "order-2" : ""}>
                                     {currentStep > 1 && (
                                         <button
                                             type="button"
@@ -767,7 +788,7 @@ export default function AddPackagePage() {
                                     )}
                                 </div>
 
-                                <div className="flex flex-col gap-3 sm:flex-row">
+                                <div className={`flex flex-col gap-3 ${isMobile ? "order-1" : ""} sm:flex-row`}>
                                     {currentStep < 3 ? (
                                         <button
                                             type="button"
@@ -790,14 +811,14 @@ export default function AddPackagePage() {
                             </div>
                         </>
                     ) : (
-                        <div className="flex min-h-[65vh] flex-col items-center justify-center space-y-6 text-center">
+                        <div className={`flex min-h-[65vh] flex-col items-center justify-center text-center ${isMobile ? "space-y-4" : "space-y-6"}`}>
                             {paymentStatus === 'processing' && (
                                 <>
                                     <div className="h-20 w-20 rounded-full border-4 border-[#CDD645] border-t-transparent animate-spin" />
-                                    <h3 className="text-2xl font-bold text-[#F6FF6A]">
+                                    <h3 className={`font-bold text-[#F6FF6A] ${isMobile ? "text-xl" : "text-2xl"}`}>
                                         {isAdminBookingUser ? "Confirming Booking..." : "Processing Payment..."}
                                     </h3>
-                                    <p className="max-w-md text-white/70">
+                                    <p className={`max-w-md text-white/70 ${isMobile ? "text-sm leading-6" : "text-base"}`}>
                                         {isAdminBookingUser
                                             ? "Please wait while we confirm this manual booking."
                                             : "Please wait while we confirm your payment. Do not close this window."}
@@ -810,39 +831,39 @@ export default function AddPackagePage() {
                                     <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#CDD645] text-[#2A3125]">
                                         <Icon icon="mdi:check-bold" fontSize={50} />
                                     </div>
-                                    <h3 className="text-3xl font-bold text-[#F6FF6A]">
+                                    <h3 className={`font-bold text-[#F6FF6A] ${isMobile ? "text-2xl" : "text-3xl"}`}>
                                         {isAdminBookingUser ? "Booking Confirmed!" : "Payment Successful!"}
                                     </h3>
-                                    <p className="max-w-md text-white/80">
+                                    <p className={`max-w-md text-white/80 ${isMobile ? "text-sm leading-6" : ""}`}>
                                         {isAdminBookingUser
                                             ? "Order has been created on behalf of the customer."
                                             : "Your package has been scheduled for pickup."}
                                     </p>
 
-                                    <div className="package-panel w-full max-w-xl rounded-[1.6rem] p-5 sm:p-6">
-                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                    <div className="package-panel w-full max-w-xl rounded-[1.6rem] p-4 sm:p-5 sm:p-6">
+                                        <div className="flex justify-between gap-4 border-b border-white/10 pb-4 mb-4">
                                             <span className="text-white/60">Order ID</span>
-                                            <span className="font-mono text-[#F6FF6A]">{orderData.orderId}</span>
+                                            <span className="font-mono text-right text-[#F6FF6A] break-all">{orderData.orderId}</span>
                                         </div>
-                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                        <div className="flex justify-between gap-4 border-b border-white/10 pb-4 mb-4">
                                             <span className="text-white/60">Tracking ID</span>
-                                            <span className="font-mono text-[#F6FF6A]">{orderData.trackingId}</span>
+                                            <span className="font-mono text-right text-[#F6FF6A] break-all">{orderData.trackingId}</span>
                                         </div>
-                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                        <div className="flex justify-between gap-4 border-b border-white/10 pb-4 mb-4">
                                             <span className="text-white/60">Bus Operator</span>
-                                            <span className={`font-bold ${orderData.busOperator ? "text-white" : "text-white/40 italic text-sm"}`}>
+                                            <span className={`text-right font-bold ${orderData.busOperator ? "text-white" : "text-white/40 italic text-sm"}`}>
                                                 {orderData.busOperator || "Pending Assignment"}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between border-b border-white/10 pb-4 mb-4">
+                                        <div className="flex justify-between gap-4 border-b border-white/10 pb-4 mb-4">
                                             <span className="text-white/60">Bus Number</span>
-                                            <span className={`font-bold ${orderData.busNumber ? "text-white" : "text-white/40"}`}>
+                                            <span className={`text-right font-bold ${orderData.busNumber ? "text-white" : "text-white/40"}`}>
                                                 {orderData.busNumber || "--"}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between gap-4">
                                             <span className="text-white/60">Estimated Arrival</span>
-                                            <span className={`font-bold ${orderData.eta ? "text-green-400" : "text-white/40 italic text-sm"}`}>
+                                            <span className={`text-right font-bold ${orderData.eta ? "text-green-400" : "text-white/40 italic text-sm"}`}>
                                                 {orderData.eta || "Pending Schedule"}
                                             </span>
                                         </div>
@@ -863,10 +884,10 @@ export default function AddPackagePage() {
                                     <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-red-500 bg-red-500/20 text-red-500">
                                         <Icon icon="mdi:close-thick" fontSize={50} />
                                     </div>
-                                    <h3 className="text-3xl font-bold text-red-400">
+                                    <h3 className={`font-bold text-red-400 ${isMobile ? "text-2xl" : "text-3xl"}`}>
                                         {isAdminBookingUser ? "Booking Failed" : "Payment Failed"}
                                     </h3>
-                                    <p className="max-w-md text-white/70">
+                                    <p className={`max-w-md text-white/70 ${isMobile ? "text-sm leading-6" : ""}`}>
                                         {isAdminBookingUser
                                             ? "Could not confirm this booking. Please retry."
                                             : "Something went wrong with the transaction. Please try again."}
@@ -894,10 +915,10 @@ export default function AddPackagePage() {
 
             {showAdminConfirmModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-                    <div className="w-full max-w-md rounded-2xl border border-[#CDD645]/30 bg-[#1f271a] p-5 shadow-2xl">
-                        <h3 className="text-lg font-semibold text-[#F6FF6A]">
-                            Confirm Admin Booking
-                        </h3>
+                        <div className="w-full max-w-md rounded-2xl border border-[#CDD645]/30 bg-[#1f271a] p-5 shadow-2xl">
+                            <h3 className="text-lg font-semibold text-[#F6FF6A]">
+                                Confirm Admin Booking
+                            </h3>
                         <p className="mt-2 text-sm text-white/75">
                             This will confirm the order without Razorpay payment.
                         </p>

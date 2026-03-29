@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Icon } from '@iconify/react';
 import { useToast } from '@/context/ToastContext';
 import Skeleton from '@/components/Skeleton';
+import { useResponsiveMode } from '@/hooks/useResponsiveMode';
 
 interface Order {
     id: string;
@@ -134,6 +135,7 @@ export default function RecentOrders() {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const { addToast } = useToast();
+    const { isMobile, isTablet } = useResponsiveMode();
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -154,7 +156,7 @@ export default function RecentOrders() {
                     ? data.map(mapOrder).filter((order): order is Order => Boolean(order))
                     : [];
 
-                setOrders(normalizedOrders.slice(0, 3));
+                setOrders(normalizedOrders.slice(0, 4));
             } catch (error) {
                 console.error('Error fetching recent orders:', error);
                 addToast('Network issue while loading recent orders.', 'error');
@@ -201,6 +203,13 @@ export default function RecentOrders() {
         return null;
     }
 
+    const visibleOrders = isMobile ? orders.slice(0, 2) : isTablet ? orders.slice(0, 2) : orders.slice(0, 3);
+    const gridClassName = isMobile
+        ? 'grid grid-cols-1 gap-3'
+        : isTablet
+            ? 'grid grid-cols-2 gap-4'
+            : 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3';
+
     return (
         <div className="mt-12">
             <div className="mb-6 flex items-center justify-between gap-4">
@@ -210,7 +219,13 @@ export default function RecentOrders() {
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-[#F6FF6A] sm:text-2xl">Recent Orders</h2>
-                        <p className="text-sm text-white/60">Quick scan of your latest shipments.</p>
+                        <p className="text-sm text-white/60">
+                            {isMobile
+                                ? 'Your latest shipment snapshots.'
+                                : isTablet
+                                    ? 'Balanced view of your latest shipments.'
+                                    : 'Quick scan of your latest shipments.'}
+                        </p>
                     </div>
                 </div>
                 <button
@@ -221,67 +236,120 @@ export default function RecentOrders() {
                     }}
                     className="inline-flex items-center gap-2 rounded-full border border-[#F6FF6A]/20 bg-[#F6FF6A]/10 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition-colors hover:bg-[#F6FF6A]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6FF6A]/50"
                 >
-                    View More
+                    {isMobile ? 'All Orders' : 'View More'}
                     <Icon icon="mdi:arrow-down" className="text-base -rotate-90" />
                 </button>
             </div>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {orders.map((order) => (
-                    <button
-                        key={order.id}
-                        type="button"
-                        onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                        className="group overflow-hidden rounded-3xl border border-[#4e573f] bg-[#1f251c] text-left shadow-[0_18px_40px_-30px_rgba(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-1 hover:border-[#F6FF6A]/20 hover:shadow-[0_24px_50px_-30px_rgba(246,255,106,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6FF6A]/50"
-                        aria-label={`Open order ${order.packageName}`}
-                    >
-                        <div className="relative h-44 overflow-hidden">
-                            {order.packageImage ? (
-                                <Image
-                                    src={order.packageImage}
-                                    alt={order.packageName}
-                                    fill
-                                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
+            <div className={gridClassName}>
+                {visibleOrders.map((order) => {
+                    const tone = getStatusTone(order.status);
+
+                    return (
+                        <button
+                            key={order.id}
+                            type="button"
+                            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
+                            className="group overflow-hidden rounded-3xl border border-[#4e573f] bg-[#1f251c] text-left shadow-[0_18px_40px_-30px_rgba(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-1 hover:border-[#F6FF6A]/20 hover:shadow-[0_24px_50px_-30px_rgba(246,255,106,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6FF6A]/50"
+                            aria-label={`Open order ${order.packageName}`}
+                        >
+                            {isMobile ? (
+                                <div className="flex items-center gap-3 p-3.5">
+                                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/8 bg-[#20271C]">
+                                        {order.packageImage ? (
+                                            <Image
+                                                src={order.packageImage}
+                                                alt={order.packageName}
+                                                fill
+                                                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                                sizes="5rem"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#1E261A] to-[#2A3324] text-[#CDD645]">
+                                                <Icon icon="mdi:package-variant-closed" className="text-3xl opacity-90" />
+                                            </div>
+                                        )}
+                                        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-t ${tone.accent} via-transparent to-transparent`} />
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <h3 className="truncate text-base font-semibold text-white">{order.packageName}</h3>
+                                                <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/58">
+                                                    <Icon icon="mdi:calendar-blank-outline" className="text-sm" />
+                                                    {order.date}
+                                                </p>
+                                            </div>
+                                            <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ${tone.badge}`}>
+                                                <Icon icon={tone.icon} className="text-xs" />
+                                                {order.status}
+                                            </span>
+                                        </div>
+
+                                        {order.collectionTag ? (
+                                            <p className="mt-2 truncate text-xs text-amber-100/90">{order.collectionTag}</p>
+                                        ) : null}
+
+                                        <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#CDD645]">
+                                            <span>Open Details</span>
+                                            <Icon icon="mdi:chevron-right" className="text-base transition-transform group-hover:translate-x-0.5" />
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
-                                <div className={`flex h-full items-center justify-center bg-gradient-to-br from-[#1E261A] to-[#2A3324] text-[#CDD645]`}>
-                                    <Icon icon="mdi:package-variant-closed" className="text-5xl opacity-90" />
-                                </div>
+                                <>
+                                    <div className={`relative overflow-hidden ${isTablet ? 'h-36' : 'h-44'}`}>
+                                        {order.packageImage ? (
+                                            <Image
+                                                src={order.packageImage}
+                                                alt={order.packageName}
+                                                fill
+                                                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                                sizes={isTablet ? '(max-width: 1024px) 50vw, 28rem' : '(max-width: 1280px) 33vw, 24rem'}
+                                            />
+                                        ) : (
+                                            <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#1E261A] to-[#2A3324] text-[#CDD645]">
+                                                <Icon icon="mdi:package-variant-closed" className="text-5xl opacity-90" />
+                                            </div>
+                                        )}
+                                        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-t ${tone.accent} via-transparent to-transparent`} />
+                                        <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/85 backdrop-blur">
+                                            <Icon icon={tone.icon} className="text-sm text-[#F6FF6A]" />
+                                            {order.status}
+                                        </div>
+                                    </div>
+                                    <div className={`space-y-4 ${isTablet ? 'p-4' : 'p-4'}`}>
+                                        <div className="space-y-2">
+                                            <h3 className="text-lg font-semibold leading-snug text-white">{order.packageName}</h3>
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/60">
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <Icon icon="mdi:calendar-blank-outline" className="text-base" />
+                                                    {order.date}
+                                                </span>
+                                                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${tone.badge}`}>
+                                                    <Icon icon={tone.icon} className="text-sm" />
+                                                    {order.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {order.collectionTag ? (
+                                            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">
+                                                <Icon icon="mdi:store-marker-outline" className="text-sm shrink-0" />
+                                                <span className="truncate">{order.collectionTag}</span>
+                                            </div>
+                                        ) : null}
+                                        <div className="flex items-center justify-between border-t border-white/5 pt-3 text-xs font-semibold text-[#CDD645]">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                {isTablet ? 'View order details' : 'View package details'}
+                                            </span>
+                                            <Icon icon="mdi:chevron-right" className="text-base transition-transform group-hover:translate-x-0.5" />
+                                        </div>
+                                    </div>
+                                </>
                             )}
-                            <div className={`pointer-events-none absolute inset-0 bg-gradient-to-t ${getStatusTone(order.status).accent} via-transparent to-transparent`} />
-                            <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/85 backdrop-blur">
-                                <Icon icon={getStatusTone(order.status).icon} className="text-sm text-[#F6FF6A]" />
-                                {order.status}
-                            </div>
-                        </div>
-                        <div className="space-y-4 p-4">
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-semibold leading-snug text-white">{order.packageName}</h3>
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/60">
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <Icon icon="mdi:calendar-blank-outline" className="text-base" />
-                                        {order.date}
-                                    </span>
-                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getStatusTone(order.status).badge}`}>
-                                        <Icon icon={getStatusTone(order.status).icon} className="text-sm" />
-                                        {order.status}
-                                    </span>
-                                </div>
-                            </div>
-                            {order.collectionTag ? (
-                                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">
-                                    <Icon icon="mdi:store-marker-outline" className="text-sm shrink-0" />
-                                    <span className="truncate">{order.collectionTag}</span>
-                                </div>
-                            ) : null}
-                            <div className="flex items-center justify-between border-t border-white/5 pt-3 text-xs font-semibold text-[#CDD645]">
-                                <span className="inline-flex items-center gap-1.5">
-                                    View package details
-                                </span>
-                                <Icon icon="mdi:chevron-right" className="text-base transition-transform group-hover:translate-x-0.5" />
-                            </div>
-                        </div>
-                    </button>
-                ))}
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );

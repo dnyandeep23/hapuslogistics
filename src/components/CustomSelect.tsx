@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
@@ -24,14 +26,15 @@ export default function CustomSelect({
     error,
 }: CustomSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
     const selectRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
     const selectedOption = options.find((opt) => opt._id === value);
+    const selectedLabel = selectedOption
+        ? `${selectedOption.name}, ${selectedOption.city}`
+        : value
+            ? "Selected location unavailable"
+            : placeholder;
+    const canRenderPortal = typeof document !== "undefined";
 
     const handleOptionClick = (optionValue: string) => {
         onChange(optionValue);
@@ -60,6 +63,10 @@ export default function CustomSelect({
                 className={`package-input min-h-12 md:min-h-16 w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm transition duration-300 ease ${error ? "border-red-500" : "focus:border-[#CDD645]"
                     } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                     }`}
+                role="button"
+                aria-haspopup="dialog"
+                aria-expanded={isOpen}
+                aria-disabled={disabled}
             >
                 <div className="flex min-h-8 md:min-h-10 items-center justify-between gap-3 md:gap-4">
                     {selectedOption ? (
@@ -73,7 +80,7 @@ export default function CustomSelect({
                             <Skeleton className="h-2.5 md:h-3 w-1/2" />
                         </div>
                     ) : (
-                        <span className="text-white/42 text-xs md:text-sm">{placeholder}</span>
+                        <span className="text-white/42 text-xs md:text-sm">{selectedLabel}</span>
                     )}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5 shrink-0 text-[#f7fac7]" fill="none" viewBox="0 0 24 24" strokeWidth="1.2" stroke="currentColor" >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
@@ -107,13 +114,15 @@ export default function CustomSelect({
                                     </li>
                                 ))
                             ) : (
-                                <li className="px-4 py-3 text-white/55">No locations available</li>
+                                <li className="px-4 py-4 text-center text-sm text-white/55">
+                                    No locations available yet
+                                </li>
                             )}
                         </ul>
                     </div>
 
                     {/* Mobile Bottom Sheet Drawer (Portaled) */}
-                    {mounted && createPortal(
+                    {canRenderPortal && createPortal(
                         <div className="fixed inset-0 z-[100] flex flex-col justify-end lg:hidden pointer-events-auto">
                             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-modalFadeIn" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
                             <div className="relative flex max-h-[75vh] min-h-[50vh] flex-col rounded-t-[2rem] border-t border-white/10 bg-[#141B12] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] animate-modalSlideUp">
@@ -158,7 +167,9 @@ export default function CustomSelect({
                                                 </li>
                                             ))
                                         ) : (
-                                            <li className="px-4 py-5 text-center text-white/55">No locations available</li>
+                                            <li className="px-4 py-6 text-center text-sm text-white/55">
+                                                No locations available yet
+                                            </li>
                                         )}
                                     </ul>
                                 </div>

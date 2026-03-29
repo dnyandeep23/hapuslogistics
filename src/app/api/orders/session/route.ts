@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
-import Razorpay from "razorpay";
 import { dbConnect } from "@/app/api/lib/db";
+import { createRazorpayClient, getServerRazorpayKeyId } from "@/app/api/lib/razorpayServer";
 import User from "@/app/api/models/userModel";
 import BookingSession from "@/app/api/models/bookingSessionModel";
 import { cleanupExpiredBookingSessions } from "@/app/api/lib/bookingSessionCleanup";
 
 const HOLD_DURATION_MS = 20 * 60 * 1000;
-
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
 
 class ApiError extends Error {
   status: number;
@@ -37,6 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await dbConnect();
+    const razorpay = createRazorpayClient();
 
     const { sessionId, userId, senderInfo, receiverInfo } = await request.json();
 
@@ -106,6 +102,7 @@ export async function POST(request: NextRequest) {
         razorpayOrderId: holdSession.razorpayOrderId,
         amount: Math.round(holdSession.totalAmount * 100),
         currency: "INR",
+        keyId: getServerRazorpayKeyId(),
         continued: true,
         expiresAt: holdSession.expiresAt,
       },

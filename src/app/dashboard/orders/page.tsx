@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
 import { useRouter, useSearchParams } from "next/navigation";
-import { downloadOrderInvoice } from "@/lib/orderInvoice";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
 import { formatIndiaPhoneInput, normalizeIndiaPhone } from "@/lib/phone";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 interface BusContact {
   _id: string;
@@ -181,11 +181,6 @@ function toStringValue(value: unknown, fallback = ""): string {
   return fallback;
 }
 
-function telHref(phone: string): string {
-  const normalized = String(phone ?? "").trim().replace(/[^\d+]/g, "");
-  return normalized ? `tel:${normalized}` : "";
-}
-
 function isOngoingOrder(order: UserDashboardOrder, now: Date): boolean {
   const orderStatus = order.status.toLowerCase();
   if (orderStatus === "delivered" || orderStatus === "cancelled" || orderStatus === "missed_package") {
@@ -239,17 +234,6 @@ function nearestDateDiff(isoDate: string, referenceMs: number): number {
   const dateMs = new Date(isoDate).getTime();
   if (!Number.isFinite(dateMs)) return Number.MAX_SAFE_INTEGER;
   return Math.abs(dateMs - referenceMs);
-}
-
-function getStepIndex(status: string): number {
-  const normalized = status.toLowerCase();
-  if (normalized === "pending") return 0;
-  if (normalized === "confirmed" || normalized === "allocated") return 1;
-  if (normalized === "in-transit") return 2;
-  if (normalized === "delivered") return 3;
-  if (normalized === "missed_package") return -1;
-  if (normalized === "cancelled") return -1;
-  return 0;
 }
 
 function getStatusBadge(status: string): string {
@@ -352,6 +336,7 @@ function classifyOperatorOrderTab(order: RoleDashboardOrder, now: Date): Operato
 }
 
 export default function OrderPage() {
+  const { isMobile, isTablet } = useResponsiveMode();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.user);
   const searchParams = useSearchParams();
@@ -365,7 +350,6 @@ export default function OrderPage() {
   const [requiredPhoneDraft, setRequiredPhoneDraft] = useState("");
   const [requiredPhoneError, setRequiredPhoneError] = useState("");
   const [savingRequiredPhone, setSavingRequiredPhone] = useState(false);
-  const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
   const [feedbackModalOrder, setFeedbackModalOrder] = useState<FeedbackModalOrder | null>(null);
   const [feedbackRatingDraft, setFeedbackRatingDraft] = useState(5);
   const [feedbackCommentDraft, setFeedbackCommentDraft] = useState("");
@@ -384,6 +368,8 @@ export default function OrderPage() {
     [searchParams],
   );
   const requiresStaffPhone = role !== "user" && !normalizeIndiaPhone(user?.phone);
+  const pagePaddingClass = isMobile ? "p-3 pb-24" : isTablet ? "p-4 pb-28" : "p-4 sm:p-6 lg:p-8";
+  const sectionStackClass = isMobile ? "space-y-3" : "space-y-4";
 
   const fetchOrders = async () => {
     try {
@@ -475,33 +461,6 @@ export default function OrderPage() {
       );
     } finally {
       setSavingRequiredPhone(false);
-    }
-  };
-
-  const handleDownloadInvoice = async (orderId: string) => {
-    if (!orderId) {
-      addToast("Order ID is missing. Cannot download invoice.", "warning");
-      return;
-    }
-
-    try {
-      setDownloadingOrderId(orderId);
-      const response = await fetch(`/api/orders/${orderId}`, { cache: "no-store" });
-      const data = await response.json();
-
-      if (!response.ok) {
-        addToast(data?.error || "Failed to load invoice data.", "error");
-        return;
-      }
-
-      const fileName = await downloadOrderInvoice(data);
-      addToast(`Invoice downloaded: ${fileName}`, "success");
-    } catch (downloadError: unknown) {
-      const message =
-        downloadError instanceof Error ? downloadError.message : "Failed to download invoice.";
-      addToast(message, "error");
-    } finally {
-      setDownloadingOrderId(null);
     }
   };
 
@@ -697,7 +656,7 @@ export default function OrderPage() {
         tabIndex={0}
         onClick={() => openOrderDetail(order.id)}
         onKeyDown={(event) => handleCardKeyDown(event, () => openOrderDetail(order.id))}
-        className={modernOrderCardClass}
+        className={`${modernOrderCardClass} ${isMobile ? "p-4 rounded-[1.6rem]" : isTablet ? "p-5 rounded-[1.75rem]" : ""}`}
       >
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
@@ -711,7 +670,7 @@ export default function OrderPage() {
               {order.pickupLocation?.name || "--"} to {order.dropLocation?.name || "--"}
             </p>
             <p className="text-xs text-white/60">
-              {formatDate(order.orderDate)} | {order.user?.name || "--"} ({order.user?.email || "--"})
+              {formatDate(order.orderDate)} | {order.user?.name || "--"}{isMobile ? "" : ` (${order.user?.email || "--"})`}
             </p>
           </div>
           <span className={`rounded-full border px-3 py-1 text-xs capitalize ${getStatusBadge(order.status)}`}>
@@ -719,7 +678,7 @@ export default function OrderPage() {
           </span>
         </div>
 
-        <div className="relative mt-4 grid gap-3 text-xs text-white/70 sm:grid-cols-3">
+        <div className={`relative mt-4 grid gap-3 text-xs text-white/70 ${isMobile ? "grid-cols-2" : "sm:grid-cols-3"}`}>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Bus</p>
             <p className="mt-1 text-sm text-white">
@@ -730,12 +689,14 @@ export default function OrderPage() {
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Amount</p>
             <p className="mt-1 text-sm text-white">{formatMoney(order.totalAmount)}</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Proof</p>
-            <p className="mt-1 text-sm text-white">
-              Pickup {order.pickupProofImage ? "Uploaded" : "Pending"}, Drop {order.dropProofImage ? "Uploaded" : "Pending"}
-            </p>
-          </div>
+          {!isMobile ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Proof</p>
+              <p className="mt-1 text-sm text-white">
+                Pickup {order.pickupProofImage ? "Uploaded" : "Pending"}, Drop {order.dropProofImage ? "Uploaded" : "Pending"}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {order.operatorNote && !order.report ? (
@@ -770,11 +731,15 @@ export default function OrderPage() {
         ) : null}
 
         <div className="relative mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-4">
-          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
-            Open card to view full package details
-          </span>
+          {!isMobile ? (
+            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
+              Open card to view full package details
+            </span>
+          ) : (
+            <span className="text-[11px] text-white/48">Compact view. Tap for full order details.</span>
+          )}
           <span className="inline-flex items-center gap-2 text-sm font-medium text-[#DDE98D]">
-            View Order
+            {isMobile ? "View" : "View Order"}
             <Icon icon="mdi:arrow-top-right" className="text-base transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </span>
         </div>
@@ -887,7 +852,7 @@ export default function OrderPage() {
   if (role === "user") {
     if (userOrders.length === 0) {
       return (
-        <div className="p-6">
+        <div className={pagePaddingClass}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-bold text-[#F6FF6A]">My Orders</h1>
             <div className="relative w-full max-w-sm">
@@ -909,22 +874,9 @@ export default function OrderPage() {
     }
 
     const renderUserOrderCard = (order: UserDashboardOrder) => {
-      const normalizedStatus = order.status.toLowerCase();
-      const isDelivered = normalizedStatus === "delivered";
-      const isCancelled = normalizedStatus === "cancelled";
-      const isMissedPackage = normalizedStatus === "missed_package";
-      const hasBusContact = Boolean(
-        order.busContact?.contactPersonNumber || order.busContact?.contactPersonName,
-      );
-      const shouldHideUpcomingContact = Boolean(order.contactLocked);
-      const canShowBusContact =
-        hasBusContact && !isDelivered && !isCancelled && !isMissedPackage && !shouldHideUpcomingContact;
-      const supportPhone = order.supportContact?.phone || "";
-      const supportPhoneHref = telHref(supportPhone);
+      const isCompact = isMobile;
       const officeCollectionTag = getOfficeCollectionTag(order.report);
-
-      const stepIndex = getStepIndex(order.status);
-      const steps = ["Order Placed", "Confirmed", "In Transit", "Delivered"];
+      const routeSummary = `${order.pickupLocation?.name || "--"} to ${order.dropLocation?.name || "--"}`;
 
       return (
         <article
@@ -933,338 +885,72 @@ export default function OrderPage() {
           tabIndex={0}
           onClick={() => openOrderDetail(order.id)}
           onKeyDown={(event) => handleCardKeyDown(event, () => openOrderDetail(order.id))}
-          className={modernOrderCardClass}
+          className={`${modernOrderCardClass} ${isMobile ? "p-3.5 rounded-[1.4rem]" : isTablet ? "p-4 rounded-[1.65rem]" : "p-5"}`}
         >
-          <div className="relative mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[#CDD645]/25 bg-[#CDD645]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
-                  Tap for details
-                </span>
-                <p className="font-mono text-sm text-[#F6FF6A]">{order.trackingId}</p>
-              </div>
-              <p className="mt-2 text-sm text-white/65">Open the card to view the full package detail page.</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-right">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-white/42">Pickup Date</p>
-              <p className="mt-1 text-sm font-semibold text-white">{formatDate(order.orderDate)}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className={`font-mono text-[#F6FF6A] ${isMobile ? "text-[11px]" : "text-sm"}`}>{order.trackingId}</p>
+              <p className={`mt-1 truncate text-white ${isMobile ? "text-sm" : "text-base"}`}>{routeSummary}</p>
             </div>
             <span
-              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize backdrop-blur-sm ${getStatusBadge(
-                order.status,
-              )}`}
+              className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold capitalize ${getStatusBadge(order.status)}`}
             >
               {order.status}
             </span>
           </div>
 
-          {officeCollectionTag ? (
-            <div className="relative mb-5 flex">
-              <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-100 shadow-[0_10px_30px_-20px_rgba(251,191,36,0.8)]">
-                <Icon icon="mdi:store-marker-outline" className="text-sm" />
-                {officeCollectionTag}
+          <div className="mt-3 flex items-center gap-2 text-xs text-white/55">
+            <Icon icon="mdi:calendar-blank-outline" className="text-sm" />
+            <span>{formatDate(order.orderDate)}</span>
+          </div>
+
+          {officeCollectionTag && !isCompact ? (
+            <div className="mt-3">
+              <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold text-amber-100">
+                <Icon icon="mdi:store-marker-outline" className="text-xs" />
+                <span className="truncate">{officeCollectionTag}</span>
               </span>
             </div>
           ) : null}
 
-          <div className="relative mb-5 grid gap-3 md:grid-cols-2">
-            <div className="rounded-[1.25rem] border border-emerald-300/12 bg-emerald-500/6 p-4">
-              <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-emerald-100/55">From</p>
-              <p className="font-semibold text-white">{order.pickupLocation.name}</p>
-              <p className="text-sm text-white/70">
-                {order.pickupLocation.city}, {order.pickupLocation.state}
-              </p>
-            </div>
-            <div className="rounded-[1.25rem] border border-sky-300/12 bg-sky-500/6 p-4">
-              <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-sky-100/55">To</p>
-              <p className="font-semibold text-white">{order.dropLocation.name}</p>
-              <p className="text-sm text-white/70">
-                {order.dropLocation.city}, {order.dropLocation.state}
-              </p>
-            </div>
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/8 pt-3">
+            <span className="text-[11px] text-white/48">
+              {isCompact ? "Tap for details." : "Open card for full package details."}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#DDE98D]">
+              {isCompact ? "Open" : "View Details"}
+              <Icon icon="mdi:chevron-right" className="text-sm transition-transform group-hover:translate-x-0.5" />
+            </span>
           </div>
 
-          <div className="relative mb-5 rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Tracking Progress</p>
-              <span className="text-xs text-[#DDE98D]">Live order snapshot</span>
+          {order.feedbackSubmitted && !isCompact ? (
+            <div className="mt-3 rounded-xl border border-emerald-400/15 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-100/85">
+              Feedback submitted
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {steps.map((step, idx) => {
-                const active = stepIndex >= idx;
-                return (
-                  <div key={step} className="flex flex-col items-center gap-2">
-                    <div
-                      className={`h-2 w-full rounded-full ${active ? "bg-[#CDD645]" : "bg-white/15"}`}
-                    />
-                    <p className={`text-[11px] ${active ? "text-white" : "text-white/45"}`}>
-                      {step}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          ) : null}
 
-          {(order.pickupProofImage || order.dropProofImage) && (
-            <div className="relative mb-5 rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Verification Proofs</p>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    stopCardNavigation(event);
-                    setProofModalOrder({
-                      orderId: order.id,
-                      trackingId: order.trackingId,
-                      pickupProofImage: order.pickupProofImage,
-                      dropProofImage: order.dropProofImage,
-                    });
-                  }}
-                  className="inline-flex items-center gap-1 rounded-md border border-[#6A774F] bg-[#25311E] px-2 py-1 text-[11px] font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
-                >
-                  <Icon icon="mdi:magnify-plus-outline" className="text-sm" />
-                  Full View
-                </button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <p className="mb-1 text-xs text-white/55">Pickup Proof</p>
-                  {order.pickupProofImage ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        stopCardNavigation(event);
-                        setProofModalOrder({
-                          orderId: order.id,
-                          trackingId: order.trackingId,
-                          pickupProofImage: order.pickupProofImage,
-                          dropProofImage: order.dropProofImage,
-                        });
-                      }}
-                      className="block w-full text-left"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={order.pickupProofImage}
-                        alt="Pickup proof"
-                        className="h-28 w-full rounded-lg border border-white/15 object-cover transition hover:opacity-90"
-                      />
-                    </button>
-                  ) : (
-                    <div className="dashboard-surface-soft flex h-28 items-center justify-center rounded-lg text-xs text-white/50">
-                      Not uploaded
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="mb-1 text-xs text-white/55">Drop Proof</p>
-                  {order.dropProofImage ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        stopCardNavigation(event);
-                        setProofModalOrder({
-                          orderId: order.id,
-                          trackingId: order.trackingId,
-                          pickupProofImage: order.pickupProofImage,
-                          dropProofImage: order.dropProofImage,
-                        });
-                      }}
-                      className="block w-full text-left"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={order.dropProofImage}
-                        alt="Drop proof"
-                        className="h-28 w-full rounded-lg border border-white/15 object-cover transition hover:opacity-90"
-                      />
-                    </button>
-                  ) : (
-                    <div className="dashboard-surface-soft flex h-28 items-center justify-center rounded-lg text-xs text-white/50">
-                      Not uploaded
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="relative grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[1.25rem] border border-[#CDD645]/16 bg-[#CDD645]/8 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#F6FF6A]/60">Packages</p>
-              <p className="mt-2 text-lg font-semibold text-white">{order.packageCount} item(s)</p>
-              <p className="mt-1 text-xs leading-5 text-white/68">
-                {order.packageNames.slice(0, 3).join(", ") || "Package details available"}
-              </p>
-              <div className="mt-3 flex items-center gap-2 text-xs font-medium text-[#DDE98D]">
-                <Icon icon="mdi:package-variant-closed" className="text-sm" />
-                Full package detail opens on card click
-              </div>
-            </div>
-
-            <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Order Value</p>
-              <p className="mt-2 text-lg font-semibold text-white">{formatMoney(order.totalAmount)}</p>
-              <p className="mt-1 text-xs text-white/65">{order.totalWeightKg} kg total</p>
-            </div>
-
-            <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Assigned Bus</p>
-              {order.busContact ? (
-                <div className="mt-2 flex items-center gap-3">
-                  {order.busContact.busImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={order.busContact.busImage}
-                      alt={order.busContact.busName || "Assigned bus"}
-                      className="h-12 w-12 rounded-lg border border-white/15 object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/15 bg-[#252f1f] text-[#F6FF6A]">
-                      <Icon icon="mdi:bus" className="text-xl" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {order.busContact.busName || "Assigned Bus"}
-                    </p>
-                    <p className="text-xs text-[#F6FF6A]">
-                      {order.busContact.busNumber || "Bus number pending"}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-white/55">Bus not assigned yet.</p>
-              )}
-            </div>
-
-            <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Operator Contact</p>
-
-              {canShowBusContact && order.busContact ? (
-                <div className="mt-1 space-y-1 text-sm text-white">
-                  <p>{order.busContact.contactPersonName || "Support Desk"}</p>
-                  <p className="font-mono text-[#F6FF6A]">{order.busContact.contactPersonNumber}</p>
-                </div>
-              ) : shouldHideUpcomingContact ? (
-                <div className="mt-2 space-y-2">
-                  <div className="dashboard-subsurface relative overflow-hidden rounded-lg p-2">
-                    <div className="select-none blur-sm">
-                      <p className="text-sm text-white">Assigned Operator</p>
-                      <p className="font-mono text-sm text-[#F6FF6A]">XXXXXXXXXX</p>
-                    </div>
-                    <div className="pointer-events-none absolute inset-0 bg-black/40" />
-                  </div>
-                  <p className="text-xs text-white/70">Visible 1 day before pickup.</p>
-                </div>
-              ) : isDelivered ? (
-                <p className="mt-1 text-sm text-white/55">Hidden after delivery is completed.</p>
-              ) : (
-                <p className="mt-1 text-sm text-white/55">Not available for this order</p>
-              )}
-            </div>
-          </div>
-
-          <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
-              <Icon icon="mdi:gesture-tap" className="text-sm text-[#DDE98D]" />
-              Open this card for full package details
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-            {supportPhoneHref ? (
-              <a
-                href={supportPhoneHref}
-                onClick={stopCardNavigation}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
-              >
-                <Icon icon="mdi:lifebuoy" className="text-base" />
-                Support: {supportPhone}
-              </a>
-            ) : (
-              <button
-                type="button"
-                onClick={(event) => {
-                  stopCardNavigation(event);
-                  router.push(`/dashboard/support?orderId=${order.id}`);
-                }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
-              >
-                <Icon icon="mdi:lifebuoy" className="text-base" />
-                Contact Support
-              </button>
-            )}
+          {toSearchText(order.status) === "delivered" && !order.feedbackSubmitted && !isCompact ? (
             <button
               type="button"
               onClick={(event) => {
                 stopCardNavigation(event);
-                handleDownloadInvoice(order.id);
+                openFeedbackModal(order);
               }}
-              disabled={downloadingOrderId === order.id}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#CDD645]/15 bg-[#CDD645]/5 px-3 py-2 text-xs text-[#F6FF6A]/80 transition hover:bg-[#CDD645]/10"
             >
-              <Icon
-                icon={
-                  downloadingOrderId === order.id
-                    ? "line-md:loading-loop"
-                    : "mdi:file-document-outline"
-                }
-                className="text-base"
-              />
-              {downloadingOrderId === order.id ? "Preparing Invoice..." : "Download Invoice"}
+              <span className="flex items-center gap-1.5">
+                <Icon icon="mdi:star-outline" className="text-sm" />
+                Rate your delivery experience
+              </span>
+              <Icon icon="mdi:chevron-right" className="text-sm" />
             </button>
-            </div>
-          </div>
-
-          {isDelivered ? (
-            <div className="mt-4 rounded-2xl border border-[#CDD645]/20 bg-[linear-gradient(135deg,rgba(205,214,69,0.08),rgba(37,49,30,0.65))] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-[#F6FF6A]/70">Delivery feedback</p>
-                  <h3 className="mt-1 text-sm font-semibold text-white">
-                    {order.feedbackSubmitted ? "Thanks for your feedback" : "Tell us how the delivery went"}
-                  </h3>
-                  <p className="mt-1 text-xs text-white/60">
-                    {order.feedbackSubmitted
-                      ? `Submitted on ${order.feedbackUpdatedAt ? formatDate(order.feedbackUpdatedAt) : "recently"}`
-                      : "Your rating helps us improve the handoff and delivery experience."}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    stopCardNavigation(event);
-                    openFeedbackModal(order);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 text-sm font-medium text-[#F6FF6A] hover:bg-[#2D3A24]"
-                >
-                  <Icon icon={order.feedbackSubmitted ? "mdi:pencil-outline" : "mdi:star-outline"} className="text-base" />
-                  {order.feedbackSubmitted ? "Edit Feedback" : "Leave Feedback"}
-                </button>
-              </div>
-              {order.feedbackSubmitted ? (
-                <div className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs uppercase tracking-wide text-white/45">Your rating</span>
-                    <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-1 text-xs text-white/80">
-                      {order.feedbackRating ?? 0}/5
-                    </span>
-                  </div>
-                  {order.feedbackComment ? (
-                    <p className="mt-2 text-sm leading-6 text-white/80">{order.feedbackComment}</p>
-                  ) : (
-                    <p className="mt-2 text-sm text-white/55">No written comment was added.</p>
-                  )}
-                </div>
-              ) : null}
-            </div>
           ) : null}
         </article>
       );
     };
 
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className={pagePaddingClass}>
         <section className={heroPanelClass}>
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div className="max-w-2xl">
@@ -1273,10 +959,14 @@ export default function OrderPage() {
               </span>
               <h1 className="mt-3 text-3xl font-bold text-white">My Orders</h1>
               <p className="mt-2 text-sm text-white/68">
-                Track active shipments, revisit past deliveries, and open any card to see the full package detail flow.
+                {isMobile
+                  ? "Essential tracking first. Open any card for full order details."
+                  : isTablet
+                    ? "Track active shipments and review more details without overload."
+                    : "Track active shipments, revisit past deliveries, and open any card to see the full package detail flow."}
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className={`grid gap-3 ${isMobile ? "w-full grid-cols-2" : "sm:grid-cols-2"}`}>
               <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.06] px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Ongoing</p>
                 <p className="mt-1 text-2xl font-semibold text-white">{sortedUserOrders.ongoing.length}</p>
@@ -1305,7 +995,7 @@ export default function OrderPage() {
             title="Ongoing Orders"
             count={sortedUserOrders.ongoing.length}
           />
-          <div className="space-y-4">
+          <div className={sectionStackClass}>
             {sortedUserOrders.ongoing.length > 0 ? (
               sortedUserOrders.ongoing.map((order) => renderUserOrderCard(order))
             ) : (
@@ -1323,7 +1013,7 @@ export default function OrderPage() {
             count={sortedUserOrders.past.length}
             tone="muted"
           />
-          <div className="space-y-4">
+          <div className={sectionStackClass}>
             {sortedUserOrders.past.length > 0 ? (
               sortedUserOrders.past.map((order) => renderUserOrderCard(order))
             ) : (
@@ -1498,7 +1188,7 @@ export default function OrderPage() {
   if (role === "admin") {
     return (
       <>
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className={pagePaddingClass}>
           <section className={heroPanelClass}>
             <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-[radial-gradient(circle_at_center,rgba(205,214,69,0.16),transparent_70%)]" />
             <div className="relative flex flex-wrap items-center justify-between gap-4">
@@ -1508,7 +1198,11 @@ export default function OrderPage() {
                 </span>
                 <h1 className="mt-3 text-3xl font-bold text-white">All Orders</h1>
                 <p className="mt-2 text-sm text-white/68">
-                  Review each bus manifest in a cleaner layout. Every order row now opens the complete package detail page.
+                  {isMobile
+                    ? "Compact bus-wise oversight. Tap into any order for the full package view."
+                    : isTablet
+                      ? "Balanced bus manifests with room for customer and route context."
+                      : "Review each bus manifest in a cleaner layout. Every order row now opens the complete package detail page."}
                 </p>
               </div>
               <div className="rounded-[1.45rem] border border-white/10 bg-white/[0.06] px-4 py-3">
@@ -1534,7 +1228,7 @@ export default function OrderPage() {
                 : "No orders found for your buses."}
             </div>
           ) : (
-            <div className="mt-6 space-y-5">
+            <div className={`mt-6 ${isMobile ? "space-y-4" : "space-y-5"}`}>
               {sortedGroupedByBus.map((busGroup) => (
                 <section key={busGroup.busId} className={sectionCardClass}>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -1571,7 +1265,7 @@ export default function OrderPage() {
                         tabIndex={0}
                         onClick={() => openOrderDetail(order.id)}
                         onKeyDown={(event) => handleCardKeyDown(event, () => openOrderDetail(order.id))}
-                        className={modernOrderCardClass}
+                        className={`${modernOrderCardClass} ${isMobile ? "p-4 rounded-[1.6rem]" : isTablet ? "p-5 rounded-[1.8rem]" : ""}`}
                       >
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(205,214,69,0.16),transparent_72%)] opacity-0 transition duration-300 group-hover:opacity-100" />
                         <div className="relative flex flex-wrap items-center justify-between gap-2">
@@ -1598,7 +1292,7 @@ export default function OrderPage() {
                           </div>
                         ) : null}
 
-                        <div className="relative mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className={`relative mt-4 grid gap-3 ${isMobile ? "grid-cols-2" : isTablet ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}>
                           <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                             <p className="text-[11px] uppercase tracking-[0.14em] text-white/42">Customer</p>
                             <p className="mt-1 text-sm text-white">{order.user?.name || "--"}</p>
@@ -1647,11 +1341,15 @@ export default function OrderPage() {
                           </p>
                         ) : null}
                         <div className="relative mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-4">
-                          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
-                            Open card to view package details
-                          </span>
+                          {!isMobile ? (
+                            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
+                              Open card to view package details
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-white/48">Tap to inspect full order details.</span>
+                          )}
                           <span className="inline-flex items-center gap-2 text-sm font-medium text-[#DDE98D]">
-                            View Order
+                            {isMobile ? "View" : "View Order"}
                             <Icon icon="mdi:arrow-top-right" className="text-base transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                           </span>
                         </div>
@@ -1671,7 +1369,7 @@ export default function OrderPage() {
 
   return (
     <>
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className={pagePaddingClass}>
         <section className={heroPanelClass}>
           <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-[radial-gradient(circle_at_center,rgba(205,214,69,0.16),transparent_70%)]" />
           <div className="relative flex flex-wrap items-center justify-between gap-4">
@@ -1681,10 +1379,14 @@ export default function OrderPage() {
               </span>
               <h1 className="mt-3 text-3xl font-bold text-white">{OPERATOR_ORDER_TAB_LABEL[operatorTab]}</h1>
               <p className="mt-2 text-sm text-white/68">
-                Active, upcoming, and past assignments are grouped into a cleaner workspace. Open any card for the full package detail view.
+                {isMobile
+                  ? "Short assignment summaries first, full order details on tap."
+                  : isTablet
+                    ? "Balanced active, upcoming, and past assignment views for touch devices."
+                    : "Active, upcoming, and past assignments are grouped into a cleaner workspace. Open any card for the full package detail view."}
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className={`grid gap-3 ${isMobile ? "w-full grid-cols-3" : "sm:grid-cols-3"}`}>
               {OPERATOR_TAB_ORDER.map((tab) => (
                 <div key={`summary-${tab}`} className="rounded-[1.35rem] border border-white/10 bg-white/[0.06] px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">{tab}</p>
@@ -1705,7 +1407,7 @@ export default function OrderPage() {
           </div>
         </section>
 
-        <div className="mt-6 mb-5 flex flex-wrap items-center gap-2">
+        <div className={`mt-6 mb-5 flex flex-wrap items-center gap-2 ${isMobile ? "overflow-x-auto pb-1" : ""}`}>
           {(["active", "upcoming", "past"] as const).map((tab) => {
             const isActiveTab = operatorTab === tab;
             return (
@@ -1757,7 +1459,7 @@ export default function OrderPage() {
                         : `No ${tab} orders found.`}
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className={sectionStackClass}>
                       {operatorOrdersByTab[tab].map((order) => renderOperatorOrderCard(order))}
                     </div>
                   )}

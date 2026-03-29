@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type LatLngValue = {
   latitude: number;
@@ -89,6 +90,7 @@ export default function OpenStreetMapPicker({
   searchQuery = "",
   autoSelectSearchResult = true,
 }: Props) {
+  const { isMobile, isTablet } = useResponsiveMode();
   const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
   const [searchStatus, setSearchStatus] = useState("");
   const normalizedQuery = searchQuery.trim();
@@ -103,7 +105,10 @@ export default function OpenStreetMapPicker({
       ? [Number(value?.latitude), Number(value?.longitude)]
       : searchCenter ?? [20.5937, 78.9629];
 
-  const viewZoom = hasSelectedMarker || searchCenter ? 13 : 5;
+  // Responsive zoom: keep mobile a little wider, tablet balanced, desktop a little tighter.
+  const focusedZoom = isMobile ? 9 : isTablet ? 12 : 15;
+  const defaultZoom = isMobile ? 4 : 6.5;
+  const viewZoom = hasSelectedMarker || searchCenter ? focusedZoom : defaultZoom;
 
   const resolveAddressByCoordinates = async (
     latitude: number,

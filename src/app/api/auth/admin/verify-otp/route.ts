@@ -12,6 +12,7 @@ import {
   signAuthToken,
   verifyPendingAdminToken,
 } from "@/app/api/lib/authHelpers";
+import { getOtpValidationMessage } from "@/lib/authFlow";
 
 dbConnect();
 
@@ -35,10 +36,14 @@ export async function POST(request: NextRequest) {
 
     const reqBody = await request.json();
     const { code } = reqBody as { code?: string };
+    const codeError = getOtpValidationMessage(
+      typeof code === "string" ? code : "",
+      6,
+    );
 
-    if (!code) {
+    if (codeError) {
       return NextResponse.json(
-        { success: false, message: "Access code is required." },
+        { success: false, message: codeError },
         { status: 400 },
       );
     }

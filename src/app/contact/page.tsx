@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
-import Header from "@/components/Header";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 import contactVector from "@/assets/images/contactVector.png";
 import { STRINGS } from "@/lib/strings";
+import PublicAppShell from "@/components/PublicAppShell";
+import { getIndiaPhoneDigits, isValidIndiaPhone } from "@/lib/phone";
 
 const contactPoints = [
   {
@@ -37,16 +38,83 @@ const quickStats = [
 
 export default function ContactPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [touched, setTouched] = useState<{
+    name?: boolean;
+    phone?: boolean;
+    subject?: boolean;
+    message?: boolean;
+  }>({});
   const [form, setForm] = useState({
     name: "",
     phone: "",
     subject: "",
     message: "",
   });
+  const errors = useMemo(() => {
+    const nextErrors: {
+      name?: string;
+      phone?: string;
+      subject?: string;
+      message?: string;
+    } = {};
+
+    if (submitAttempted || touched.name) {
+      if (!form.name.trim()) {
+        nextErrors.name = "Name is required";
+      }
+    }
+
+    if (submitAttempted || touched.phone) {
+      if (!form.phone.trim() || !isValidIndiaPhone(form.phone)) {
+        nextErrors.phone = "Enter a valid Indian mobile number";
+      }
+    }
+
+    if (submitAttempted || touched.subject) {
+      if (!form.subject.trim()) {
+        nextErrors.subject = "Subject is required";
+      }
+    }
+
+    if (submitAttempted || touched.message) {
+      if (!form.message.trim()) {
+        nextErrors.message = "Message is required";
+      }
+    }
+
+    return nextErrors;
+  }, [form.message, form.name, form.phone, form.subject, submitAttempted, touched.message, touched.name, touched.phone, touched.subject]);
+
+  const isSubmitDisabled =
+    !form.name.trim() ||
+    !form.phone.trim() ||
+    !form.subject.trim() ||
+    !form.message.trim() ||
+    !isValidIndiaPhone(form.phone);
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSubmitAttempted(true);
+    setTouched({
+      name: true,
+      phone: true,
+      subject: true,
+      message: true,
+    });
+
+    if (
+      !form.name.trim() ||
+      !form.subject.trim() ||
+      !form.message.trim() ||
+      !isValidIndiaPhone(form.phone)
+    ) {
+      return;
+    }
+
     setShowSuccessModal(true);
+    setSubmitAttempted(false);
+    setTouched({});
     setForm({
       name: "",
       phone: "",
@@ -56,9 +124,10 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(213,228,0,0.16),transparent_28%),linear-gradient(180deg,#10150f_0%,#1f261b_48%,#2a3125_100%)] text-white">
-      <Header />
-
+    <PublicAppShell
+      className="bg-[radial-gradient(circle_at_top,rgba(213,228,0,0.16),transparent_28%),linear-gradient(180deg,#10150f_0%,#1f261b_48%,#2a3125_100%)]"
+      showDock={false}
+    >
       <section className="relative overflow-hidden pt-24">
         <div className="absolute inset-0">
           <Image src={contactVector} alt={`Contact ${STRINGS.brand.appName}`} fill priority className="object-cover object-center opacity-45" />
@@ -182,26 +251,48 @@ export default function ContactPage() {
                     <input
                       value={form.name}
                       onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                      onBlur={() =>
+                        setTouched((prev) => ({ ...prev, name: true }))
+                      }
                       placeholder="Your name"
-                      className="dashboard-input w-full rounded-2xl px-4 py-3 text-sm"
+                      className={`dashboard-input w-full rounded-2xl px-4 py-3 text-sm ${
+                        errors.name ? "border-red-500/70 bg-red-500/10" : ""
+                      }`}
                       required
                     />
+                    <span className={`mt-2 block text-sm text-red-300 transition-all duration-300 ${errors.name ? "opacity-100" : "opacity-0"}`}>
+                      {errors.name || " "}
+                    </span>
                   </label>
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
                       Contact No
                     </span>
-                    <div className="flex items-center gap-2 rounded-2xl border border-white/14 bg-black/20 px-4 py-3">
+                    <div className={`flex items-center gap-2 rounded-2xl border bg-black/20 px-4 py-3 ${
+                      errors.phone ? "border-red-500/70 bg-red-500/10" : "border-white/14"
+                    }`}>
                       <span className="text-sm text-white/70">+91</span>
                       <input
                         value={form.phone}
-                        onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            phone: getIndiaPhoneDigits(event.target.value),
+                          }))
+                        }
+                        onBlur={() =>
+                          setTouched((prev) => ({ ...prev, phone: true }))
+                        }
                         placeholder="98765 43210"
                         className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/35"
                         inputMode="numeric"
+                        maxLength={10}
                         required
                       />
                     </div>
+                    <span className={`mt-2 block text-sm text-red-300 transition-all duration-300 ${errors.phone ? "opacity-100" : "opacity-0"}`}>
+                      {errors.phone || " "}
+                    </span>
                   </label>
                 </div>
 
@@ -212,10 +303,18 @@ export default function ContactPage() {
                   <input
                     value={form.subject}
                     onChange={(event) => setForm((prev) => ({ ...prev, subject: event.target.value }))}
+                    onBlur={() =>
+                      setTouched((prev) => ({ ...prev, subject: true }))
+                    }
                     placeholder="Booking, refund, tracking, or business inquiry"
-                    className="dashboard-input w-full rounded-2xl px-4 py-3 text-sm"
+                    className={`dashboard-input w-full rounded-2xl px-4 py-3 text-sm ${
+                      errors.subject ? "border-red-500/70 bg-red-500/10" : ""
+                    }`}
                     required
                   />
+                  <span className={`mt-2 block text-sm text-red-300 transition-all duration-300 ${errors.subject ? "opacity-100" : "opacity-0"}`}>
+                    {errors.subject || " "}
+                  </span>
                 </label>
 
                 <label className="block">
@@ -225,12 +324,20 @@ export default function ContactPage() {
                   <textarea
                     value={form.message}
                     onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
+                    onBlur={() =>
+                      setTouched((prev) => ({ ...prev, message: true }))
+                    }
                     placeholder="Please tell us a little about your request..."
                     rows={6}
                     maxLength={200}
-                    className="dashboard-input w-full rounded-[1.5rem] px-4 py-3 text-sm"
+                    className={`dashboard-input w-full rounded-[1.5rem] px-4 py-3 text-sm ${
+                      errors.message ? "border-red-500/70 bg-red-500/10" : ""
+                    }`}
                     required
                   />
+                  <span className={`mt-2 block text-sm text-red-300 transition-all duration-300 ${errors.message ? "opacity-100" : "opacity-0"}`}>
+                    {errors.message || " "}
+                  </span>
                   <div className="mt-2 flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-white/45">
                     <span>Message limit</span>
                     <span>{form.message.length}/200</span>
@@ -243,6 +350,7 @@ export default function ContactPage() {
                   </p>
                   <button
                     type="submit"
+                    disabled={isSubmitDisabled}
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-[#D5E400]/30 bg-[#D5E400]/12 px-5 py-3 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#D5E400]/20"
                   >
                     <Icon icon="mdi:send-outline" className="text-base" />
@@ -284,6 +392,6 @@ export default function ContactPage() {
         onClose={() => setShowSuccessModal(false)}
         onConfirm={() => setShowSuccessModal(false)}
       />
-    </main>
+    </PublicAppShell>
   );
 }

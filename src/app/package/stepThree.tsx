@@ -4,6 +4,7 @@ import { useState, useEffect, type ChangeEvent, type Dispatch, type SetStateActi
 import { AvailableCoupon, calculatePrice, getAvailableCoupons, type PricingInfo } from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
 import { formatIndiaPhoneInput } from "@/lib/phone";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type LocationOption = {
     _id: string;
@@ -48,6 +49,7 @@ type StepThreeProps = {
 };
 
 export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: StepThreeProps) {
+    const { isMobile, isTablet, isDesktop } = useResponsiveMode();
     const pickUpLoc = pickupLocations.find((opt) => opt._id === formData.pickupLocationId);
     const dropLoc = dropLocations.find((opt) => opt._id === formData.dropLocationId);
     const displayedItems = formData.cart.map((item, index) => ({
@@ -60,6 +62,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
     const [couponError, setCouponError] = useState("");
     const [availableCoupons, setAvailableCoupons] = useState<AvailableCoupon[]>([]);
     const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+    const [showAllPackages, setShowAllPackages] = useState(false);
 
     const [isLoadingPrice, setIsLoadingPrice] = useState(false);
     const [pricingError, setPricingError] = useState<string | null>(null);
@@ -197,14 +200,22 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
     const pickupDate = formData.cart?.[0]?.pickUpDate
         ? formData.cart[0].pickUpDate.split("-").reverse().join("/")
         : "--/--/----";
+    const visibleItems = isMobile && !showAllPackages ? displayedItems.slice(0, 1) : displayedItems;
+    const hasCartItems = displayedItems.length > 0;
 
     return (
         <div className="space-y-5 text-white sm:space-y-8">
 
             {/* Header */}
             <div className="max-w-2xl text-[#F6FF6A]">
-                <h2 className="text-xl font-bold sm:text-3xl">Review & Checkout</h2>
-                <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">Review your order details and proceed to payment.</p>
+                <h2 className="text-xl font-bold sm:text-3xl">{isMobile ? "Review before paying" : "Review & Checkout"}</h2>
+                <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">
+                    {isMobile
+                        ? "Phone view shows the essentials first. Expand package details only when needed."
+                        : isTablet
+                            ? "Tablet keeps route, package, and checkout details balanced."
+                            : "Review your order details and proceed to payment."}
+                </p>
             </div>
 
             {/* Location Information */}
@@ -213,13 +224,15 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                     Location Information
                 </span>
 
-                <div className="mt-4 md:mt-6 grid gap-3 lg:gap-4 lg:grid-cols-2">
+                <div className={`mt-4 md:mt-6 grid gap-3 lg:gap-4 ${isDesktop ? "lg:grid-cols-2" : ""}`}>
                     <div className="package-panel-soft flex items-start gap-2 md:gap-3 rounded-[1.3rem] p-3 md:p-4">
                         <Icon icon="streamline-plump:location-pin-solid" className="text-green-400 text-2xl md:text-3xl" />
                         <div>
                             <p className="text-xs md:text-sm text-[#F4FF9F]">Pickup Location</p>
-                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{pickUpLoc?.name}</p>
-                            <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">{pickUpLoc?.address}, {pickUpLoc?.city}, {pickUpLoc?.state} {pickUpLoc?.zip}</p>
+                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{pickUpLoc?.name || "Select a pickup location"}</p>
+                            <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">
+                                {pickUpLoc ? `${pickUpLoc.address || "--"}, ${pickUpLoc.city || "--"}, ${pickUpLoc.state || "--"} ${pickUpLoc.zip || ""}` : "Route details will appear here."}
+                            </p>
                         </div>
                     </div>
 
@@ -227,8 +240,10 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         <Icon icon="streamline-plump:location-pin-solid" className="text-red-400 text-2xl md:text-3xl" />
                         <div>
                             <p className="text-xs md:text-sm text-[#F4FF9F]">Drop Location</p>
-                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{dropLoc?.name}</p>
-                            <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">{dropLoc?.address}, {dropLoc?.city}, {dropLoc?.state} {dropLoc?.zip}</p>
+                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{dropLoc?.name || "Select a drop location"}</p>
+                            <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">
+                                {dropLoc ? `${dropLoc.address || "--"}, ${dropLoc.city || "--"}, ${dropLoc.state || "--"} ${dropLoc.zip || ""}` : "Destination details will appear here."}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -242,8 +257,13 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 <div className="package-badge absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-1 md:gap-2 rounded-full px-2 md:px-3 py-1 text-[10px] md:text-sm text-white/90"> <Icon icon="solar:calendar-linear" className=" text-white text-sm md:text-base" /> <span>Pickup Date {pickupDate}</span>
                 </div>
 
-                <div className="space-y-3 mt-6">
-                    {displayedItems.map((item: CartItem, index: number) => (
+                <div className="mt-6 space-y-3">
+                    {!hasCartItems ? (
+                        <div className="package-panel-soft rounded-[1.3rem] p-4 text-sm text-white/70">
+                            No packages are in the cart yet. Add at least one package before reviewing payment.
+                        </div>
+                    ) : null}
+                    {visibleItems.map((item: CartItem, index: number) => (
                         <div key={index} className="package-panel-soft flex flex-col overflow-hidden rounded-[1.3rem] sm:flex-row">
                             {/* Image */}
                             <div className="relative mx-3 mt-3 h-24 rounded-xl bg-black/10 sm:mb-3 sm:mr-0 sm:w-24 sm:min-w-24">
@@ -288,10 +308,23 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         </div>
                     ))}
                 </div>
+                {isMobile && displayedItems.length > 1 ? (
+                    <button
+                        type="button"
+                        onClick={() => setShowAllPackages((prev) => !prev)}
+                        className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-[#F6FF6A]"
+                    >
+                        <Icon icon={showAllPackages ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} className="text-sm" />
+                        {showAllPackages ? "Show fewer packages" : `View ${displayedItems.length - 1} more package${displayedItems.length > 2 ? "s" : ""}`}
+                    </button>
+                ) : null}
+                {!isMobile && !hasCartItems ? (
+                    <p className="mt-3 text-sm text-white/55">Package details will appear here once items are added.</p>
+                ) : null}
             </div>
 
             {/* Sender & Receiver Info */}
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className={`grid gap-4 ${isDesktop ? "lg:grid-cols-2" : ""}`}>
 
                 {/* Sender */}
                 <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
@@ -383,7 +416,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
             </div>
 
             {/* Coupon & Amount */}
-            <div className={`mt-6 flex flex-col gap-4 xl:flex-row xl:items-start ${shouldShowCouponSection ? "xl:justify-between" : "xl:justify-end"}`}>
+            <div className={`mt-6 flex flex-col gap-4 ${isDesktop ? `xl:flex-row xl:items-start ${shouldShowCouponSection ? "xl:justify-between" : "xl:justify-end"}` : ""}`}>
 
                 {/* Coupon */}
                 {shouldShowCouponSection ? (
@@ -470,7 +503,11 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                             );
                                         })}
                                     </div>
-                                ) : null}
+                                ) : (
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+                                        No coupons are available right now.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -479,7 +516,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
 
                 {/* Amount */}
-                <div className="package-panel w-full rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-right space-y-1 sm:p-5 xl:w-96">
+                <div className={`package-panel w-full rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-right space-y-1 sm:p-5 ${isDesktop ? "xl:w-96" : ""}`}>
                     {isLoadingPrice && (
                         <div className="space-y-2">
                             <Skeleton className="ml-auto h-4 w-44" />
@@ -489,6 +526,11 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         </div>
                     )}
                     {pricingError && <p className="text-red-400">{pricingError}</p>}
+                    {!isLoadingPrice && !pricingError && !pricingInfo ? (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/60">
+                            Pricing will appear after route and package details are ready.
+                        </div>
+                    ) : null}
                     {!isLoadingPrice && !pricingError && pricingInfo && (
                         <>
                             <div className="border-b border-gray-600 pb-2 mb-2">

@@ -5,6 +5,7 @@ import { getAvailableDates } from "@/services/logistics";
 import { useSelector } from "react-redux";
 import { selectPackage } from "@/lib/redux/packageSlice";
 import Skeleton from "@/components/Skeleton";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 interface CustomDatePickerProps {
   value: string;
@@ -60,6 +61,7 @@ export default function CustomDatePicker({
   disablePastDates = true,
 }: CustomDatePickerProps) {
   const { formData } = useSelector(selectPackage);
+  const { isMobile, isTablet } = useResponsiveMode();
   const shouldRestrictToAvailableDates =
     restrictToAvailableDates ?? Boolean(pickupLocationId && dropLocationId);
   const shouldSyncWithCartDate = syncWithCartDate ?? shouldRestrictToAvailableDates;
@@ -186,7 +188,7 @@ export default function CustomDatePicker({
         onClick={handleOpenToggle}
         className={`relative w-full rounded-xl border-b-2 bg-[#1e241b] px-4 py-3 pr-12 text-left text-sm text-white transition ${
           error ? "border-red-500" : "border-[#CDD645]/60"
-        }`}
+        } ${isMobile ? "min-h-12" : ""}`}
       >
         {formatDateForDisplay(value) || <span className="text-white/45">{placeholder}</span>}
         <Icon
@@ -196,7 +198,7 @@ export default function CustomDatePicker({
       </button>
 
       {isOpen && (
-        <div className="absolute z-20 mt-2 w-full rounded-xl border border-[#CDD645]/60 bg-[#1e241b] p-4 shadow-2xl sm:w-80">
+        <div className={`absolute z-20 mt-2 w-full rounded-xl border border-[#CDD645]/60 bg-[#1e241b] p-4 shadow-2xl ${isMobile ? "max-h-[70vh]" : isTablet ? "sm:w-[22rem]" : "sm:w-80"}`}>
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -272,6 +274,11 @@ export default function CustomDatePicker({
           {!isLoading && availabilityMessage && (
             <p className="mt-3 text-xs text-amber-200">{availabilityMessage}</p>
           )}
+          {!isLoading && shouldRestrictToAvailableDates && availableDates.length === 0 && !availabilityMessage ? (
+            <p className="mt-3 text-xs text-amber-200">
+              No dates are available for this route yet.
+            </p>
+          ) : null}
         </div>
       )}
     </div>

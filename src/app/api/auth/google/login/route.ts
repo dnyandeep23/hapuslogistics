@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeIntent, normalizePortal, normalizeRole } from '@/app/api/lib/authHelpers';
+import { sanitizeRedirectPath } from "@/lib/authFlow";
 
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
       ? "operator"
       : "user";
   const intent = normalizeIntent(searchParams.get("intent")) ?? "login";
+  const redirect = sanitizeRedirectPath(searchParams.get("redirect"));
   const initialCompanyName = searchParams.get("companyName")?.trim() ?? "";
   const initialCompanyId = searchParams.get("companyId")?.trim() ?? "";
   const registerState =
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
       : {};
 
   const state = Buffer.from(
-    JSON.stringify({ portal, role, intent, ...registerState }),
+    JSON.stringify({ portal, role, intent, redirect, ...registerState }),
     "utf-8",
   ).toString("base64url");
 

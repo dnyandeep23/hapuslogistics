@@ -1,51 +1,86 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import Loginvector from "@/assets/images/loginvector.png";
-import Image from "next/image";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
-import NotificationBox from "@/components/NotificationBox";
-import { useToast } from "@/context/ToastContext";
+import AuthShell from "@/components/AuthShell";
 import { forgotPassword } from "@/services/auth";
 import { getErrorMessage } from "@/lib/authError";
+import {
+  GENERIC_AUTH_ERROR_MESSAGE,
+  getEmailValidationMessage,
+  normalizeEmail,
+} from "@/lib/authFlow";
+
+function getRecoveryErrorMessage(error: unknown): string {
+  const message = getErrorMessage(error, GENERIC_AUTH_ERROR_MESSAGE);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("not found") || normalized.includes("no account")) {
+    return "We could not find an account for that email.";
+  }
+
+  if (normalized.includes("rate") || normalized.includes("too many")) {
+    return "Too many attempts. Please wait a moment and try again.";
+  }
+
+  return message;
+}
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const { addToast } = useToast();
-  const router = useRouter();
-  const [notification, setNotification] = useState({ message: '', type: '' as 'success' | 'warning' | 'error' | '' });
-  const [errors, setErrors] = useState<{ email?: string; }>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [touched, setTouched] = useState<{ email?: boolean }>({});
+  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" | "warning" | "" }>({
+    message: "",
+    type: "",
+  });
+  const errors = useMemo(() => {
+    const nextErrors: { email?: string } = {};
 
-  const validate = () => {
-    const newErrors: typeof errors = {};
-    if (!email) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = "Enter a valid email address";
+    if (submitAttempted || touched.email) {
+      const emailMessage = getEmailValidationMessage(email);
+      if (emailMessage) {
+        nextErrors.email = emailMessage;
+      }
     }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
+    return nextErrors;
+  }, [email, submitAttempted, touched.email]);
+
+  const isSubmitDisabled = loading || !email.trim() || Boolean(errors.email);
+
+  const handleSendCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (loading) return;
+
+    setSubmitAttempted(true);
+    setTouched({ email: true });
+
+    const normalizedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(normalizedEmail);
+    if (emailError) return;
 
     setLoading(true);
-    setNotification({ message: '', type: '' });
+    setNotification({ message: "", type: "" });
 
     try {
-      const data = await forgotPassword(email);
-      addToast(data.message || "Security code sent successfully!", "success");
-      sessionStorage.setItem('reset-password-email', email);
-      router.push("/reset-password");
+      const response = await forgotPassword(normalizedEmail);
+      sessionStorage.setItem("reset-password-email", normalizedEmail);
+      setNotification({
+        message: response.message || "Security code sent. Redirecting you to the reset step.",
+        type: "success",
+      });
+      window.setTimeout(() => {
+        router.push("/reset-password");
+      }, 550);
     } catch (error: unknown) {
       setNotification({
-        message: getErrorMessage(error, "Failed to send security code."),
-        type: 'error',
+        message: getRecoveryErrorMessage(error),
+        type: "error",
       });
     } finally {
       setLoading(false);
@@ -53,77 +88,113 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <section className="text-white">
-      <div className="relative h-screen flex flex-col justify-end py-12 px-6 md:py-20 md:px-20">
-        <Link href={"/"} className="absolute top-4 right-4 z-50">
-          <div className="flex gap-2 items-center bg-gray-600/60 hover:bg-gray-700 cursor-pointer px-4 py-2 rounded-lg text-white">
-            <Icon icon="solar:home-2-broken" />
-            <span>Return to Home</span>
+    <AuthShell
+      badge="Password recovery"
+      title="Reset your password in a few secure steps"
+      description="Enter the email tied to your account and we’ll send a security code so you can get back in quickly."
+      supportLine="We only use this email to verify recovery and continue the reset flow."
+      highlights={["Email recovery", "Security code", "Fast reset"]}
+    >
+      <div className="space-y-6">
+        {notification.message ? (
+          <div
+            role="alert"
+            className={`rounded-[1.4rem] border px-4 py-3.5 text-sm leading-6 ${
+              notification.type === "error"
+                ? "border-red-400/30 bg-red-500/10 text-red-100"
+                : notification.type === "warning"
+                  ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
+                  : "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
+            }`}
+          >
+            {notification.message}
           </div>
-        </Link>
-        <div className="absolute bg-[#25421E] top-0 left-0 w-[75%] rounded-br-[60%] h-full"></div>
-        <div className="absolute inset-0 h-full w-[70%]  flex flex-col">
-          <Image src={Loginvector} alt="vector image" className="object-cover"></Image>
-        </div>
-        <div className="flex ml-6  items-center  gap-8">
-          <p className="z-50 relative text-9xl font-bold text-white">Hapus</p>
-          <p className="z-50 mt-4 text text-center relative text-3xl font-medium text-white line-clamp-2">
-            Travels & <br /> Logistics
-          </p>
-        </div>
-        <div>
-          <p className="z-50 ml-6 relative mt-12 text-white/80">
-            Reset your password with confidence — your luggage is in safe hands
-            with Hapus Logistics.
-          </p>
-        </div>
-        <div className="absolute right-4 bottom-6 md:right-24 md:bottom-24 bg-black/40 px-6 md:px-12 py-8 rounded-[8%] flex flex-col w-full md:w-[480px]">
-          <div className="pb-4">
-            <NotificationBox message={notification.message} type={notification.type} />
-          </div>
-          <p className="text-white font-bold text-3xl mb-5">Forgot Password</p>
+        ) : null}
 
-          <form onSubmit={handleSendCode} className="flex flex-col gap-4">
-            <div className="flex flex-col">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/42">Account recovery</p>
+              <p className="mt-2 text-3xl font-bold text-white">Forgot Password</p>
+            </div>
+            <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
+              <span className="rounded-full bg-[#D5E400]/18 px-4 py-1.5 text-sm font-semibold text-[#F6FF6A]">
+                Secure
+              </span>
+            </div>
+          </div>
+          <p className="text-sm leading-6 text-white/60">
+            Enter your email and we’ll send an 8-digit security code to continue the reset flow.
+          </p>
+        </div>
+
+        <form onSubmit={handleSendCode} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-[0.18em] text-white/45">
+              Email
+            </label>
+            <div
+              className={`flex items-center rounded-[1.2rem] border px-4 transition-all ${
+                errors.email
+                  ? "border-red-500/70 bg-red-500/10"
+                  : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/40 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
+              }`}
+            >
+              <Icon icon="solar:letter-bold-duotone" className="text-lg text-white/38" />
               <input
                 type="email"
-                placeholder="Email"
+                placeholder="Enter your email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setErrors({});
-                  setNotification({ message: '', type: '' });
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setNotification({ message: "", type: "" });
                 }}
-                className={`bg-black px-4 pt-5 pb-2 rounded-lg text-lg border-b-2 transition-all duration-300 ${errors.email ? "border-red-500" : "border-white/60 focus:border-white"} focus:outline-none`}
+                onBlur={() =>
+                  setTouched((currentValue) => ({ ...currentValue, email: true }))
+                }
+                className="w-full bg-transparent px-3 py-4 text-base text-white placeholder:text-white/35 focus:outline-none"
+                autoComplete="email"
+                inputMode="email"
               />
-              <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.email ? "opacity-100" : "opacity-0"}`}>{errors.email || " "}</span>
             </div>
+            <span
+              className={`block text-sm text-red-400 transition-all duration-300 ${
+                errors.email ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {errors.email || " "}
+            </span>
+          </div>
+
+          <div className="rounded-[1.4rem] border border-white/8 bg-white/[0.04] p-4 text-sm leading-6 text-white/60">
+            We will send the code only to the account email you enter here. If you already have the code, continue to the next step after verification.
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link
+              href="/login"
+              className="text-sm font-semibold text-[#D5E400] transition hover:text-[#F6FF6A]"
+            >
+              Remembered your password?
+            </Link>
+
             <button
               type="submit"
-              className="
-                self-end mt-6 px-8 py-2 rounded-full
-                border border-[#D5E400]
-                text-[#D5E400] font-semibold
-                transition-all duration-300
-                cursor-pointer
-                hover:shadow-2xl shadow-[#D5E400]/60
-                hover:bg-[#D5E400] hover:text-black
-              "
-              disabled={loading}
+              disabled={isSubmitDisabled}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-[#9CB800] bg-[#D5E400]/6 px-8 py-3 text-base font-semibold text-[#F6FF6A] transition-all duration-300 hover:bg-[#D5E400] hover:text-[#17210F] hover:shadow-[0_18px_40px_-24px_rgba(213,228,0,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? (
-                <span className="inline-flex items-center gap-2">
+                <>
                   <Icon icon="line-md:loading-loop" className="text-lg" />
                   Sending...
-                </span>
-              ) : "Send Security Code"}
+                </>
+              ) : (
+                "Send Security Code"
+              )}
             </button>
-            <div className="flex justify-between items-center text-sm text-white/80 mt-2">
-              <span>Remembered your password? <Link href="/login" className="text-[#D5E400] underline cursor-pointer">Log In</Link></span>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
-    </section>
+    </AuthShell>
   );
 }

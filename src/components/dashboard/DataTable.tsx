@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type ColumnDef<T> = {
   key: keyof T;
@@ -22,6 +23,7 @@ export default function DataTable<T extends { id: string }>({
   columns,
   searchPlaceholder = "Search...",
 }: DataTableProps<T>) {
+  const { isMobile } = useResponsiveMode();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -65,6 +67,8 @@ export default function DataTable<T extends { id: string }>({
     setSortDirection("asc");
   };
 
+  const emptyMessage = searchQuery.trim() ? "No records match your search." : "No records found.";
+
   return (
     <div className="dashboard-surface rounded-2xl p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -77,63 +81,90 @@ export default function DataTable<T extends { id: string }>({
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="dashboard-table-head">
-            <tr className="border-b border-white/10 text-white/75">
-              {columns.map((column) => (
-                <th
-                  key={String(column.key)}
-                  aria-sort={
-                    column.sortable && sortKey === column.key
-                      ? sortDirection === "asc"
-                        ? "ascending"
-                        : "descending"
-                      : "none"
-                  }
-                  className="px-3 py-2"
-                >
-                  {column.sortable ? (
-                    <button
-                      type="button"
-                      className="inline-flex cursor-pointer select-none items-center gap-1 text-left transition hover:text-white"
-                      onClick={() => toggleSort(column.key, column.sortable)}
-                    >
-                      {column.label}
-                      {sortKey === column.key && (
-                        <span className="text-[#e8f2b9]">{sortDirection === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </button>
-                  ) : (
-                    <span className="inline-flex items-center gap-1">{column.label}</span>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((row) => (
-              <tr key={row.id} className="border-b border-[#4f5a3f]/40 text-white/90">
+      {isMobile ? (
+        <div className="space-y-3">
+          {sorted.map((row) => (
+            <article key={row.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="grid gap-3">
                 {columns.map((column) => {
                   const value = row[column.key];
                   return (
-                    <td key={`${row.id}-${String(column.key)}`} className="px-3 py-2 align-top">
-                      {column.render ? column.render(value, row) : String(value ?? "-")}
-                    </td>
+                    <div key={`${row.id}-${String(column.key)}`} className="flex flex-col gap-1">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{column.label}</p>
+                      <div className="text-sm text-white/90">
+                        {column.render ? column.render(value, row) : String(value ?? "-")}
+                      </div>
+                    </div>
                   );
                 })}
+              </div>
+            </article>
+          ))}
+          {sorted.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-4 py-6 text-center text-sm text-white/60">
+              {emptyMessage}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="dashboard-table-head">
+              <tr className="border-b border-white/10 text-white/75">
+                {columns.map((column) => (
+                  <th
+                    key={String(column.key)}
+                    aria-sort={
+                      column.sortable && sortKey === column.key
+                        ? sortDirection === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    className="px-3 py-2"
+                  >
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        className="inline-flex cursor-pointer select-none items-center gap-1 text-left transition hover:text-white"
+                        onClick={() => toggleSort(column.key, column.sortable)}
+                      >
+                        {column.label}
+                        {sortKey === column.key && (
+                          <span className="text-[#e8f2b9]">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">{column.label}</span>
+                    )}
+                  </th>
+                ))}
               </tr>
-            ))}
-            {sorted.length === 0 && (
-              <tr>
-                <td colSpan={columns.length} className="px-3 py-6 text-center text-white/60">
-                  No records found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {sorted.map((row) => (
+                <tr key={row.id} className="border-b border-[#4f5a3f]/40 text-white/90">
+                  {columns.map((column) => {
+                    const value = row[column.key];
+                    return (
+                      <td key={`${row.id}-${String(column.key)}`} className="px-3 py-2 align-top">
+                        {column.render ? column.render(value, row) : String(value ?? "-")}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={columns.length} className="px-3 py-6 text-center text-white/60">
+                    {emptyMessage}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

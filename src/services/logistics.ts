@@ -58,6 +58,7 @@ export interface BookingSessionResponse {
   razorpayOrderId: string;
   amount: number;
   currency: string;
+  keyId: string;
   reused?: boolean;
   continued?: boolean;
   expiresAt?: string;

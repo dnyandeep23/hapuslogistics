@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/context/ToastContext";
 import { formatIndiaPhoneInput, normalizeIndiaPhone } from "@/lib/phone";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 const roleLabel = (role: string | undefined) => {
   if (role === "admin") return "Admin";
@@ -30,6 +31,7 @@ export default function DashboardProfilePage() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isMobile, isTablet } = useResponsiveMode();
   const { addToast } = useToast();
   const { user } = useAppSelector((state) => state.user);
   const [name, setName] = useState("");
@@ -235,11 +237,11 @@ export default function DashboardProfilePage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="dashboard-surface rounded-2xl p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className={`flex gap-4 ${isMobile ? "flex-col" : "flex-wrap items-start justify-between"}`}>
           <div>
             <p className="text-xs uppercase tracking-[0.16em] text-[#D7E18D]/80">Dashboard Profile</p>
-            <h1 className="mt-2 text-2xl font-bold text-[#F6FF6A] sm:text-3xl">Account Settings</h1>
-            <p className="mt-2 text-sm text-white/70">
+            <h1 className={`mt-2 font-bold text-[#F6FF6A] ${isMobile ? "text-2xl" : "text-2xl sm:text-3xl"}`}>Account Settings</h1>
+            <p className={`mt-2 text-white/70 ${isMobile ? "text-sm leading-6" : "text-sm"}`}>
               Manage your profile details and keep your contact info up to date.
             </p>
           </div>
@@ -264,7 +266,7 @@ export default function DashboardProfilePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : isTablet ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
         <div className="dashboard-surface-soft rounded-2xl p-4">
           <p className="text-[11px] uppercase tracking-wide text-white/55">Full Name</p>
           <p className="mt-2 text-sm font-medium text-white">{user.name || "-"}</p>
@@ -328,12 +330,12 @@ export default function DashboardProfilePage() {
 
           {fieldError && <p className="text-xs text-red-400">{fieldError}</p>}
 
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+          <div className={`flex gap-3 pt-1 ${isMobile ? "flex-col" : "flex-wrap items-center justify-end"}`}>
             {!hasChanged && <span className="text-xs text-white/55">No unsaved changes</span>}
             <button
               type="submit"
               disabled={saving || !hasChanged}
-              className="inline-flex items-center gap-2 rounded-full border border-[#D5E400] px-6 py-2 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-2xl hover:shadow-[#D5E400]/50 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`inline-flex items-center gap-2 rounded-full border border-[#D5E400] px-6 py-2 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-2xl hover:shadow-[#D5E400]/50 disabled:cursor-not-allowed disabled:opacity-60 ${isMobile ? "w-full justify-center" : ""}`}
             >
               {saving ? (
                 <>
@@ -443,11 +445,11 @@ export default function DashboardProfilePage() {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className={`${isMobile ? "flex flex-col" : "flex justify-end"}`}>
             <button
               type="submit"
               disabled={changingPassword}
-              className="inline-flex items-center gap-2 rounded-full border border-[#D5E400] px-6 py-2 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-2xl hover:shadow-[#D5E400]/50 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`inline-flex items-center gap-2 rounded-full border border-[#D5E400] px-6 py-2 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-2xl hover:shadow-[#D5E400]/50 disabled:cursor-not-allowed disabled:opacity-60 ${isMobile ? "w-full justify-center" : ""}`}
             >
               {changingPassword ? (
                 <>
@@ -463,7 +465,7 @@ export default function DashboardProfilePage() {
       </div>
 
       <div className="rounded-2xl border border-rose-500/35 bg-rose-950/20 p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className={`flex gap-4 ${isMobile ? "flex-col" : "items-start justify-between"}`}>
           <div>
             <div className="flex items-center gap-2">
               <Icon icon="mdi:alert-circle-outline" className="text-lg text-rose-300" />
@@ -492,7 +494,7 @@ export default function DashboardProfilePage() {
               setDeleteAccountError("");
               setDeleteModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 rounded-full border border-rose-400/50 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20"
+            className={`inline-flex items-center gap-2 rounded-full border border-rose-400/50 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 ${isMobile ? "w-full justify-center" : ""}`}
           >
             <Icon icon="mdi:delete-outline" className="text-base" />
             Delete Account

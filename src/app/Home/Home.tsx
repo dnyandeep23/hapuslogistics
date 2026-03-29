@@ -1,13 +1,12 @@
 import Link from "next/link";
-import Header from "@/components/Header";
 import Banner from "@/app/Home/Banner";
 import FAQ from "@/app/Home/FAQ";
 import TestimonialCarousel from "@/app/Home/Testimonials";
+import PublicAppShell from "@/components/PublicAppShell";
 
 export default function Home() {
   return (
-    <main className="w-full overflow-x-hidden bg-[#1A1F1B]">
-      <Header />
+    <PublicAppShell className="w-full bg-[#1A1F1B]" contentClassName="pt-0">
       <Banner />
 
       <TestimonialCarousel />
@@ -42,6 +41,6 @@ export default function Home() {
             </div>
         </div>
       </section>
-    </main>
+    </PublicAppShell>
   );
 }

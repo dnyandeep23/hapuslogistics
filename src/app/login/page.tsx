@@ -1,15 +1,52 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from "react";
-import Loginvector from "@/assets/images/loginvector.png";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
-import googleVector from "@/assets/images/googleVector.png";
-import { loginUser, resendVerificationEmail } from "@/services/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useToast } from "@/context/ToastContext";
+import googleVector from "@/assets/images/googleVector.png";
+import loginVector from "@/assets/images/loginvector.png";
+import AuthShell from "@/components/AuthShell";
 import NotificationBox from "@/components/NotificationBox";
+import { useToast } from "@/context/ToastContext";
+import { getErrorMessage } from "@/lib/authError";
+import {
+  appendRedirectParam,
+  GENERIC_AUTH_ERROR_MESSAGE,
+  getEmailValidationMessage,
+  getPasswordValidationMessage,
+  normalizeEmail,
+  sanitizeRedirectPath,
+} from "@/lib/authFlow";
+import { loginUser, resendVerificationEmail } from "@/services/auth";
+
+type LoginErrors = {
+  email?: string;
+  password?: string;
+};
+
+const getRedirectCopy = (redirectPath: string) => {
+  if (redirectPath.startsWith("/package")) {
+    return "Log in to continue your package booking.";
+  }
+
+  if (redirectPath.startsWith("/dashboard/orders")) {
+    return "Log in to open your order details.";
+  }
+
+  if (redirectPath.startsWith("/dashboard")) {
+    return "Log in to return to your dashboard.";
+  }
+
+  return "Log in to continue where you left off.";
+};
+
+const passwordInputClass =
+  "w-full bg-transparent px-0 py-3 text-base text-white placeholder:text-white/38 focus:outline-none";
+const fieldShellClass =
+  "rounded-[1rem] border border-white/10 bg-black/70 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.14)] transition focus-within:border-white/35";
+const fieldRowClass = "flex items-center gap-3";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -19,30 +56,88 @@ function LoginPageContent() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>(
+    {},
+  );
   const [notification, setNotification] = useState({
     message: "",
     type: "" as "success" | "warning" | "error" | "",
     showResend: false,
   });
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {},
-  );
   const role = "user" as const;
 
+  const redirectTarget = useMemo(
+    () => sanitizeRedirectPath(searchParams.get("redirect")),
+    [searchParams],
+  );
+  const hasCustomRedirect = redirectTarget !== "/dashboard";
+  const registerHref = useMemo(
+    () => appendRedirectParam("/register", redirectTarget),
+    [redirectTarget],
+  );
+  const forgotPasswordHref = useMemo(
+    () => appendRedirectParam("/forgot-password", redirectTarget),
+    [redirectTarget],
+  );
+  const googleLoginHref = useMemo(() => {
+    const params = new URLSearchParams({
+      role: "user",
+      intent: "login",
+      redirect: redirectTarget,
+    });
+    return `/api/auth/google/login?${params.toString()}`;
+  }, [redirectTarget]);
+
+  const errors = useMemo<LoginErrors>(() => {
+    const nextErrors: LoginErrors = {};
+
+    if (submitAttempted || touched.email) {
+      const emailMessage = getEmailValidationMessage(email);
+      if (emailMessage) {
+        nextErrors.email = emailMessage;
+      }
+    }
+
+    if (submitAttempted || touched.password) {
+      const passwordMessage = getPasswordValidationMessage(password);
+      if (passwordMessage) {
+        nextErrors.password = passwordMessage;
+      }
+    }
+
+    return nextErrors;
+  }, [email, password, submitAttempted, touched.email, touched.password]);
+
+  const isSubmitDisabled =
+    loading ||
+    !email.trim() ||
+    !password.trim() ||
+    Boolean(errors.email || errors.password);
+
   useEffect(() => {
+    const incomingEmail = searchParams.get("email")?.trim();
     const registered = searchParams.get("registered");
     const error = searchParams.get("error");
     const deletionScheduled = searchParams.get("deletionScheduled");
 
+    if (incomingEmail) {
+      setEmail((currentValue) => currentValue || normalizeEmail(incomingEmail));
+    }
+
     if (registered === "true") {
       addToast(
-        "Registration successful! Please check your email to verify your account.",
+        "Registration successful. Please verify your email before logging in.",
         "success",
       );
     }
 
     if (error) {
-      setNotification({ message: error, type: "error", showResend: false });
+      setNotification({
+        message: getErrorMessage(error, GENERIC_AUTH_ERROR_MESSAGE),
+        type: "error",
+        showResend: false,
+      });
       return;
     }
 
@@ -53,69 +148,82 @@ function LoginPageContent() {
         showResend: false,
       });
     }
-  }, [searchParams, addToast]);
-
-  const validate = () => {
-    const newErrors: typeof errors = {};
-    if (!email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(email))
-      newErrors.email = "Enter a valid email address";
-    if (!password) newErrors.password = "Password is required";
-    else if (password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  }, [addToast, searchParams]);
 
   const handleResend = async () => {
-    if (!email) {
-      addToast(
-        "Please enter the email address of the unverified account.",
-        "error",
-      );
+    const trimmedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(trimmedEmail);
+
+    if (emailError) {
+      setTouched((currentValue) => ({ ...currentValue, email: true }));
+      setSubmitAttempted(true);
       return;
     }
+
     try {
-      const response = await resendVerificationEmail(email);
-      addToast(response.message || "Verification email sent successfully.", "success");
+      const response = await resendVerificationEmail(trimmedEmail);
+      addToast(
+        response.message || "Verification email sent successfully.",
+        "success",
+      );
     } catch (error: unknown) {
       addToast(
-        error instanceof Error
-          ? error.message
-          : "Failed to resend verification email.",
+        getErrorMessage(error, "Failed to resend verification email."),
         "error",
       );
     }
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (loading) {
+      return;
+    }
+
+    setSubmitAttempted(true);
+    setTouched({ email: true, password: true });
+
+    const trimmedEmail = normalizeEmail(email);
+    const emailError = getEmailValidationMessage(trimmedEmail);
+    const passwordError = getPasswordValidationMessage(password);
+
+    if (emailError || passwordError) {
+      return;
+    }
+
     setLoading(true);
     setNotification({ message: "", type: "", showResend: false });
 
     try {
-      const response = (await loginUser({ email, password, role })) as {
+      const response = (await loginUser({
+        email: trimmedEmail,
+        password,
+        role,
+      })) as {
         accountDeletionCancelled?: boolean;
         requirePasswordChange?: boolean;
       };
+
       if (response.accountDeletionCancelled) {
         addToast("Your scheduled account deletion has been cancelled.", "success");
       }
+
       if (response.requirePasswordChange) {
         addToast("Update your temporary password before continuing.", "warning");
-        router.push("/dashboard/profile?forcePasswordChange=true");
+        router.replace("/dashboard/profile?forcePasswordChange=true");
         return;
       }
-      router.push("/dashboard");
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An unexpected error occurred.";
 
-      if (errorMessage.includes("Account not verified")) {
+      addToast("Login successful. Redirecting you now.", "success");
+      router.replace(redirectTarget);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, GENERIC_AUTH_ERROR_MESSAGE);
+
+      if (errorMessage.toLowerCase().includes("not verified")) {
         setNotification({
           message:
-            "This account is not verified. A new verification email has been sent.",
+            "Your account is not verified yet. Request a fresh verification email below.",
           type: "warning",
           showResend: true,
         });
@@ -132,224 +240,216 @@ function LoginPageContent() {
   };
 
   return (
-    <section>
-      <div className="relative h-[120vh] md:h-screen flex flex-col  md:justify-end py-12 px-6 md:py-20 md:px-20 text-white">
-        <Link
-          href="/"
-          className="
-  absolute 
-  top-2 right-2
-  sm:top-3 sm:right-3
-  md:top-4 md:right-4
-  z-50
-"
-        >
-          <div
-            className="
-    flex gap-2 items-center
-    bg-gray-600/60 hover:bg-gray-700
-    cursor-pointer
-    px-2 py-1 text-sm
-    sm:px-3 sm:py-1.5 sm:text-sm
-    md:px-4 md:py-2 md:text-base
-    rounded-lg text-white
-  "
-          >
-            <Icon icon="solar:home-2-broken" className="text-sm md:text-base" />
-            <span className="">Return to Home</span>
-          </div>
-        </Link>
+    <AuthShell
+      badge="All users access"
+      title="Log in to manage bookings and delivery"
+      description="A cleaner all-user login that keeps tracking, bookings, and account recovery in one place."
+      supportLine="Use your email and password to continue securely across mobile, tablet, and desktop."
+      highlights={["Fast access", "Secure login", "Order tracking"]}
+      artwork={loginVector}
+      artworkAlt="Hapus login background vector"
+    >
+      <div className="space-y-4 sm:space-y-5">
+        <NotificationBox
+          message={notification.message}
+          type={notification.type}
+          showResend={notification.showResend}
+          onResend={handleResend}
+        />
 
-        <div className="absolute bg-[#25421E] top-0 left-0 w-[95%] md:w-[75%] h-[50%] rounded-br-[60%] md:h-full lg:h-full"></div>
-        <div className="absolute inset-0 h-full w-full md:w-[70%] lg:w-[70%] flex flex-col">
-          <Image
-            src={Loginvector}
-            alt="vector image"
-            className="object-cover"
-          ></Image>
-        </div>
-        <div
-          className=" top-[55%] w-[90%] translate-y-46 md:relative left-auto md:top-auto md:translate-y-0 md:ml-6 md:w-auto"
-        >
-          <div className="flex   items-center gap-4 md:gap-8">
-            <p className="z-50 relative text-6xl md:text-9xl font-bold">
-              Hapus
-            </p>
-            <p className="z-50 mt-4 text text-center relative text-lg md:text-2xl font-medium line-clamp-2">
-              Travels & <br /> Logistics
-            </p>
-          </div>
-          <div>
-            <p className="z-50 text-sm md:text-base relative mt-3 md:mt-12 text-white/80">
-              Log in with confidence — your luggage is in safe hands with Hapus
-              Logistics.
-            </p>
-          </div>
-        </div>
+        <div className="space-y-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/42">
+            All users access
+          </p>
+          <p className="text-[1.7rem] font-black leading-[0.96] tracking-tight text-white sm:text-[2.15rem]">
+            Welcome back
+          </p>
+          <p className="max-w-lg text-sm leading-6 text-white/62 sm:text-[0.96rem] sm:leading-7">
+            Sign in with your email and password to continue.
+          </p>
 
-        <div
-          className="
-    absolute
-    left-1/2 top-[65%] -translate-x-1/2 -translate-y-1/2
-    px-7 py-6
-    bg-black/40
-    rounded-[10%]
-    md:rounded-[8%]
-    flex flex-col
-    max-w-md w-[90%]
-
-    md:left-auto md:top-auto md:translate-x-0 md:translate-y-0
-    md:right-20 md:bottom-20
-    md:px-10 md:py-8
-  "
-        >
-          <div className="pb-3 md:pb-4">
-            <NotificationBox
-              message={notification.message}
-              type={notification.type}
-              showResend={notification.showResend}
-              onResend={handleResend}
-            />
-          </div>
-
-          <p className="text-white font-bold text-2xl md:text-3xl mb-6">Login</p>
-
-          <form onSubmit={submit} className="flex flex-col gap-4">
-
-            {/* Email */}
-            <div className="flex flex-col">
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setErrors((prev) => ({ ...prev, email: undefined }));
-                }}
-                className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300
-      ${errors.email ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
-              />
-              <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.email ? "opacity-100" : "opacity-0"}`}>
-                {errors.email || " "}
-              </span>
+          {hasCustomRedirect ? (
+            <div className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-white/70">
+              {getRedirectCopy(redirectTarget)}
             </div>
+          ) : null}
+        </div>
 
-            {/* Password */}
-            <div className="flex flex-col relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setErrors((prev) => ({ ...prev, password: undefined }));
-                }}
-                className={`bg-black px-4 pt-4 pb-2 rounded-lg text-base md:text-lg border-b-2 transition-all duration-300
-      ${errors.password ? "border-red-500" : "border-white/60 focus:border-white"}
-      focus:outline-none`}
-              />
-
-              <div
-                className="absolute right-8 md:right-6 top-[40%] md:top-1/2 -translate-y-1/2 cursor-pointer"
-                onClick={() => {
-                  setShowPassword((v) => !v);
-                  setTimeout(() => setShowPassword((v) => !v), 1000);
-                }}
-              >
-                <Icon
-                  icon="streamline:eye-optic-remix"
-                  width={18}
-                  className={`absolute text-white/60 transition-all duration-300 ${showPassword ? "opacity-100" : "opacity-0"}`}
-                />
-                <Icon
-                  icon="ri:eye-close-fill"
-                  width={18}
-                  className={`absolute text-white/60 transition-all duration-300 ${showPassword ? "opacity-0" : "opacity-100"}`}
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="login-email"
+              className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45"
+            >
+              Email
+            </label>
+            <div
+              className={`${fieldShellClass} ${
+                errors.email
+                  ? "border-red-500/70 bg-red-500/10"
+                  : "focus-within:border-[#D5E400]/40"
+              }`}
+            >
+              <div className={fieldRowClass}>
+                <span className="text-white/38">
+                  <Icon icon="solar:letter-bold-duotone" width={20} />
+                </span>
+                <input
+                  id="login-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  autoComplete="email"
+                  inputMode="email"
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby="login-email-error"
+                  onBlur={() =>
+                    setTouched((currentValue) => ({ ...currentValue, email: true }))
+                  }
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setNotification({ message: "", type: "", showResend: false });
+                  }}
+                  className="w-full bg-transparent py-4 text-lg text-white placeholder:text-white/40 focus:outline-none"
                 />
               </div>
-
-              <span className={`text-sm text-red-400 mt-1 transition-all duration-300 ${errors.password ? "opacity-100" : "opacity-0"}`}>
-                {errors.password || " "}
-              </span>
             </div>
+            <span
+              id="login-email-error"
+              className={`block text-sm text-red-400 transition-all duration-300 ${
+                errors.email ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {errors.email || " "}
+            </span>
+          </div>
 
-            {/* Links */}
-            <div className="flex  justify-between items-center gap-2   text-xs md:text-sm text-white/80 mt-2">
-              <span className="w-1/2 md:w-full">
-                Don&apos;t have an account?{" "}
-                <Link href="/register" className="text-[#D5E400] underline cursor-pointer">
-                  Sign Up
-                </Link>
-              </span>
-              <Link href="/forgot-password" className="text-[#D5E400] underline cursor-pointer">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <label
+                htmlFor="login-password"
+                className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45"
+              >
+                Password
+              </label>
+              <Link
+                href={forgotPasswordHref}
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A] transition hover:text-[#fff37a]"
+              >
                 Forgot Password?
               </Link>
             </div>
-
-            {/* Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="
-      self-end mt-4 md:mt-6
-      px-6 md:px-8 py-2
-      rounded-full border border-[#D5E400]
-      text-[#D5E400] font-semibold
-      transition-all duration-300
-      hover:shadow-2xl hover:shadow-[#D5E400]/60
-      hover:bg-[#D5E400] hover:text-black
-      disabled:opacity-50
-    "
+            <div
+              className={`relative ${fieldShellClass} pr-14 ${
+                errors.password
+                  ? "border-red-500/70 bg-red-500/10"
+                  : "focus-within:border-[#D5E400]/40"
+              }`}
             >
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <Icon icon="line-md:loading-loop" className="text-lg" />
-                  Logging in...
+              <div className={fieldRowClass}>
+                <span className="text-white/38">
+                  <Icon icon="solar:lock-password-bold-duotone" width={20} />
                 </span>
-              ) : "Login"}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mt-4 text-white/80">
-            <div className="w-full h-0.5 bg-white/40"></div>
-            <span>or</span>
-            <div className="w-full h-0.5 bg-white/40"></div>
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={password}
+                  autoComplete="current-password"
+                  aria-invalid={Boolean(errors.password)}
+                  aria-describedby="login-password-error login-password-help"
+                  onBlur={() =>
+                    setTouched((currentValue) => ({ ...currentValue, password: true }))
+                  }
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setNotification({ message: "", type: "", showResend: false });
+                  }}
+                  className={passwordInputClass}
+                />
+              </div>
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/55 transition hover:text-white"
+                onClick={() => setShowPassword((currentValue) => !currentValue)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <Icon
+                  icon={showPassword ? "ri:eye-close-fill" : "streamline:eye-optic-remix"}
+                  width={18}
+                />
+              </button>
+            </div>
+            <div id="login-password-help" className="text-xs leading-5 text-white/42">
+              Keep your password hidden unless you need to check it.
+            </div>
+            <span
+              id="login-password-error"
+              className={`block text-sm text-red-400 transition-all duration-300 ${
+                errors.password ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {errors.password || " "}
+            </span>
           </div>
 
-          {/* Google Button */}
-          <Link
-            href="/api/auth/google/login?role=user&intent=login"
-            className="
-    relative flex mt-4 mx-auto
-    bg-[#404811]/60
-    px-10 md:px-24 py-3
-    rounded-full
-    cursor-pointer justify-center
-    group
-    hover:bg-linear-120 from-[#637501] to-[#9cb800]
-    hover:shadow-2xl hover:shadow-[#9cb800]/60
-  "
-          >
-            <Image
-              src={googleVector}
-              width={32}
-              alt="Google logo"
-              className="absolute left-2 top-0 bottom-0 my-auto group-hover:bg-green-950/40 p-2 rounded-full"
-            />
-            <span className="text-sm ml-4 md:ml-0 md:text-base">Sign in with Google</span>
-          </Link>
+          <div className="space-y-2 pt-1 text-sm text-white/70">
+            <p>
+              Don&apos;t have an account?{" "}
+              <Link
+                href={registerHref}
+                className="font-semibold text-[#F6FF6A] underline underline-offset-4 transition hover:text-[#fff37a]"
+              >
+                Sign Up
+              </Link>
+            </p>
+          </div>
 
+          <button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D5E400] bg-transparent px-6 py-3.5 text-base font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-[0_18px_40px_-24px_rgba(213,228,0,0.75)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Icon icon="line-md:loading-loop" className="text-lg" />
+                Logging in...
+              </>
+            ) : (
+              <>
+                <Icon icon="solar:login-3-bold-duotone" width={18} />
+                Login
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-4 py-1 text-white/65">
+          <div className="h-px w-full bg-white/15" />
+          <span className="text-xs uppercase tracking-[0.22em]">or</span>
+          <div className="h-px w-full bg-white/15" />
         </div>
+
+        <Link
+          href={googleLoginHref}
+          className="relative flex items-center justify-center gap-3 rounded-full border border-[#6e7400]/40 bg-[#5b5f09] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#70750a] hover:shadow-[0_20px_40px_-24px_rgba(156,184,0,0.55)]"
+        >
+          <Image
+            src={googleVector}
+            width={24}
+            alt="Google logo"
+            className="absolute left-4 top-0 bottom-0 my-auto rounded-full bg-black/15 p-1"
+          />
+          <span className="ml-6">Sign in with Google</span>
+        </Link>
       </div>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<section className="min-h-screen bg-[#25421E]" />}>
+    <Suspense fallback={<section className="min-h-screen bg-[#0A0D09]" />}>
       <LoginPageContent />
     </Suspense>
   );

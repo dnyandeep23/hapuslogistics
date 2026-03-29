@@ -28,6 +28,7 @@ import {
   type AuthPortal,
   type UserRole,
 } from "@/app/api/lib/authHelpers";
+import { sanitizeRedirectPath } from "@/lib/authFlow";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
@@ -39,10 +40,19 @@ const portalLoginPath: Record<AuthPortal, string> = {
   admin: "/admin/login",
 };
 
+const applyRedirectParam = (url: URL, redirectPath?: string) => {
+  if (redirectPath) {
+    url.searchParams.set("redirect", redirectPath);
+  }
+
+  return url;
+};
+
 const getAuthFromState = (state: string | null): {
   portal: AuthPortal;
   role: UserRole;
   intent: AuthIntent;
+  redirect?: string;
   companyName?: string;
   companyId?: string;
 } => {
@@ -56,6 +66,7 @@ const getAuthFromState = (state: string | null): {
       portal?: unknown;
       role?: unknown;
       intent?: unknown;
+      redirect?: unknown;
       companyName?: unknown;
       companyId?: unknown;
     };
@@ -72,6 +83,10 @@ const getAuthFromState = (state: string | null): {
       portal: normalizedPortal,
       role: normalizedRole,
       intent: normalizeIntent(parsed.intent) ?? "login",
+      redirect:
+        typeof parsed.redirect === "string"
+          ? sanitizeRedirectPath(parsed.redirect, "")
+          : undefined,
       companyName: typeof parsed.companyName === "string" ? parsed.companyName.trim() : undefined,
       companyId: typeof parsed.companyId === "string" ? parsed.companyId.trim() : undefined,
     };
@@ -208,13 +223,19 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const authProviderSchemaInstance = User.schema.path("authProvider")?.instance;
   const fallbackAuth = getAuthFromState(requestUrl.searchParams.get("state"));
-  const fallbackLoginUrl = new URL(portalLoginPath[fallbackAuth.portal], request.url);
+  const fallbackLoginUrl = applyRedirectParam(
+    new URL(portalLoginPath[fallbackAuth.portal], request.url),
+    fallbackAuth.redirect,
+  );
 
   try {
     const { searchParams } = requestUrl;
     const code = searchParams.get("code");
     const auth = getAuthFromState(searchParams.get("state"));
-    const loginUrl = new URL(portalLoginPath[auth.portal], request.url);
+    const loginUrl = applyRedirectParam(
+      new URL(portalLoginPath[auth.portal], request.url),
+      auth.redirect,
+    );
 
     if (!code) {
       loginUrl.searchParams.set("error", "Authorization code missing");
@@ -613,7 +634,11 @@ export async function GET(request: NextRequest) {
       role: user.role,
     });
 
-    const response = NextResponse.redirect(new URL("/callback-success", request.url));
+    const callbackSuccessUrl = applyRedirectParam(
+      new URL("/callback-success", request.url),
+      auth.redirect,
+    );
+    const response = NextResponse.redirect(callbackSuccessUrl);
 
     response.cookies.set("token", token, {
       httpOnly: true,

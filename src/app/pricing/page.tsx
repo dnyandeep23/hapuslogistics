@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Header from "@/components/Header";
+import PublicAppShell from "@/components/PublicAppShell";
 
 export const metadata: Metadata = {
   title: "Pricing | Hapus Logistics",
@@ -40,10 +40,8 @@ const factors = [
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(205,214,69,0.12),transparent_30%),linear-gradient(180deg,#11160f_0%,#1a2017_45%,#0d110b_100%)] text-white">
-      <Header />
-
-      <section className="mx-auto max-w-6xl px-4 pb-16 pt-28 sm:px-6 lg:px-8">
+    <PublicAppShell className="bg-[radial-gradient(circle_at_top,rgba(205,214,69,0.12),transparent_30%),linear-gradient(180deg,#11160f_0%,#1a2017_45%,#0d110b_100%)]">
+      <section className="mx-auto max-w-6xl px-4 pb-10 pt-24 sm:px-6 sm:pb-14 lg:px-8 lg:pt-28">
         <div className="dashboard-surface rounded-[2rem] p-6 sm:p-8">
           <div className="max-w-3xl">
             <span className="inline-flex rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
@@ -61,26 +59,44 @@ export default function PricingPage() {
           <div className="mt-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="dashboard-surface-soft rounded-2xl p-5">
               <h2 className="text-lg font-semibold text-[#F6FF6A]">Service pricing</h2>
-              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
-                <div className="grid grid-cols-3 bg-black/20 px-4 py-3 text-xs uppercase tracking-[0.18em] text-white/50">
-                  <span>Service</span>
-                  <span>What it covers</span>
-                  <span>Price</span>
+              <div className="mt-4">
+                <div className="grid gap-3 md:grid-cols-2 lg:hidden">
+                  {serviceRows.map((row) => (
+                    <article key={row.service} className="rounded-2xl border border-white/10 bg-black/15 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{row.service}</p>
+                          <p className="mt-1 text-sm leading-6 text-white/68">{row.detail}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-[#CDD645]/25 bg-[#CDD645]/10 px-3 py-1 text-xs font-semibold text-[#F6FF6A]">
+                          {row.price}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-                {serviceRows.map((row) => (
-                  <div key={row.service} className="grid grid-cols-3 gap-3 border-t border-white/8 px-4 py-4 text-sm">
-                    <span className="font-medium text-white">{row.service}</span>
-                    <span className="text-white/70">{row.detail}</span>
-                    <span className="text-[#F6FF6A]">{row.price}</span>
+
+                <div className="hidden overflow-hidden rounded-2xl border border-white/10 lg:block">
+                  <div className="grid grid-cols-3 bg-black/20 px-4 py-3 text-xs uppercase tracking-[0.18em] text-white/50">
+                    <span>Service</span>
+                    <span>What it covers</span>
+                    <span>Price</span>
                   </div>
-                ))}
+                  {serviceRows.map((row) => (
+                    <div key={row.service} className="grid grid-cols-3 gap-3 border-t border-white/8 px-4 py-4 text-sm">
+                      <span className="font-medium text-white">{row.service}</span>
+                      <span className="text-white/70">{row.detail}</span>
+                      <span className="text-[#F6FF6A]">{row.price}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                 <p className="text-xs uppercase tracking-[0.18em] text-white/45">Pricing factors</p>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-white/75">
+                <ul className="mt-4 grid gap-3 text-sm leading-7 text-white/75">
                   {factors.map((factor) => (
                     <li key={factor} className="rounded-xl border border-white/8 bg-black/15 p-3">
                       {factor}
@@ -122,6 +138,6 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
-    </main>
+    </PublicAppShell>
   );
 }

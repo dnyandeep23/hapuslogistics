@@ -11,6 +11,7 @@ import { useToast } from "@/context/ToastContext";
 import Skeleton from "@/components/Skeleton";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 import { normalizeIndiaPhone } from "@/lib/phone";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type OperatorStatus =
   | "none"
@@ -78,8 +79,6 @@ const formatDateTime = (value?: string | null) => {
   return date.toLocaleString("en-IN");
 };
 
-const sectionClassName =
-  "dashboard-surface rounded-2xl p-4 sm:p-5";
 const operatorStatusMessage = (status: OperatorStatus) => {
   if (status === "approved") {
     return "You are currently connected to a company.";
@@ -101,6 +100,7 @@ export default function UsersPage() {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const pathname = usePathname();
+  const { isMobile } = useResponsiveMode();
   const { addToast } = useToast();
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -131,6 +131,7 @@ export default function UsersPage() {
   const canManageOperators = isAdmin;
 
   const operatorStatus = (user?.operatorApprovalStatus || "none") as OperatorStatus;
+  const sectionClassName = isMobile ? "dashboard-surface rounded-2xl p-4" : "dashboard-surface rounded-2xl p-4 sm:p-5";
 
   const selectedOperator = useMemo(
     () => operators.find((operator) => operator._id === selectedOperatorId) ?? null,
@@ -456,10 +457,10 @@ export default function UsersPage() {
   if (isOperator) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className={`flex gap-3 ${isMobile ? "flex-col" : "flex-wrap items-end justify-between"}`}>
           <div>
-            <h1 className="text-2xl font-semibold text-[#F6FF6A] sm:text-3xl">Company Management</h1>
-            <p className="mt-1 text-sm text-white/70">Track your company approval status and operator notifications.</p>
+            <h1 className={`font-semibold text-[#F6FF6A] ${isMobile ? "text-2xl" : "text-2xl sm:text-3xl"}`}>Company Management</h1>
+            <p className={`mt-1 text-white/70 ${isMobile ? "text-sm leading-6" : "text-sm"}`}>Track your company approval status and operator notifications.</p>
           </div>
           <button
             type="button"
@@ -468,7 +469,7 @@ export default function UsersPage() {
               loadCompanyOffer();
               loadNotifications();
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/80 transition hover:bg-white/10"
+            className={`inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/80 transition hover:bg-white/10 ${isMobile ? "w-full justify-center" : ""}`}
           >
             <Icon icon="solar:refresh-outline" className="text-sm" />
             Refresh
@@ -477,12 +478,10 @@ export default function UsersPage() {
 
         <section className={sectionClassName}>
           <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide ${statusClasses[operatorStatus]}`}
-            >
+            <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide ${statusClasses[operatorStatus]}`}>
               {formatStatus(operatorStatus)}
             </span>
-            <p className="text-sm text-white/70">{operatorStatusMessage(operatorStatus)}</p>
+            <p className={`text-white/70 ${isMobile ? "text-sm leading-6" : "text-sm"}`}>{operatorStatusMessage(operatorStatus)}</p>
           </div>
 
           {loadingCompanyOffer && (

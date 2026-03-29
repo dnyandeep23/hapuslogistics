@@ -1,6 +1,15 @@
+"use client";
+
 import { Icon } from "@iconify/react";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+
+type PackageDraft = {
+    packageImage?: string | File | null;
+    [key: string]: unknown;
+};
 
 export default function DropzoneUpload({
     currentPackage,
@@ -8,7 +17,15 @@ export default function DropzoneUpload({
     onFileDrop,
     errors,
     isUploading = false,
-}: any) {
+}: {
+    currentPackage: PackageDraft;
+    setCurrentPackage: (next: PackageDraft) => void;
+    onFileDrop?: (file: File) => void;
+    errors: Record<string, string>;
+    isUploading?: boolean;
+}) {
+    const { isMobile, isTablet } = useResponsiveMode();
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         accept: {
             "image/*": [],
@@ -20,8 +37,11 @@ export default function DropzoneUpload({
             if (!file) return;
 
             if (onFileDrop) {
+                setPreviewUrl(null);
                 onFileDrop(file);
             } else {
+                const objectUrl = URL.createObjectURL(file);
+                setPreviewUrl(objectUrl);
                 // Fallback for existing implementation if onFileDrop is not provided
                 setCurrentPackage({
                     ...currentPackage,
@@ -31,19 +51,17 @@ export default function DropzoneUpload({
         },
     });
 
-    const getPreviewUrl = () => {
-        if (!currentPackage.packageImage) return null;
-        if (typeof currentPackage.packageImage === 'string') {
-            return currentPackage.packageImage;
-        }
-        // It's a File object
-        if (currentPackage.packageImage instanceof File) {
-            return URL.createObjectURL(currentPackage.packageImage);
-        }
-        return null;
-    }
-
-    const previewUrl = getPreviewUrl();
+    useEffect(() => {
+        return () => {
+            if (previewUrl?.startsWith("blob:")) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [previewUrl]);
+    const resolvedPreviewUrl =
+        typeof currentPackage.packageImage === "string"
+            ? currentPackage.packageImage
+            : previewUrl;
 
 
     return (
@@ -56,10 +74,10 @@ export default function DropzoneUpload({
             >
                 <input {...getInputProps()} />
 
-                {previewUrl ? (
-                    <div className="relative h-[180px] sm:h-[260px] w-full overflow-hidden rounded-[1.1rem]">
+                {resolvedPreviewUrl ? (
+                    <div className={`relative w-full overflow-hidden rounded-[1.1rem] ${isMobile ? "h-[180px]" : isTablet ? "h-[220px]" : "h-[260px]"}`}>
                         <Image
-                            src={previewUrl}
+                            src={resolvedPreviewUrl}
                             alt="Package Preview"
                             fill
                             className="object-cover rounded-xl"
@@ -71,6 +89,10 @@ export default function DropzoneUpload({
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation(); // prevent opening file dialog
+                                if (previewUrl?.startsWith("blob:")) {
+                                    URL.revokeObjectURL(previewUrl);
+                                }
+                                setPreviewUrl(null);
                                 setCurrentPackage({
                                     ...currentPackage,
                                     packageImage: "",
@@ -84,15 +106,15 @@ export default function DropzoneUpload({
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 px-3 py-6 sm:px-4 sm:py-8 text-center">
-                        <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-[#d5e400]/14 text-[#F6FF6A]">
-                            <Icon icon="solar:gallery-add-bold-duotone" className="text-[1.5rem] sm:text-[1.8rem]" />
+                        <div className={`flex items-center justify-center rounded-2xl bg-[#d5e400]/14 text-[#F6FF6A] ${isMobile ? "h-11 w-11" : "h-12 w-12 sm:h-14 sm:w-14"}`}>
+                            <Icon icon="solar:gallery-add-bold-duotone" className={isMobile ? "text-[1.35rem]" : "text-[1.5rem] sm:text-[1.8rem]"} />
                         </div>
                         <div>
-                            <p className="text-[13px] sm:text-sm font-semibold text-[#F6FF6A]">
+                            <p className={`font-semibold text-[#F6FF6A] ${isMobile ? "text-sm" : "text-[13px] sm:text-sm"}`}>
                                 {isDragActive ? "Drop image here" : "Upload package image"}
                             </p>
-                            <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-sm text-white/60">
-                                Tap to browse or drag and drop on desktop.
+                            <p className={`mt-0.5 sm:mt-1 text-white/60 ${isMobile ? "text-[11px]" : "text-[11px] sm:text-sm"}`}>
+                                {isMobile ? "Tap to browse." : "Tap to browse or drag and drop on desktop."}
                             </p>
                         </div>
                     </div>

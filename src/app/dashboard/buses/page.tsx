@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import CustomDateRangePicker from "@/components/CustomDateRangePicker";
 import Skeleton from "@/components/Skeleton";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 type OperatorContactPeriod = {
   operatorId: unknown;
@@ -135,9 +136,10 @@ function AdminBusesPageContent() {
   const { user } = useAppSelector((state) => state.user);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isMobile } = useResponsiveMode();
   const queryOperatorId = String(searchParams.get("operatorId") ?? "").trim();
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">(isMobile ? "list" : "grid");
   const [loading, setLoading] = useState(false);
   const [loadingOperators, setLoadingOperators] = useState(false);
   const [buses, setBuses] = useState<BusRow[]>([]);
@@ -206,6 +208,10 @@ function AdminBusesPageContent() {
     loadBuses();
     loadOperators();
   }, [isAdmin, loadBuses, loadOperators, router]);
+
+  useEffect(() => {
+    setViewMode(isMobile ? "list" : "grid");
+  }, [isMobile]);
 
   const filteredBuses = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -628,8 +634,8 @@ function AdminBusesPageContent() {
         </button>
       </div>
 
-      <div className="dashboard-surface flex flex-wrap items-center justify-between gap-4 rounded-3xl p-4 shadow-xl backdrop-blur-xl border border-white/5">
-        <div className="relative w-full sm:w-96">
+      <div className={`dashboard-surface flex gap-4 rounded-3xl p-4 shadow-xl backdrop-blur-xl border border-white/5 ${isMobile ? "flex-col" : "flex-wrap items-center justify-between"}`}>
+        <div className={`relative w-full ${isMobile ? "" : "sm:w-96"}`}>
           <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-white/40" />
           <input
             value={query}
@@ -638,7 +644,7 @@ function AdminBusesPageContent() {
             className="w-full rounded-xl border border-white/10 bg-black/40 py-3 pl-11 pr-4 text-sm text-white/90 outline-none transition focus:border-[#D5E400]/50 focus:bg-black/60 focus:shadow-[0_0_20px_rgba(213,228,0,0.1)]"
           />
         </div>
-        <div className="flex gap-2">
+        <div className={`flex gap-2 ${isMobile ? "w-full justify-end" : ""}`}>
           <button
             type="button"
             onClick={() => setViewMode("grid")}
