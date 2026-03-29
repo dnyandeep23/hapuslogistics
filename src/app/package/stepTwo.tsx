@@ -10,6 +10,7 @@ import {
   type PackageCategoryConfig,
   type PackageSizeConfig,
 } from "@/lib/packageCatalog";
+import type { PackageDraft, PackageFormData } from "./types";
 
 type PackageTypeOption = {
   id: string;
@@ -21,23 +22,6 @@ type PackageSizeOption = {
   label: string;
   desc: string;
   scale: number;
-};
-
-type PackageDraft = {
-  packageName: string;
-  packageType: string;
-  otherPackageType: string;
-  packageSize: string;
-  packageWeight: number | "";
-  packageQuantities: number;
-  packageImage: string | File;
-  pickUpDate: string;
-};
-
-type PackageFormData = {
-  cart: Array<PackageDraft & Record<string, unknown>>;
-  pickupLocationId: string;
-  dropLocationId: string;
 };
 
 type PackageErrors = Record<string, string>;
@@ -403,7 +387,7 @@ export default function StepTwo({
               pickupLocationId={formData.pickupLocationId}
               dropLocationId={formData.dropLocationId}
               onChange={handleDateChange}
-              error={!hasDateConflict && datePickerError}
+              error={hasDateConflict ? undefined : datePickerError}
             />
             {datePickerError && (
               <p className={`${hasDateConflict ? "mt-1 text-amber-400" : "text-red-400"} text-sm`}>

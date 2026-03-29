@@ -14,10 +14,10 @@ export interface ICompanyProfile extends Document {
 const CompanyProfileSchema = new Schema<ICompanyProfile>(
   {
     companyName: { type: String, required: true, trim: true, default: "Hapus Logistics" },
-    address: { type: String, required: true, trim: true, default: "138/D, Kinny House Room No. 1, 2nd Floor, near Parcel ST Depot, Pune, Maharashtra 411001" },
+    address: { type: String, required: true, trim: true, default: "Shop No.1, Ramu Niwas, Near W.E. Highway, Khar (East), Mumbai, Maharashtra - 400051" },
     supportEmail: { type: String, trim: true, lowercase: true, default: "support@hapuslogistics.com" },
     supportPhone: { type: String, trim: true, default: "+91 98765 43210" },
-    websiteDomain: { type: String, trim: true, default: "https://hapuslogistics.com" },
+    websiteDomain: { type: String, trim: true, default: "https://hapuslogistics.vercel.app" },
     logoUrl: { type: String, trim: true, default: "" },
   },
   { timestamps: true }

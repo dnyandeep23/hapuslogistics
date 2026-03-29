@@ -5,11 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
-
-type PackageDraft = {
-    packageImage?: string | File | null;
-    [key: string]: unknown;
-};
+import type { PackageDraft } from "@/app/package/types";
 
 export default function DropzoneUpload({
     currentPackage,

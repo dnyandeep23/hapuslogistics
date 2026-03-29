@@ -3,27 +3,14 @@
 import { Icon } from "@iconify/react";
 import Image from "next/image";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
-
-type CartItem = {
-    packageImage?: string;
-    packageName?: string;
-    packageType?: string;
-    packageSize?: string;
-    packageWeight?: number;
-    packageQuantities?: number;
-    pickUpDate?: string;
-};
-
-type CartFormData = {
-    cart?: CartItem[];
-};
+import type { CartItem, PackageFormData } from "@/app/package/types";
 
 export default function Cart({
     formData,
     handleEditPackage,
     handleDeletePackage,
 }: {
-    formData: CartFormData;
+    formData: PackageFormData;
     handleEditPackage: (index: number) => void;
     handleDeletePackage: (index: number) => void;
 }) {
@@ -54,12 +41,18 @@ export default function Cart({
                             <div key={index} className={`package-panel-soft flex flex-col overflow-hidden rounded-[1.3rem] sm:rounded-[1.4rem] ${isMobile ? "" : "sm:flex-row"}`}>
                                 {/* Image */}
                                 <div className={`relative mx-3 mt-3 rounded-xl bg-black/10 sm:mb-3 sm:mr-0 sm:min-w-28 ${isMobile ? "h-20" : "h-24 sm:h-28 sm:w-28"}`}>
-                                    <Image
-                                        src={item.packageImage}
-                                        alt="Package Preview"
-                                        fill
-                                        className="object-cover rounded-lg"
-                                    />
+                                    {typeof item.packageImage === "string" && item.packageImage ? (
+                                        <Image
+                                            src={item.packageImage}
+                                            alt="Package Preview"
+                                            fill
+                                            className="object-cover rounded-lg"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50">
+                                            <Icon icon="solar:gallery-bold-duotone" className="text-3xl" />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Content */}

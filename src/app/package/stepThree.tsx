@@ -1,10 +1,17 @@
 import { Icon } from "@iconify/react";
 import Image from "next/image";
-import { useState, useEffect, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
-import { AvailableCoupon, calculatePrice, getAvailableCoupons, type PricingInfo } from "@/services/logistics";
+import { useState, useEffect, useMemo, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
+import {
+    AvailableCoupon,
+    calculatePrice,
+    getAvailableCoupons,
+    type PricingInfo,
+    type PricingItem,
+} from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
 import { formatIndiaPhoneInput } from "@/lib/phone";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+import type { CartItem, PackageFormData } from "./types";
 
 type LocationOption = {
     _id: string;
@@ -15,38 +22,20 @@ type LocationOption = {
     zip?: string;
 };
 
-type CartItem = {
-    packageImage: string;
-    packageName?: string;
-    packageSize: string;
-    packageWeight: number;
-    packageQuantities: number;
-    packageType?: string;
-    pickUpDate?: string;
-    price?: number;
-};
-
-type FormDataState = {
-    pickupLocationId: string;
-    dropLocationId: string;
-    coupon?: string;
-    senderName: string;
-    senderContact: string;
-    receiverName: string;
-    receiverContact: string;
-    cart: CartItem[];
-};
-
 type StepThreeProps = {
     errors: Record<string, string>;
-    setFormData: (next: FormDataState) => void;
-    formData: FormDataState;
+    setFormData: (next: PackageFormData) => void;
+    formData: PackageFormData;
     pickupLocations: LocationOption[];
     dropLocations: LocationOption[];
     pricingInfo: PricingInfo | null;
     setPricingInfo: Dispatch<SetStateAction<PricingInfo | null>>;
     userId?: string;
 };
+
+function hasNumericWeight(item: CartItem): item is CartItem & { packageWeight: number } {
+    return typeof item.packageWeight === "number";
+}
 
 export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: StepThreeProps) {
     const { isMobile, isTablet, isDesktop } = useResponsiveMode();
@@ -66,6 +55,17 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
     const [isLoadingPrice, setIsLoadingPrice] = useState(false);
     const [pricingError, setPricingError] = useState<string | null>(null);
+    const pricingCartItems = useMemo<PricingItem[]>(
+        () =>
+            formData.cart
+                .filter(hasNumericWeight)
+                .map((item) => ({
+                    ...item,
+                    packageWeight: item.packageWeight,
+                    packageQuantities: item.packageQuantities,
+                })),
+        [formData.cart],
+    );
 
     useEffect(() => {
         setCoupon(formData.coupon || "");
@@ -109,7 +109,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 setCouponStatus(hasCoupon ? "loading" : "idle");
                 try {
                     const data = await calculatePrice(
-                        formData.cart,
+                        pricingCartItems,
                         formData.coupon,
                         userId,
                         formData.pickupLocationId,
@@ -142,6 +142,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
         formData.pickupLocationId,
         formData.dropLocationId,
         formData.coupon,
+        pricingCartItems,
         userId,
         setPricingInfo,
     ]);
@@ -267,12 +268,18 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         <div key={index} className="package-panel-soft flex flex-col overflow-hidden rounded-[1.3rem] sm:flex-row">
                             {/* Image */}
                             <div className="relative mx-3 mt-3 h-24 rounded-xl bg-black/10 sm:mb-3 sm:mr-0 sm:w-24 sm:min-w-24">
-                                <Image
-                                    src={item.packageImage}
-                                    alt="Package Preview"
-                                    fill
-                                    className="object-cover rounded-lg"
-                                />
+                                {typeof item.packageImage === "string" && item.packageImage ? (
+                                    <Image
+                                        src={item.packageImage}
+                                        alt="Package Preview"
+                                        fill
+                                        className="object-cover rounded-lg"
+                                    />
+                                ) : (
+                                    <div className="flex h-full items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50">
+                                        <Icon icon="solar:gallery-bold-duotone" className="text-3xl" />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Content */}

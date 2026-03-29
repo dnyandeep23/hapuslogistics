@@ -539,19 +539,21 @@ export default function AddPackagePage() {
             }
 
             const rzp = new Razorpay(options);
-            rzp.on('payment.failed', async (failure: any) => {
-                try {
-                    await markBookingSessionFailed(sessionId, {
-                        reason: failure?.error?.description || "PAYMENT_FAILED",
-                        razorpayOrderId,
-                        razorpayPaymentId: failure?.error?.metadata?.payment_id,
-                    });
-                } catch (markError) {
-                    console.error("Failed to mark failed payment session:", markError);
-                }
-                setPaymentStatus('failed');
-                addToast("Payment failed. Please try again.", "error");
-            });
+            if (typeof rzp.on === "function") {
+                rzp.on('payment.failed', async (failure: any) => {
+                    try {
+                        await markBookingSessionFailed(sessionId, {
+                            reason: failure?.error?.description || "PAYMENT_FAILED",
+                            razorpayOrderId,
+                            razorpayPaymentId: failure?.error?.metadata?.payment_id,
+                        });
+                    } catch (markError) {
+                        console.error("Failed to mark failed payment session:", markError);
+                    }
+                    setPaymentStatus('failed');
+                    addToast("Payment failed. Please try again.", "error");
+                });
+            }
             rzp.open();
         } catch (error: any) {
             addToast(error.message, 'error');
@@ -732,7 +734,6 @@ export default function AddPackagePage() {
                                         handleAddToCart={handleAddToCart}
                                         handleClearForm={handleClearForm}
                                         editIndex={editIndex}
-                                        setEditIndex={(idx: number | null) => dispatch(setEditIndex(idx))}
                                         handleEdit={handleEdit}
                                         handleDelete={handleDelete}
                                         errors={errors}

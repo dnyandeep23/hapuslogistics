@@ -25,9 +25,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: STRINGS.appName,
+  title: STRINGS.brand.appName,
   description: STRINGS.homeSubtitle,
-  applicationName: STRINGS.appName,
+  applicationName: STRINGS.brand.appName,
   keywords: "",
 };
 
