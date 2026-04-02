@@ -17,6 +17,7 @@ import { useToast } from "@/context/ToastContext";
 import NotificationBox from "@/components/NotificationBox";
 import { getErrorMessage, normalizeAuthQueryError } from "@/lib/authError";
 import AuthShell from "@/components/AuthShell";
+import AuthInput from "@/components/AuthInput";
 import {
   GENERIC_AUTH_ERROR_MESSAGE,
   getEmailValidationMessage,
@@ -340,51 +341,38 @@ function AdminLoginPageContent() {
         <form onSubmit={submit} className="space-y-4" noValidate>
           {step === "credentials" ? (
             <>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
-                  Email address
-                </label>
-                <div
-                  className={`flex items-center rounded-[1rem] border px-4 transition-all ${
-                    errors.email
-                      ? "border-red-500/70 bg-red-500/10"
-                      : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/35 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
-                  }`}
-                >
-                  <Icon icon="solar:letter-bold-duotone" className="text-lg text-white/38" />
-                  <input
-                    type="email"
-                    placeholder="name@example.com"
-                    value={email}
-                    autoComplete="email"
-                    inputMode="email"
-                    aria-invalid={Boolean(errors.email)}
-                    aria-describedby="admin-login-email-error"
-                    onBlur={() =>
-                      setTouched((currentValue) => ({ ...currentValue, email: true }))
-                    }
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setNotification({ message: "", type: "", showResend: false });
-                    }}
-                    className="w-full bg-transparent py-4 text-base text-white placeholder:text-white/35 focus:outline-none"
-                  />
-                </div>
-                <span
-                  id="admin-login-email-error"
-                  className={`block text-sm text-red-400 transition-all duration-300 ${
-                    errors.email ? "opacity-100" : "opacity-0"
-                  }`}
-                >
-                  {errors.email || " "}
-                </span>
-              </div>
+              <AuthInput
+                id="admin-login-email"
+                label="Email Address"
+                icon="solar:letter-bold-duotone"
+                type="email"
+                value={email}
+                autoComplete="email"
+                inputMode="email"
+                error={errors.email}
+                onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setNotification({ message: "", type: "", showResend: false });
+                }}
+              />
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
-                    Password
-                  </label>
+              <div className="space-y-1">
+                <AuthInput
+                  id="admin-login-password"
+                  label="Password"
+                  icon="solar:lock-password-bold-duotone"
+                  isPassword
+                  value={password}
+                  autoComplete="current-password"
+                  error={errors.password}
+                  onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setNotification({ message: "", type: "", showResend: false });
+                  }}
+                />
+                <div className="flex items-center justify-end pr-2 pt-1">
                   <Link
                     href="/forgot-password"
                     className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A] transition hover:text-[#fff37a]"
@@ -392,94 +380,27 @@ function AdminLoginPageContent() {
                     Forgot password?
                   </Link>
                 </div>
-                <div
-                  className={`flex items-center rounded-[1rem] border px-4 transition-all ${
-                    errors.password
-                      ? "border-red-500/70 bg-red-500/10"
-                      : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/35 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
-                  }`}
-                >
-                  <Icon icon="solar:lock-password-bold-duotone" className="text-lg text-white/38" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    autoComplete="current-password"
-                    aria-invalid={Boolean(errors.password)}
-                    aria-describedby="admin-login-password-error"
-                    onBlur={() =>
-                      setTouched((currentValue) => ({ ...currentValue, password: true }))
-                    }
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setNotification({ message: "", type: "", showResend: false });
-                    }}
-                    className="w-full bg-transparent py-4 text-base text-white placeholder:text-white/35 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    className="text-white/50 transition hover:text-white"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    <Icon
-                      icon={showPassword ? "ri:eye-close-fill" : "streamline:eye-optic-remix"}
-                      width={18}
-                    />
-                  </button>
-                </div>
-                <span
-                  id="admin-login-password-error"
-                  className={`block text-sm text-red-400 transition-all duration-300 ${
-                    errors.password ? "opacity-100" : "opacity-0"
-                  }`}
-                >
-                  {errors.password || " "}
-                </span>
               </div>
             </>
           ) : (
             <>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
-                  One-time access code
-                </label>
-                <div
-                  className={`flex items-center rounded-[1rem] border px-4 transition-all ${
-                    errors.otp
-                      ? "border-red-500/70 bg-red-500/10"
-                      : "border-white/10 bg-black/35 focus-within:border-[#D5E400]/35 focus-within:bg-black/50 focus-within:shadow-[0_0_0_4px_rgba(213,228,0,0.08)]"
-                  }`}
-                >
-                  <Icon icon="solar:key-bold-duotone" className="text-lg text-white/38" />
-                  <input
-                    type="text"
-                    placeholder="6-digit access code"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otpCode}
-                    aria-invalid={Boolean(errors.otp)}
-                    aria-describedby="admin-login-otp-error"
-                    onBlur={() =>
-                      setTouched((currentValue) => ({ ...currentValue, otp: true }))
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, "").slice(0, 6);
-                      setOtpCode(value);
-                      setNotification({ message: "", type: "", showResend: false });
-                    }}
-                    className="w-full bg-transparent py-4 text-base tracking-[0.32em] text-white placeholder:text-white/35 focus:outline-none"
-                  />
-                </div>
-                <span
-                  id="admin-login-otp-error"
-                  className={`block text-sm text-red-400 transition-all duration-300 ${
-                    errors.otp ? "opacity-100" : "opacity-0"
-                  }`}
-                >
-                  {errors.otp || " "}
-                </span>
-              </div>
+              <AuthInput
+                id="admin-login-otp"
+                label="6-digit access code"
+                icon="solar:key-bold-duotone"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otpCode}
+                error={errors.otp}
+                onBlur={() => setTouched((prev) => ({ ...prev, otp: true }))}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  setOtpCode(value);
+                  setNotification({ message: "", type: "", showResend: false });
+                }}
+                className="font-mono tracking-[0.32em]"
+              />
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/75 md:text-sm">
                 <button
@@ -517,7 +438,7 @@ function AdminLoginPageContent() {
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D5E400] bg-transparent px-6 py-3.5 font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-[0_18px_40px_-24px_rgba(213,228,0,0.75)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,#D5E400_0%,#E9F628_50%,#D5E400_100%)] bg-size-[200%_auto] px-6 py-4 text-[1.05rem] font-bold text-black shadow-[0_0_20px_rgba(213,228,0,0.15)] transition-all duration-300 hover:bg-right hover:shadow-[0_0_30px_rgba(213,228,0,0.3)] disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98]"
           >
             {loading ? (
               <>
@@ -525,9 +446,15 @@ function AdminLoginPageContent() {
                 {step === "otp" ? "Verifying..." : "Logging in..."}
               </>
             ) : step === "otp" ? (
-              "Verify Access"
+              <>
+                <Icon icon="solar:shield-check-bold-duotone" width={22} className="transition-transform group-hover:translate-x-1" />
+                Verify Access
+              </>
             ) : (
-              "Login"
+              <>
+                <Icon icon="solar:login-3-bold-duotone" width={22} className="transition-transform group-hover:translate-x-1" />
+                Secure Login
+              </>
             )}
           </button>
         </form>
@@ -550,7 +477,7 @@ function AdminLoginPageContent() {
                 alt="Google logo"
                 className="absolute bottom-0 left-4 top-0 my-auto rounded-full bg-black/15 p-1"
               />
-              <span className="ml-6">Continue with Google</span>
+              <span className="ml-6 font-bold tracking-wide">Continue with Google</span>
             </Link>
           </>
         ) : null}

@@ -68,19 +68,19 @@ export default function CustomSelect({
                 aria-expanded={isOpen}
                 aria-disabled={disabled}
             >
-                <div className="flex min-h-8 md:min-h-10 items-center justify-between gap-3 md:gap-4">
+                <div className="flex min-h-8 md:min-h-10 w-full items-center justify-between gap-3 md:gap-4">
                     {selectedOption ? (
-                        <div className="min-w-0">
-                            <p className="truncate font-semibold text-[#F6FF6A] text-xs md:text-sm">{selectedOption.name}, {selectedOption.city}</p>
-                            <p className="truncate text-[10px] md:text-xs text-white/55 mt-0.5">{selectedOption.address}, {selectedOption.state} {selectedOption.zip}</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[#F6FF6A] text-xs md:text-sm whitespace-normal wrap-break-word">{selectedOption.name}, {selectedOption.city}</p>
+                            <p className="text-[10px] md:text-xs text-white/55 mt-0.5 whitespace-normal wrap-break-word">{selectedOption.address}, {selectedOption.state} {selectedOption.zip}</p>
                         </div>
                     ) : isLoading ? (
-                        <div className="w-full space-y-1 pr-6">
+                        <div className="flex-1 w-full space-y-1 pr-6">
                             <Skeleton className="h-3 md:h-4 w-3/4" />
                             <Skeleton className="h-2.5 md:h-3 w-1/2" />
                         </div>
                     ) : (
-                        <span className="text-white/42 text-xs md:text-sm">{selectedLabel}</span>
+                        <span className="flex-1 min-w-0 text-white/42 text-xs md:text-sm whitespace-normal wrap-break-word">{selectedLabel}</span>
                     )}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5 shrink-0 text-[#f7fac7]" fill="none" viewBox="0 0 24 24" strokeWidth="1.2" stroke="currentColor" >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
@@ -107,9 +107,9 @@ export default function CustomSelect({
                                         onClick={() => handleOptionClick(option._id)}
                                         className="cursor-pointer px-4 py-3 transition bg-[#161700]/90 hover:bg-[#161700]/60"
                                     >
-                                        <div>
-                                            <p className="font-semibold text-[#F6FF6A]">{option.name}, {option.city}</p>
-                                            <p className="text-xs text-white/55">{option.address}, {option.state} {option.zip}</p>
+                                        <div className="w-full">
+                                            <p className="font-semibold text-[#F6FF6A] whitespace-normal wrap-break-word">{option.name}, {option.city}</p>
+                                            <p className="text-xs text-white/55 mt-0.5 whitespace-normal wrap-break-word">{option.address}, {option.state} {option.zip}</p>
                                         </div>
                                     </li>
                                 ))
@@ -155,13 +155,13 @@ export default function CustomSelect({
                                                     onClick={(e) => { e.stopPropagation(); handleOptionClick(option._id); }}
                                                     className="mb-2 cursor-pointer rounded-2xl px-5 py-4 transition bg-[#D5E400]/5 hover:bg-[#D5E400]/15 active:bg-[#D5E400]/25"
                                                 >
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#CDD645]/15 text-[#CDD645]">
+                                                    <div className="flex items-start gap-4 w-full">
+                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#CDD645]/15 text-[#CDD645] mt-1">
                                                             <Icon icon="streamline-plump:location-pin-solid" className="text-lg" />
                                                         </div>
-                                                        <div>
-                                                            <p className="font-semibold text-[#F6FF6A]">{option.name}, {option.city}</p>
-                                                            <p className="text-xs text-white/60">{option.address}, {option.state} {option.zip}</p>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-semibold text-[#F6FF6A] whitespace-normal wrap-break-word">{option.name}, {option.city}</p>
+                                                            <p className="text-xs text-white/60 mt-0.5 whitespace-normal wrap-break-word">{option.address}, {option.state} {option.zip}</p>
                                                         </div>
                                                     </div>
                                                 </li>

@@ -62,6 +62,8 @@ export default function AddPackagePage() {
     const packageState = useSelector(selectPackage);
     const { user, loading } = useSelector((state: any) => state.user)
     const { formData, currentPackage, editIndex, currentStep } = packageState;
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => { setIsMounted(true); }, []);
     const [pickupLocations, setPickupLocations] = useState<Location[]>([]);
     const [dropLocations, setDropLocations] = useState<Location[]>([]);
     const [isLoadingPickup, setIsLoadingPickup] = useState(false);
@@ -156,30 +158,23 @@ export default function AddPackagePage() {
 
     useEffect(() => {
         if (!formData.pickupLocationId) return;
+        if (pickupLocations.length === 0) return; // Wait until loaded
+
         const pickupExists = pickupLocations.some((location) => location._id === formData.pickupLocationId);
         if (pickupExists) return;
 
-        dispatch(
-            setFormData({
-                ...formData,
-                pickupLocationId: "",
-                dropLocationId: "",
-            }),
-        );
-    }, [dispatch, formData, pickupLocations]);
+        dispatch(resetPackageState());
+    }, [dispatch, formData.pickupLocationId, pickupLocations]);
 
     useEffect(() => {
         if (!formData.dropLocationId) return;
+        if (dropLocations.length === 0) return;
+
         const dropExists = dropLocations.some((location) => location._id === formData.dropLocationId);
         if (dropExists) return;
 
-        dispatch(
-            setFormData({
-                ...formData,
-                dropLocationId: "",
-            }),
-        );
-    }, [dispatch, dropLocations, formData]);
+        dispatch(resetPackageState());
+    }, [dispatch, dropLocations, formData.dropLocationId]);
 
 
 
@@ -487,6 +482,10 @@ export default function AddPackagePage() {
             };
 
             const { sessionId, razorpayOrderId, amount, keyId } = await createBookingSession(sessionPayload);
+            console.log("sessionId", sessionId);
+            console.log("razorpayOrderId", razorpayOrderId);
+            console.log("amount", amount);
+            console.log("keyId", keyId);
 
             const options = {
                 key: requireRazorpayKeyId(keyId),
@@ -539,6 +538,7 @@ export default function AddPackagePage() {
             }
 
             const rzp = new Razorpay(options);
+            console.log("rzp", rzp);
             if (typeof rzp.on === "function") {
                 rzp.on('payment.failed', async (failure: any) => {
                     try {
@@ -687,19 +687,17 @@ export default function AddPackagePage() {
                                             <div key={entry.step} className={`flex items-center ${index !== list.length - 1 ? "flex-1" : "flex-none"}`}>
                                                 <div className="flex flex-col items-center">
                                                     <div
-                                                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] md:text-sm font-bold transition sm:h-12 sm:w-12 ${
-                                                            isComplete
-                                                                ? "border-[#CDD645] bg-[#CDD645]/65 text-[#1f271a]"
-                                                                : isActive
-                                                                    ? "border-[#CDD645] bg-[#CDD645]/18 text-[#F6FF6A]"
-                                                                    : "border-[#CDD645]/45 bg-white/6 text-white/65"
-                                                        }`}
+                                                        className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-[13px] md:text-sm font-bold transition sm:h-12 sm:w-12 ${isMounted && isComplete
+                                                            ? "border-[#CDD645] bg-[#CDD645]/65 text-[#1f271a]"
+                                                            : isMounted && isActive
+                                                                ? "border-[#CDD645] bg-[#CDD645]/18 text-[#F6FF6A]"
+                                                                : "border-[#CDD645]/45 bg-white/6 text-white/65"
+                                                            }`}
                                                     >
-                                                        {isComplete ? <Icon icon="mdi:check" className="text-lg" /> : entry.step}
+                                                        {isMounted && isComplete ? <Icon icon="mdi:check" className="text-lg" /> : entry.step}
                                                     </div>
-                                                    <p className={`mt-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] sm:mt-2 md:text-xs sm:text-sm ${
-                                                        isActive || isComplete ? "text-[#F6FF6A]" : "text-white/55"
-                                                    }`}>
+                                                    <p className={`mt-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] sm:mt-2 md:text-xs sm:text-sm ${isActive || isComplete ? "text-[#F6FF6A]" : "text-white/55"
+                                                        }`}>
                                                         {entry.label}
                                                     </p>
                                                 </div>
@@ -916,10 +914,10 @@ export default function AddPackagePage() {
 
             {showAdminConfirmModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-                        <div className="w-full max-w-md rounded-2xl border border-[#CDD645]/30 bg-[#1f271a] p-5 shadow-2xl">
-                            <h3 className="text-lg font-semibold text-[#F6FF6A]">
-                                Confirm Admin Booking
-                            </h3>
+                    <div className="w-full max-w-md rounded-2xl border border-[#CDD645]/30 bg-[#1f271a] p-5 shadow-2xl">
+                        <h3 className="text-lg font-semibold text-[#F6FF6A]">
+                            Confirm Admin Booking
+                        </h3>
                         <p className="mt-2 text-sm text-white/75">
                             This will confirm the order without Razorpay payment.
                         </p>

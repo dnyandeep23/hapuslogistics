@@ -157,7 +157,7 @@ export default function AuthShell({
         </div>
 
         <div className="order-2 lg:justify-self-end lg:self-center">
-          <div className={`rounded-[2rem] border border-white/10 bg-[linear-gradient(145deg,rgba(18,21,18,0.96),rgba(11,13,11,0.99))] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.36)] backdrop-blur-xl sm:p-6 lg:p-7 ${cardWidth} ${isMobile ? "mx-auto" : ""}`}>
+          <div className={`rounded-[2rem] border border-white/10 bg-[linear-gradient(145deg,rgba(18,21,18,0.7),rgba(11,13,11,0.85))] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.4)] backdrop-blur-3xl sm:p-6 lg:p-7 ${cardWidth} ${isMobile ? "mx-auto" : ""}`}>
             {children}
           </div>
         </div>

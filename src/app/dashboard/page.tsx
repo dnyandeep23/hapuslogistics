@@ -10,7 +10,7 @@ import RecentOrders from '@/components/RecentOrders';
 import OrderTrackingWidget from '@/components/OrderTrackingWidget';
 import { resetPackageState } from '@/lib/redux/packageSlice';
 import { AppDispatch } from '@/lib/redux/store';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Icon } from "@iconify/react";
 import { fetchUser } from '@/lib/redux/userSlice';
 import { useDropzone } from 'react-dropzone';
@@ -136,6 +136,13 @@ const formatBusNumberInput = (value: string) => {
 export default function DashboardPage() {
   const { isMobile, isTablet } = useResponsiveMode();
   const { user } = useAppSelector((state) => state.user)
+  const packageState = useSelector((state: any) => state.package);
+  const hasUncompletedPackage = Boolean(
+    packageState?.formData?.cart?.length > 0 ||
+    packageState?.formData?.pickupLocationId ||
+    packageState?.formData?.dropLocationId ||
+    packageState?.currentPackage?.packageType
+  );
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const [bannerSlides, setBannerSlides] = useState<string[]>([]);
@@ -681,7 +688,7 @@ export default function DashboardPage() {
       ];
     }
 
-    return [
+    const baseUserServices = [
       {
         title: "My Packages",
         description: "View current package history, statuses, and delivery progress in one place.",
@@ -690,8 +697,21 @@ export default function DashboardPage() {
         icon: myPackageImg,
         width: 135,
         onclick: handleOrdersClick,
-      },
-      {
+      }
+    ];
+
+    if (hasUncompletedPackage) {
+      baseUserServices.push({
+        title: "New Package",
+        description: "Discard your previous draft and start a fresh shipment.",
+        actionLabel: "Start fresh",
+        iconKey: "solar:refresh-circle-bold-duotone",
+        icon: addPackageImg,
+        width: 115,
+        onclick: handleAddPackageClick,
+      });
+    } else {
+      baseUserServices.push({
         title: "Add Package",
         description: "Create a new shipment quickly and pick up where you left off anytime.",
         actionLabel: "Start booking",
@@ -699,17 +719,20 @@ export default function DashboardPage() {
         icon: addPackageImg,
         width: 115,
         onclick: handleAddPackageClick,
-      },
-      {
-        title: "Track & Shipments",
-        description: "Track live movement and check delivery updates without leaving the dashboard.",
-        actionLabel: "Track now",
-        iconKey: "solar:delivery-bold-duotone",
-        icon: trackPackageImg,
-        width: 135,
-        onclick: handleTrackOrderClick,
-      },
-    ];
+      });
+    }
+
+    baseUserServices.push({
+      title: "Track & Shipments",
+      description: "Track live movement and check delivery updates without leaving the dashboard.",
+      actionLabel: "Track now",
+      iconKey: "solar:delivery-bold-duotone",
+      icon: trackPackageImg,
+      width: 135,
+      onclick: handleTrackOrderClick,
+    });
+
+    return baseUserServices;
   })();
 
   const isAdminLocked = user?.role === "admin" && user?.hasRegisteredBus === false;
@@ -1062,6 +1085,37 @@ export default function DashboardPage() {
                 />
               </div>
             </div>
+          ) : null}
+
+          {isPublicUserRole && hasUncompletedPackage ? (
+            <section className="mb-8 w-full overflow-hidden rounded-[2rem] border border-[#D5E400]/40 bg-[linear-gradient(135deg,rgba(213,228,0,0.15),rgba(176,191,18,0.05))] p-6 shadow-[0_20px_60px_rgba(213,228,0,0.12)] backdrop-blur-xl transition-all hover:bg-[linear-gradient(135deg,rgba(213,228,0,0.2),rgba(176,191,18,0.08))] sm:p-8">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#D5E400]/20 text-[#D5E400] shadow-[inset_0_0_12px_rgba(213,228,0,0.3)]">
+                    <Icon icon="solar:clock-circle-bold-duotone" className="animate-pulse text-2xl" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D5E400]">URGENT DRAFT</p>
+                       <span className="relative flex h-2 w-2">
+                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D5E400] opacity-75" />
+                         <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D5E400]" />
+                       </span>
+                    </div>
+                    <h2 className="mt-1 text-lg font-bold text-white sm:text-xl">Unfinished Package Found</h2>
+                    <p className="mt-1 max-w-2xl text-sm leading-6 text-white/70">You left a booking mid-way. Resume exactly where you left off before the session expires.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push("/package")}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-transparent bg-[#D5E400] px-8 py-3.5 text-sm font-bold text-black shadow-[0_8px_24px_rgba(213,228,0,0.35)] transition hover:scale-105 hover:bg-[#e4f51e] active:scale-95 sm:w-auto"
+                >
+                  Complete Package Now
+                  <Icon icon="solar:arrow-right-linear" className="text-lg" />
+                </button>
+              </div>
+            </section>
           ) : null}
 
           <ServicesSection services={services} />

@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import googleVector from "@/assets/images/googleVector.png";
 import loginVector from "@/assets/images/loginvector.png";
 import AuthShell from "@/components/AuthShell";
+import AuthInput from "@/components/AuthInput";
 import NotificationBox from "@/components/NotificationBox";
 import { useToast } from "@/context/ToastContext";
 import { getErrorMessage } from "@/lib/authError";
@@ -42,11 +43,6 @@ const getRedirectCopy = (redirectPath: string) => {
   return "Log in to continue where you left off.";
 };
 
-const passwordInputClass =
-  "w-full bg-transparent px-0 py-3 text-base text-white placeholder:text-white/38 focus:outline-none";
-const fieldShellClass =
-  "rounded-[1rem] border border-white/10 bg-black/70 px-4 shadow-[inset_0_-1px_0_rgba(255,255,255,0.14)] transition focus-within:border-white/35";
-const fieldRowClass = "flex items-center gap-3";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -269,69 +265,45 @@ function LoginPageContent() {
           </p>
 
           {hasCustomRedirect ? (
-            <div className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-white/70">
+            <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-sm leading-6 text-white/70">
               {getRedirectCopy(redirectTarget)}
             </div>
           ) : null}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-1.5">
-            <label
-              htmlFor="login-email"
-              className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45"
-            >
-              Email
-            </label>
-            <div
-              className={`${fieldShellClass} ${
-                errors.email
-                  ? "border-red-500/70 bg-red-500/10"
-                  : "focus-within:border-[#D5E400]/40"
-              }`}
-            >
-              <div className={fieldRowClass}>
-                <span className="text-white/38">
-                  <Icon icon="solar:letter-bold-duotone" width={20} />
-                </span>
-                <input
-                  id="login-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  autoComplete="email"
-                  inputMode="email"
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby="login-email-error"
-                  onBlur={() =>
-                    setTouched((currentValue) => ({ ...currentValue, email: true }))
-                  }
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setNotification({ message: "", type: "", showResend: false });
-                  }}
-                  className="w-full bg-transparent py-4 text-lg text-white placeholder:text-white/40 focus:outline-none"
-                />
-              </div>
-            </div>
-            <span
-              id="login-email-error"
-              className={`block text-sm text-red-400 transition-all duration-300 ${
-                errors.email ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {errors.email || " "}
-            </span>
-          </div>
+          <AuthInput
+            id="login-email"
+            label="Email Address"
+            icon="solar:letter-bold-duotone"
+            type="email"
+            value={email}
+            autoComplete="email"
+            inputMode="email"
+            error={errors.email}
+            onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setNotification({ message: "", type: "", showResend: false });
+            }}
+          />
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <label
-                htmlFor="login-password"
-                className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45"
-              >
-                Password
-              </label>
+          <div className="space-y-1">
+            <AuthInput
+              id="login-password"
+              label="Password"
+              icon="solar:lock-password-bold-duotone"
+              isPassword
+              value={password}
+              autoComplete="current-password"
+              error={errors.password}
+              onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setNotification({ message: "", type: "", showResend: false });
+              }}
+            />
+            <div className="flex items-center justify-end pr-2 pt-1">
               <Link
                 href={forgotPasswordHref}
                 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A] transition hover:text-[#fff37a]"
@@ -339,58 +311,6 @@ function LoginPageContent() {
                 Forgot Password?
               </Link>
             </div>
-            <div
-              className={`relative ${fieldShellClass} pr-14 ${
-                errors.password
-                  ? "border-red-500/70 bg-red-500/10"
-                  : "focus-within:border-[#D5E400]/40"
-              }`}
-            >
-              <div className={fieldRowClass}>
-                <span className="text-white/38">
-                  <Icon icon="solar:lock-password-bold-duotone" width={20} />
-                </span>
-                <input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  autoComplete="current-password"
-                  aria-invalid={Boolean(errors.password)}
-                  aria-describedby="login-password-error login-password-help"
-                  onBlur={() =>
-                    setTouched((currentValue) => ({ ...currentValue, password: true }))
-                  }
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                    setNotification({ message: "", type: "", showResend: false });
-                  }}
-                  className={passwordInputClass}
-                />
-              </div>
-              <button
-                type="button"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/55 transition hover:text-white"
-                onClick={() => setShowPassword((currentValue) => !currentValue)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                <Icon
-                  icon={showPassword ? "ri:eye-close-fill" : "streamline:eye-optic-remix"}
-                  width={18}
-                />
-              </button>
-            </div>
-            <div id="login-password-help" className="text-xs leading-5 text-white/42">
-              Keep your password hidden unless you need to check it.
-            </div>
-            <span
-              id="login-password-error"
-              className={`block text-sm text-red-400 transition-all duration-300 ${
-                errors.password ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {errors.password || " "}
-            </span>
           </div>
 
           <div className="space-y-2 pt-1 text-sm text-white/70">
@@ -408,17 +328,17 @@ function LoginPageContent() {
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D5E400] bg-transparent px-6 py-3.5 text-base font-semibold text-[#D5E400] transition-all duration-300 hover:bg-[#D5E400] hover:text-black hover:shadow-[0_18px_40px_-24px_rgba(213,228,0,0.75)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,#D5E400_0%,#E9F628_50%,#D5E400_100%)] bg-size-[200%_auto] px-6 py-4 text-[1.05rem] font-bold text-black shadow-[0_0_20px_rgba(213,228,0,0.15)] transition-all duration-300 hover:bg-right hover:shadow-[0_0_30px_rgba(213,228,0,0.3)] disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98]"
           >
             {loading ? (
               <>
-                <Icon icon="line-md:loading-loop" className="text-lg" />
+                <Icon icon="line-md:loading-loop" className="text-xl" />
                 Logging in...
               </>
             ) : (
               <>
-                <Icon icon="solar:login-3-bold-duotone" width={18} />
-                Login
+                <Icon icon="solar:login-3-bold-duotone" width={22} className="transition-transform group-hover:translate-x-1" />
+                Secure Login
               </>
             )}
           </button>
@@ -440,7 +360,7 @@ function LoginPageContent() {
             alt="Google logo"
             className="absolute left-4 top-0 bottom-0 my-auto rounded-full bg-black/15 p-1"
           />
-          <span className="ml-6">Sign in with Google</span>
+          <span className="ml-6 font-bold tracking-wide">Sign in with Google</span>
         </Link>
       </div>
     </AuthShell>

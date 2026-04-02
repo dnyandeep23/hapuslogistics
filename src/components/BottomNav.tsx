@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import type { MenuItem } from "../data/roleMenus";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { logoutUser } from "@/lib/redux/userSlice";
+import { resetPackageState } from "@/lib/redux/packageSlice";
 
 type Props = {
     menus: MenuItem[];
@@ -116,6 +117,11 @@ export default function BottomNav({ menus }: Props) {
                                 <Link
                                     key={item.href}
                                     href={item.href}
+                                    onClick={(e) => {
+                                        if (item.href === "/package") {
+                                            dispatch(resetPackageState());
+                                        }
+                                    }}
                                     aria-current={active ? "page" : undefined}
                                     className={`
                   group/item relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl py-2
@@ -209,7 +215,12 @@ export default function BottomNav({ menus }: Props) {
                                     <Link
                                         key={item.href}
                                         href={item.href}
-                                        onClick={() => setIsMoreOpen(false)}
+                                        onClick={() => {
+                                            if (item.href === "/package") {
+                                                dispatch(resetPackageState());
+                                            }
+                                            setIsMoreOpen(false);
+                                        }}
                                         className={`
                       group/item flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-all duration-300
                       ${active ? "border-[#d5e400]/20 bg-[linear-gradient(135deg,rgba(213,228,0,0.16),rgba(255,255,255,0.05))] text-[#F2FF8F]" : "border-white/5 text-[#C5D2AC] hover:border-white/10 hover:bg-white/5 hover:text-[#F2FF8F]"}

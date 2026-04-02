@@ -8,6 +8,7 @@ import { User } from "@/types";
 import { useAppDispatch } from "@/lib/redux/hooks";
 import { logoutUser } from "@/lib/redux/userSlice";
 import { STRINGS } from "@/lib/strings";
+import { resetPackageState } from "@/lib/redux/packageSlice";
 
 type Props = {
     user: User | null;
@@ -148,6 +149,11 @@ hover:shadow-2xl hover:shadow-[#E4E67A]`}
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                onClick={(e) => {
+                                    if (item.href === "/package") {
+                                        dispatch(resetPackageState());
+                                    }
+                                }}
                                 className={`
           group/item relative flex items-center overflow-hidden rounded-[1.25rem] border transition-all duration-300
           ${isExpanded ? "justify-start gap-3 px-3 py-3 pr-4" : "flex-col gap-1 px-2 py-3 text-center"}

@@ -300,11 +300,14 @@ export default function PackageCatalogDashboardPage() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#CDD645]/10 text-2xl text-[#E4E67A] shadow-[0_0_15px_rgba(205,214,69,0.15)] group-hover:scale-110 transition-transform">
                         <Icon icon={category.icon || "mdi:shape-outline"} />
                       </div>
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${category.isActive ? "bg-emerald-400/15 text-emerald-300" : "bg-white/10 text-white/50"
+                      <button
+                        type="button"
+                        onClick={() => updateCategory(index, (curr) => ({ ...curr, isActive: !curr.isActive }))}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors hover:opacity-80 active:scale-95 cursor-pointer ${category.isActive ? "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25" : "bg-white/10 text-white/50 hover:bg-white/20"
                         }`}>
                         <div className={`h-1.5 w-1.5 rounded-full ${category.isActive ? "bg-emerald-400" : "bg-white/40"}`} />
                         {category.isActive ? "Active" : "Hidden"}
-                      </span>
+                      </button>
                     </div>
                     <h3 className="text-lg font-bold text-white/90">{category.name || "Unnamed Category"}</h3>
                     <p className="mt-1 text-sm font-semibold text-[#E4E67A]">
@@ -360,11 +363,14 @@ export default function PackageCatalogDashboardPage() {
                       <div className="flex bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 text-white/80 shrink-0">
                         <span className="text-sm font-bold">{size.maxWeightKg}</span><span className="text-[10px] ml-0.5 mt-1 font-semibold text-white/40 uppercase">KG Max</span>
                       </div>
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${size.isActive ? "bg-emerald-400/15 text-emerald-300" : "bg-white/10 text-white/50"
+                      <button
+                        type="button"
+                        onClick={() => updateSize(index, (curr) => ({ ...curr, isActive: !curr.isActive }))}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors hover:opacity-80 active:scale-95 cursor-pointer ${size.isActive ? "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25" : "bg-white/10 text-white/50 hover:bg-white/20"
                         }`}>
                         <div className={`h-1.5 w-1.5 rounded-full ${size.isActive ? "bg-emerald-400" : "bg-white/40"}`} />
                         {size.isActive ? "Active" : "Hidden"}
-                      </span>
+                      </button>
                     </div>
 
                     <h3 className="text-lg font-bold text-white/90">{size.name || "Unnamed Size"}</h3>
