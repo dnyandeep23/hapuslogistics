@@ -128,26 +128,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="relative z-10 flex h-dvh w-full flex-col lg:hidden no-scrollbar">
         <MobileHeader />
 
-        {isTablet ? (
-          <div className="border-b border-white/10 bg-[linear-gradient(180deg,rgba(20,26,19,0.72),rgba(15,20,14,0.6))] px-4 py-3 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-[54rem] items-center justify-between gap-4">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Tablet workspace</p>
-                <p className="mt-1 text-sm font-semibold text-[#F6FF6A]">Balanced layout with wider cards and split content.</p>
-              </div>
-              <span className="rounded-full border border-[#d5e400]/25 bg-[#d5e400]/10 px-3 py-1 text-xs font-semibold text-[#F6FF6A]">
-                {roleKey}
-              </span>
-            </div>
-          </div>
-        ) : null}
 
         <main className={`flex-1 overflow-y-auto no-scrollbar ${isMobile ? "px-3 py-4 pb-28" : "px-4 py-5 pb-30"}`}>
-          <div className={`mx-auto w-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl transition-all ${
-            isMobile
+          <div className={`mx-auto w-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] shadow-[0_24px_60px_rgba(0,0,0,0.25)] backdrop-blur-2xl transition-all ${isMobile
               ? "max-w-[30rem] rounded-[1.75rem] p-3"
               : "max-w-[54rem] rounded-[2rem] p-5"
-          }`}>
+            }`}>
             {children}
           </div>
         </main>

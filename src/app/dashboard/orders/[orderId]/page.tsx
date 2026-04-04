@@ -1368,8 +1368,6 @@ export default function OrderDetailPage() {
     !isCancelled &&
     !isMissedPackage &&
     !hideContactByTime;
-  const supportPhone = toStringValue(order.supportContact?.phone);
-  const supportPhoneHref = telHref(supportPhone);
   const statusStepIndex = getStepIndex(order.status);
   const statusSteps = ["Order Placed", "Confirmed", "In Transit", "Delivered"];
   const heroDescription = isMobile
@@ -1498,24 +1496,14 @@ export default function OrderDetailPage() {
 
         <div className={`relative mt-5 flex flex-wrap gap-2 ${isMobile ? "items-stretch" : "items-center"}`}>
           {isOrderOwner ? (
-            supportPhoneHref ? (
-              <a
-                href={supportPhoneHref}
-                className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] ${isMobile ? "w-full justify-center text-sm" : "text-xs"}`}
-              >
-                <Icon icon="mdi:lifebuoy" className="text-sm" />
-                {isMobile ? "Contact Support" : `Contact Support: ${supportPhone}`}
-              </a>
-            ) : (
-              <button
-                type="button"
-                onClick={() => router.push(`/dashboard/support?orderId=${order.id}`)}
-                className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] ${isMobile ? "w-full justify-center text-sm" : "text-xs"}`}
-              >
-                <Icon icon="mdi:lifebuoy" className="text-sm" />
-                Contact Support
-              </button>
-            )
+            <button
+              type="button"
+              onClick={() => router.push(`/dashboard/support?orderId=${order.id}`)}
+              className={`inline-flex items-center gap-2 rounded-lg border border-[#6A774F] bg-[#25311E] px-3 py-2 font-semibold text-[#F6FF6A] hover:bg-[#2D3A24] ${isMobile ? "w-full justify-center text-sm" : "text-xs"}`}
+            >
+              <Icon icon="mdi:lifebuoy" className="text-sm" />
+              Contact Support
+            </button>
           ) : null}
           <button
             type="button"
