@@ -92,6 +92,41 @@ export default function AddPackagePage() {
         Number(pricingInfo?.total) > 0;
     const isAdminBookingUser = user?.role === "admin";
 
+    const getDashboardFallbackHref = () => {
+        switch (user?.role) {
+            case "admin":
+            case "operator":
+            case "user":
+            default:
+                return "/dashboard";
+        }
+    };
+
+    const shouldGoBackToDashboard = () => {
+        if (typeof window === "undefined") return false;
+
+        const referrer = document.referrer;
+        if (!referrer) return false;
+
+        try {
+            const referrerUrl = new URL(referrer);
+            if (referrerUrl.origin !== window.location.origin) return false;
+
+            return referrerUrl.pathname.startsWith("/dashboard");
+        } catch {
+            return false;
+        }
+    };
+
+    const navigateAwayFromPackagePage = () => {
+        if (shouldGoBackToDashboard()) {
+            router.back();
+            return;
+        }
+
+        router.push(getDashboardFallbackHref());
+    };
+
     useEffect(() => {
         const fetchPickups = async () => {
             setIsLoadingPickup(true);
@@ -276,7 +311,7 @@ export default function AddPackagePage() {
 
     const handleExitPackagePage = () => {
         if (!hasUnsavedChanges) {
-            router.back();
+            navigateAwayFromPackagePage();
             return;
         }
         setShowExitConfirmModal(true);
@@ -645,7 +680,7 @@ export default function AddPackagePage() {
                 onClose={() => setShowExitConfirmModal(false)}
                 onConfirm={() => {
                     setShowExitConfirmModal(false);
-                    router.back();
+                    navigateAwayFromPackagePage();
                 }}
             />
 

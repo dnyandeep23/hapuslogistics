@@ -70,6 +70,55 @@ const getApiErrorMessage = (payload: unknown, fallback: string) => {
   return data.error || data.message || fallback;
 };
 
+const getPlainTextErrorMessage = (payload: string, fallback: string) => {
+  const message = payload.trim();
+  if (!message) return fallback;
+
+  const isHtmlResponse =
+    message.startsWith("<!DOCTYPE html") || message.startsWith("<html");
+
+  return isHtmlResponse ? fallback : message;
+};
+
+const parseJsonResponse = async <T>(
+  response: Response,
+  fallback: string,
+): Promise<T> => {
+  const rawBody = await response.text();
+  const trimmedBody = rawBody.trim();
+
+  if (!trimmedBody) {
+    if (!response.ok) {
+      throw new Error(fallback);
+    }
+
+    throw new Error(`${fallback}. Server returned an empty response.`);
+  }
+
+  let data: T;
+
+  try {
+    data = JSON.parse(trimmedBody) as T;
+  } catch {
+    if (!response.ok) {
+      throw new Error(getPlainTextErrorMessage(trimmedBody, fallback));
+    }
+
+    const contentType = response.headers.get("content-type");
+    const contentTypeLabel = contentType ? ` (${contentType})` : "";
+
+    throw new Error(
+      `${fallback}. Server returned an invalid JSON response with status ${response.status}${contentTypeLabel}.`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, fallback));
+  }
+
+  return data;
+};
+
 /**
  * Fetches the list of all available pickup locations.
  * @returns A promise that resolves to an array of Location objects.
@@ -77,10 +126,10 @@ const getApiErrorMessage = (payload: unknown, fallback: string) => {
 export const getPickupLocations = async (): Promise<Location[]> => {
   try {
     const response = await fetch('/api/locations/pickup', { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch pickup locations with status: ${response.status}`);
-    }
-    const data: Location[] = await response.json();
+    const data = await parseJsonResponse<Location[]>(
+      response,
+      `Failed to fetch pickup locations with status: ${response.status}`,
+    );
     return data;
   } catch (error) {
     console.error(error);
@@ -103,10 +152,10 @@ export const getDropLocations = async (pickupLocationId: string): Promise<Locati
       `/api/locations/drop?pickupLocationId=${encodeURIComponent(pickupLocationId)}`,
       { cache: "no-store" },
     );
-    if (!response.ok) {
-      throw new Error(`Failed to fetch drop locations with status: ${response.status}`);
-    }
-    const data: Location[] = await response.json();
+    const data = await parseJsonResponse<Location[]>(
+      response,
+      `Failed to fetch drop locations with status: ${response.status}`,
+    );
     return data;
   } catch (error) {
     console.error(error);
@@ -134,12 +183,10 @@ export const getAvailableDates = async (
       `/api/availability?pickupLocationId=${encodeURIComponent(pickupLocationId)}&dropLocationId=${encodeURIComponent(dropLocationId)}&userTimestamp=${encodeURIComponent(userTimestamp)}`,
       { cache: "no-store" } // important in Next.js
     );
-
-    if (!response.ok) {
-      throw new Error(`Failed with status: ${response.status}`);
-    }
-
-    return await response.json();
+    return await parseJsonResponse<string[]>(
+      response,
+      `Failed to fetch available dates with status: ${response.status}`,
+    );
   } catch (error) {
     console.error("getAvailableDates error:", error);
     return [];
@@ -171,12 +218,7 @@ export const calculatePrice = async (
       cache: "no-store",
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(getApiErrorMessage(data, 'Failed to calculate price'));
-    }
-
-    return data as PricingInfo;
+    return await parseJsonResponse<PricingInfo>(response, 'Failed to calculate price');
   } catch (error) {
     console.error('Error calculating price:', error);
     throw error;
@@ -187,13 +229,13 @@ export const getAvailableCoupons = async (userId: string) => {
   try {
     const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
     const response = await fetch(`/api/coupons${query}`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(getApiErrorMessage(data, "Failed to fetch available coupons"));
-    }
+    const data = await parseJsonResponse<{ coupons?: unknown[] }>(
+      response,
+      "Failed to fetch available coupons",
+    );
 
-    const coupons = Array.isArray((data as { coupons?: unknown[] }).coupons)
-      ? (data as { coupons: unknown[] }).coupons
+    const coupons = Array.isArray(data.coupons)
+      ? data.coupons
       : [];
 
     return coupons as AvailableCoupon[];
@@ -204,18 +246,16 @@ export const getAvailableCoupons = async (userId: string) => {
 };
 
 export const createBookingSession = async (sessionPayload: Record<string, unknown>) => {
-    const response = await fetch('/api/orders/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionPayload),
-    });
+  const response = await fetch('/api/orders/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionPayload),
+  });
 
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, 'Failed to create booking session'));
-    }
-
-  return data as BookingSessionResponse;
+  return await parseJsonResponse<BookingSessionResponse>(
+    response,
+    'Failed to create booking session',
+  );
 };
 
 export const confirmAdminBooking = async (payload: {
@@ -230,12 +270,12 @@ export const confirmAdminBooking = async (payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, "Failed to confirm admin booking"));
-  }
-
-  return data as { success: boolean; orderId: string; trackingId: string; message?: string };
+  return await parseJsonResponse<{
+    success: boolean;
+    orderId: string;
+    trackingId: string;
+    message?: string;
+  }>(response, "Failed to confirm admin booking");
 };
 
 export const uploadPackageImage = async (file: File): Promise<string> => {
@@ -248,7 +288,10 @@ export const uploadPackageImage = async (file: File): Promise<string> => {
     body: formData,
   });
 
-  const data = await response.json();
+  const data = await parseJsonResponse<UploadedImageResponse>(
+    response,
+    "Failed to upload package image",
+  );
   if (!response.ok || !data?.imageUrl) {
     throw new Error(getApiErrorMessage(data, "Failed to upload package image"));
   }
@@ -267,12 +310,12 @@ export const confirmBookingPayment = async (payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, 'Failed to confirm payment'));
-  }
-
-  return data as { message: string; orderId?: string; trackingId?: string };
+  const data = await parseJsonResponse<{ message: string; orderId?: string; trackingId?: string }>(
+    response,
+    'Failed to confirm payment',
+  );
+  console.log("data", data);
+  return data;
 };
 
 export const markBookingSessionFailed = async (
@@ -292,10 +335,8 @@ export const markBookingSessionFailed = async (
     body: JSON.stringify(payload || {}),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(data, 'Failed to mark booking session as failed'));
-  }
-
-  return data as { message: string; sessionId?: string };
+  return await parseJsonResponse<{ message: string; sessionId?: string }>(
+    response,
+    'Failed to mark booking session as failed',
+  );
 };

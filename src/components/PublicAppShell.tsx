@@ -30,7 +30,7 @@ export default function PublicAppShell({
         {children}
       </div>
 
-      {showDock ? <PublicBottomDock /> : null}
+      {/* {showDock ? <PublicBottomDock /> : null} */}
     </main>
   );
 }
