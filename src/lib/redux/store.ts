@@ -1,48 +1,24 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, type Middleware, type UnknownAction } from '@reduxjs/toolkit';
 import counterReducer from './counterSlice';
 import userReducer from './userSlice';
 import packageReducer from './packageSlice';
+import { createPersistablePackageState, PACKAGE_STORAGE_KEY } from '@/app/package/state';
+import type { PackageState } from '@/app/package/types';
 
-const saveToLocalStorage = (store: any) => (next: any) => (action: any) => {
+const saveToLocalStorage: Middleware = (storeApi) => (next) => (action) => {
 
-    const result = next(action);
+    const result = next(action as UnknownAction);
 
-    if (action.type.startsWith('package/')) {
+    if (typeof action === "object" && action !== null && "type" in action && typeof action.type === "string" && action.type.startsWith('package/')) {
 
-        const packageState = store.getState().package;
-
-
-
-        // Keep current in-progress image out of local storage while retaining cart image URLs.
-
-        const stateToSave = {
-
-            ...packageState,
-
-            currentPackage: {
-
-                ...packageState.currentPackage,
-
-                packageImage: '', // Don't save image data
-
-            },
-
-            formData: {
-
-                ...packageState.formData,
-
-                // Keep package image URLs (small), so cart resumes correctly after refresh.
-                cart: packageState.formData.cart,
-
-            },
-
-        };
+        const packageState = (storeApi.getState() as RootState).package as PackageState;
+        const stateToSave = createPersistablePackageState(packageState);
 
 
 
         if (typeof window !== "undefined") {
             try {
-                localStorage.setItem('packageState', JSON.stringify(stateToSave));
+                localStorage.setItem(PACKAGE_STORAGE_KEY, JSON.stringify(stateToSave));
             } catch (e) {
                 console.error("Could not save state to local storage", e);
             }

@@ -35,11 +35,12 @@ export async function POST(
     body = {};
   }
 
-  const dbSession = await mongoose.startSession();
-  dbSession.startTransaction();
+  let dbSession: mongoose.ClientSession | null = null;
 
   try {
     await dbConnect();
+    dbSession = await mongoose.startSession();
+    dbSession.startTransaction();
 
     const bookingSession = await BookingSession.findById(sessionId).session(dbSession);
 
@@ -92,11 +93,13 @@ export async function POST(
       { status: 200 }
     );
   } catch (error: unknown) {
-    await dbSession.abortTransaction();
+    if (dbSession?.inTransaction()) {
+      await dbSession.abortTransaction();
+    }
     console.error(`Error marking session ${sessionId} as failed:`, error);
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   } finally {
-    dbSession.endSession();
+    dbSession?.endSession();
   }
 }

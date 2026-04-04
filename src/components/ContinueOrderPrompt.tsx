@@ -7,20 +7,28 @@ import { Icon } from '@iconify/react';
 import { selectPackage, setStep } from '@/lib/redux/packageSlice';
 import { AppDispatch } from '@/lib/redux/store';
 import { useResponsiveMode } from '@/hooks/useResponsiveMode';
+import { hasMeaningfulPackageDraft } from '@/app/package/state';
 
 export default function ContinueOrderPrompt() {
     const dispatch = useDispatch<AppDispatch>();
     const router = useRouter();
-    const { formData, currentStep } = useSelector(selectPackage);
+    const { formData, currentPackage, currentStep } = useSelector(selectPackage);
     const { isMobile, isTablet } = useResponsiveMode();
 
-    const hasInProgressOrder = formData && formData.cart && formData.cart.length > 0;
-    const draftPackageCount = hasInProgressOrder ? formData.cart.length : 0;
+    const hasSavedCart = Array.isArray(formData?.cart) && formData.cart.length > 0;
+    const hasDraftPackage = hasMeaningfulPackageDraft(currentPackage);
+    const hasInProgressOrder =
+        hasSavedCart ||
+        hasDraftPackage ||
+        Boolean(formData?.pickupLocationId || formData?.dropLocationId);
+    const draftPackageCount = hasSavedCart ? formData.cart.length : hasDraftPackage ? 1 : 0;
     const packageImage =
-        hasInProgressOrder &&
+        hasSavedCart &&
             typeof formData.cart[0].packageImage === "string" &&
             formData.cart[0].packageImage.length > 0
             ? formData.cart[0].packageImage
+            : typeof currentPackage?.packageImage === "string" && currentPackage.packageImage.length > 0
+                ? currentPackage.packageImage
             : null;
 
     if (!hasInProgressOrder) {
@@ -33,8 +41,12 @@ export default function ContinueOrderPrompt() {
     };
 
     const heading = isMobile ? 'Resume draft' : isTablet ? 'Continue your shipment draft' : 'Resume your shipment';
+    const packageSummaryLabel =
+        draftPackageCount > 0
+            ? `${draftPackageCount} package${draftPackageCount === 1 ? '' : 's'}`
+            : 'route draft';
     const description = isMobile
-        ? `Step ${currentStep || 1} is saved with ${draftPackageCount} package${draftPackageCount === 1 ? '' : 's'}.`
+        ? `Step ${currentStep || 1} is saved with ${packageSummaryLabel}.`
         : isTablet
             ? 'Your draft is saved and ready to continue, with the most important booking details still in place.'
             : 'Your draft is saved and ready. Pick up where you left off without starting over.';
@@ -67,7 +79,7 @@ export default function ContinueOrderPrompt() {
                                     </span>
                                     <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/70">
                                         <Icon icon="mdi:package-variant-closed" className="text-sm" />
-                                        {draftPackageCount} package{draftPackageCount === 1 ? '' : 's'}
+                                        {packageSummaryLabel}
                                     </span>
                                 </div>
 

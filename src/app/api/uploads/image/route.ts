@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { dbConnect } from "@/app/api/lib/db";
 import { uploadImageFile } from "@/app/api/lib/cloudinary";
+import {
+  cleanupExpiredTemporaryPackageImages,
+  deleteTemporaryPackageImageLease,
+  registerTemporaryPackageImageLease,
+} from "@/app/api/lib/packageImageCleanup";
 import User from "@/app/api/models/userModel";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -23,6 +28,9 @@ const getTokenUserId = (request: NextRequest): string | null => {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
+    void cleanupExpiredTemporaryPackageImages().catch((error: unknown) => {
+      console.error("[package-image] Cleanup before upload failed:", error);
+    });
 
     const userId = getTokenUserId(request);
     if (!userId) {
@@ -61,12 +69,72 @@ export async function POST(request: NextRequest) {
     }
 
     const imageUrl = await uploadImageFile(file, { folder });
+    await registerTemporaryPackageImageLease({ userId, imageUrl });
     return NextResponse.json({ success: true, imageUrl }, { status: 200 });
   } catch (error: unknown) {
     return NextResponse.json(
       {
         success: false,
         message: error instanceof Error ? error.message : "Failed to upload image.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await dbConnect();
+    void cleanupExpiredTemporaryPackageImages().catch((error: unknown) => {
+      console.error("[package-image] Cleanup before delete failed:", error);
+    });
+
+    const userId = getTokenUserId(request);
+    if (!userId) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await User.findById(userId).select("_id");
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = (await request.json().catch(() => ({}))) as { imageUrl?: unknown };
+    const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+    if (!imageUrl) {
+      return NextResponse.json(
+        { success: false, message: "Image URL is required." },
+        { status: 400 },
+      );
+    }
+
+    const result = await deleteTemporaryPackageImageLease({ userId, imageUrl });
+    if (result.reason === "not_found") {
+      return NextResponse.json(
+        { success: true, deleted: false, message: "Image already removed or not tracked." },
+        { status: 200 },
+      );
+    }
+    if (result.reason === "invalid_image") {
+      return NextResponse.json(
+        { success: false, deleted: false, message: "Invalid image URL." },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: result.deleted,
+        deleted: result.deleted,
+        message: result.deleted ? "Image deleted." : "Image could not be deleted from storage.",
+      },
+      { status: result.deleted ? 200 : 500 },
+    );
+  } catch (error: unknown) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to delete image.",
       },
       { status: 500 },
     );

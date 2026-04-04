@@ -78,7 +78,21 @@ export default function Footer() {
 
         <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/48 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} {STRINGS.brand.appName}. All rights reserved.</p>
-          <p>{STRINGS.brand.supportPromise}</p>
+          <div className="flex flex-col gap-2 text-left sm:items-end sm:text-right">
+            <p>{STRINGS.brand.supportPromise}</p>
+            <p>
+              Developed by{" "}
+              <Link
+                href="https://dnyandeep-gaonkar-portfolio.onrender.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-white/70 transition hover:text-[#F6FF6A]"
+              >
+                Dnyandeep Gaonkar
+              </Link>{" "}
+              with ❤️
+            </p>
+          </div>
         </div>
       </div>
     </footer>

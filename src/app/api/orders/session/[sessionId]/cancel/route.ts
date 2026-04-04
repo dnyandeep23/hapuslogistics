@@ -23,11 +23,12 @@ export async function POST(
     return NextResponse.json({ error: 'Session ID is required.' }, { status: 400 });
   }
 
-  const dbSession = await mongoose.startSession();
-  dbSession.startTransaction();
+  let dbSession: mongoose.ClientSession | null = null;
 
   try {
     await dbConnect();
+    dbSession = await mongoose.startSession();
+    dbSession.startTransaction();
 
     const bookingSession = await BookingSession.findById(sessionId).session(dbSession);
 
@@ -66,11 +67,13 @@ export async function POST(
     }, { status: 200 });
 
   } catch (error) {
-    await dbSession.abortTransaction();
+    if (dbSession?.inTransaction()) {
+      await dbSession.abortTransaction();
+    }
     console.error(`Error cancelling session ${sessionId}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   } finally {
-    dbSession.endSession();
+    dbSession?.endSession();
   }
 }

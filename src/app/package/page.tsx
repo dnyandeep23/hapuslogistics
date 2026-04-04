@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import bg from "@/assets/images/addPackageBg.png";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
@@ -18,6 +18,7 @@ import {
     confirmBookingPayment,
     markBookingSessionFailed,
     uploadPackageImage,
+    deletePackageImage,
 } from "@/services/logistics";
 import { useDispatch, useSelector } from "react-redux";
 import { useToast } from "@/context/ToastContext";
@@ -31,6 +32,8 @@ import {
     addToCart,
     updateCartItem,
     deleteFromCart,
+    replacePackageState,
+    clearPackageRecoveryNotice,
     resetPackageState,
 } from "@/lib/redux/packageSlice";
 import { AppDispatch } from "@/lib/redux/store";
@@ -51,8 +54,49 @@ import {
     type PackageCategoryConfig,
     type PackageSizeConfig,
 } from "@/lib/packageCatalog";
+import {
+    getPackageStateSignature,
+    sanitizePackageState,
+} from "@/app/package/state";
+import type { CartItem } from "@/app/package/types";
 import { appendRedirectParam } from "@/lib/authFlow";
 import { getIndiaPhoneDigits, isValidIndiaPhone } from "@/lib/phone";
+
+type PackageImageCarrier = { packageImage?: unknown };
+type PackageStateImageSource = {
+    formData?: { cart?: PackageImageCarrier[] };
+    currentPackage?: PackageImageCarrier;
+};
+
+const normalizePackageImageUrl = (value: unknown) =>
+    typeof value === "string" && value.includes("res.cloudinary.com") ? value.trim() : "";
+
+const collectPackageImageUrlsFromState = (state: PackageStateImageSource) => {
+    const urls = new Set<string>();
+    for (const item of Array.isArray(state.formData?.cart) ? state.formData.cart : []) {
+        const imageUrl = normalizePackageImageUrl(item?.packageImage);
+        if (imageUrl) urls.add(imageUrl);
+    }
+
+    const currentDraftImageUrl = normalizePackageImageUrl(state.currentPackage?.packageImage);
+    if (currentDraftImageUrl) urls.add(currentDraftImageUrl);
+
+    return urls;
+};
+
+const isPackageImageStillReferenced = (
+    imageUrl: string,
+    cart: PackageImageCarrier[],
+    currentDraftImage?: unknown,
+) => {
+    const normalized = normalizePackageImageUrl(imageUrl);
+    if (!normalized) return false;
+
+    const inCart = cart.some((item) => normalizePackageImageUrl(item?.packageImage) === normalized);
+    if (inCart) return true;
+
+    return normalizePackageImageUrl(currentDraftImage) === normalized;
+};
 
 export default function AddPackagePage() {
     const router = useRouter();
@@ -61,7 +105,7 @@ export default function AddPackagePage() {
     const { isMobile, isTablet } = useResponsiveMode();
     const packageState = useSelector(selectPackage);
     const { user, loading } = useSelector((state: any) => state.user)
-    const { formData, currentPackage, editIndex, currentStep } = packageState;
+    const { formData, currentPackage, editIndex, currentStep, recoveryNotice } = packageState;
     const [isMounted, setIsMounted] = useState(false);
     useEffect(() => { setIsMounted(true); }, []);
     const [pickupLocations, setPickupLocations] = useState<Location[]>([]);
@@ -82,6 +126,7 @@ export default function AddPackagePage() {
     const [packageSizes, setPackageSizes] = useState<PackageSizeConfig[]>(
         getActivePackageSizes(DEFAULT_PACKAGE_SIZES),
     );
+    const pendingPackageImageDeletesRef = useRef<Set<string>>(new Set());
     const defaultPackageSizeName = useMemo(
         () => getActivePackageSizes(DEFAULT_PACKAGE_SIZES)[0]?.name || "Small",
         [],
@@ -127,6 +172,21 @@ export default function AddPackagePage() {
         router.push(getDashboardFallbackHref());
     };
 
+    const requestPackageImageDelete = useCallback(async (imageUrl: string) => {
+        const normalized = normalizePackageImageUrl(imageUrl);
+        if (!normalized) return;
+        if (pendingPackageImageDeletesRef.current.has(normalized)) return;
+
+        pendingPackageImageDeletesRef.current.add(normalized);
+        try {
+            await deletePackageImage(normalized);
+        } catch (error) {
+            console.error("Failed to delete package image:", error);
+        } finally {
+            pendingPackageImageDeletesRef.current.delete(normalized);
+        }
+    }, []);
+
     useEffect(() => {
         const fetchPickups = async () => {
             setIsLoadingPickup(true);
@@ -167,6 +227,39 @@ export default function AddPackagePage() {
             active = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (!recoveryNotice) return;
+        addToast(recoveryNotice, "warning");
+        dispatch(clearPackageRecoveryNotice());
+    }, [addToast, dispatch, recoveryNotice]);
+
+    useEffect(() => {
+        const sanitized = sanitizePackageState(packageState, {
+            packageCategories,
+            packageSizes,
+            allowTransientDraftImageFile: true,
+        }).state;
+        const sanitizedWithoutNotice = { ...sanitized, recoveryNotice: null };
+        const currentWithoutNotice = { ...packageState, recoveryNotice: null };
+
+        if (getPackageStateSignature(currentWithoutNotice) === getPackageStateSignature(sanitizedWithoutNotice)) {
+            return;
+        }
+
+        const currentImageUrls = collectPackageImageUrlsFromState(currentWithoutNotice);
+        const sanitizedImageUrls = collectPackageImageUrlsFromState(sanitizedWithoutNotice);
+        for (const imageUrl of currentImageUrls) {
+            if (!sanitizedImageUrls.has(imageUrl)) {
+                void requestPackageImageDelete(imageUrl);
+            }
+        }
+
+        dispatch(replacePackageState(sanitizedWithoutNotice));
+        if (sanitized.recoveryNotice) {
+            addToast(sanitized.recoveryNotice, "warning");
+        }
+    }, [addToast, dispatch, packageCategories, packageSizes, packageState, requestPackageImageDelete]);
 
     useEffect(() => {
         // After the initial load, if there's no user, redirect to login.
@@ -225,15 +318,33 @@ export default function AddPackagePage() {
     };
     const handleFileDrop = async (file: File) => {
         setIsUploadingPackageImage(true);
+        const previousImageUrl = normalizePackageImageUrl(currentPackage.packageImage);
         try {
             const imageUrl = await uploadPackageImage(file);
             dispatch(setCurrentPackage({ ...currentPackage, packageImage: imageUrl }));
             setErrors((prev: any) => ({ ...prev, packageImage: "" }));
+            if (
+                previousImageUrl &&
+                previousImageUrl !== imageUrl &&
+                !isPackageImageStillReferenced(previousImageUrl, formData.cart, "")
+            ) {
+                void requestPackageImageDelete(previousImageUrl);
+            }
         } catch (error) {
             console.error("Error uploading package image:", error);
             setErrors((prev: any) => ({ ...prev, packageImage: "Could not upload image. Please retry." }));
         } finally {
             setIsUploadingPackageImage(false);
+        }
+    };
+
+    const handleRemoveCurrentPackageImage = () => {
+        const currentDraftImageUrl = normalizePackageImageUrl(currentPackage.packageImage);
+        dispatch(setCurrentPackage({ ...currentPackage, packageImage: "" }));
+        setErrors((prev: any) => ({ ...prev, packageImage: "" }));
+
+        if (currentDraftImageUrl && !isPackageImageStillReferenced(currentDraftImageUrl, formData.cart, "")) {
+            void requestPackageImageDelete(currentDraftImageUrl);
         }
     };
 
@@ -318,6 +429,12 @@ export default function AddPackagePage() {
     };
 
     const handleClearForm = () => {
+        const currentDraftImageUrl = normalizePackageImageUrl(currentPackage.packageImage);
+        const shouldDeleteDraftImage =
+            editIndex === null &&
+            currentDraftImageUrl &&
+            !isPackageImageStillReferenced(currentDraftImageUrl, formData.cart, "");
+
         const defaultSize = packageSizes[0]?.name || defaultPackageSizeName;
         dispatch(setCurrentPackage({
             packageName: "",
@@ -330,6 +447,9 @@ export default function AddPackagePage() {
             pickUpDate: formData.cart.length > 0 ? formData.cart[0].pickUpDate : "",
         }));
         dispatch(setEditIndex(null));
+        if (shouldDeleteDraftImage) {
+            void requestPackageImageDelete(currentDraftImageUrl);
+        }
     };
 
     const handleEdit = (index: number) => {
@@ -339,7 +459,33 @@ export default function AddPackagePage() {
     };
 
     const handleDelete = (index: number) => {
+        const cartItem = formData.cart[index];
+        const imageUrl = normalizePackageImageUrl(cartItem?.packageImage);
+        const nextCart = formData.cart.filter((_: unknown, itemIndex: number) => itemIndex !== index);
+        const nextDraftImage =
+            editIndex === index ? "" : currentPackage.packageImage;
+
         dispatch(deleteFromCart(index));
+        if (editIndex === index) {
+            const defaultSize = packageSizes[0]?.name || defaultPackageSizeName;
+            dispatch(setCurrentPackage({
+                packageName: "",
+                packageType: "",
+                otherPackageType: "",
+                packageSize: defaultSize,
+                packageWeight: 0,
+                packageQuantities: 1,
+                packageImage: "",
+                pickUpDate: nextCart.length > 0 ? nextCart[0].pickUpDate : "",
+            }));
+            dispatch(setEditIndex(null));
+        } else if (editIndex !== null && editIndex > index) {
+            dispatch(setEditIndex(editIndex - 1));
+        }
+
+        if (imageUrl && !isPackageImageStillReferenced(imageUrl, nextCart, nextDraftImage)) {
+            void requestPackageImageDelete(imageUrl);
+        }
     };
 
     const validatePackage = (pkg: any, cart: any[], editIndex: number | null) => {
@@ -445,9 +591,22 @@ export default function AddPackagePage() {
         const finalPackageName = currentPackage.packageName?.trim() || `Package ${getNextPackageNumber()}`;
 
         const packageToProcess = { ...currentPackage, packageName: finalPackageName, };
+        const previousCartItemImageUrl =
+            editIndex !== null ? normalizePackageImageUrl(formData.cart[editIndex]?.packageImage) : "";
 
         if (editIndex !== null) {
             dispatch(updateCartItem({ index: editIndex, item: packageToProcess }));
+            const nextCart: CartItem[] = formData.cart.map((item, index: number) =>
+                index === editIndex ? packageToProcess : item,
+            );
+            const nextDraftImage = "";
+            if (
+                previousCartItemImageUrl &&
+                previousCartItemImageUrl !== normalizePackageImageUrl(packageToProcess.packageImage) &&
+                !isPackageImageStillReferenced(previousCartItemImageUrl, nextCart, nextDraftImage)
+            ) {
+                void requestPackageImageDelete(previousCartItemImageUrl);
+            }
             dispatch(setEditIndex(null));
         } else {
             dispatch(addToCart(packageToProcess));
@@ -771,6 +930,7 @@ export default function AddPackagePage() {
                                         handleDelete={handleDelete}
                                         errors={errors}
                                         handleFileDrop={handleFileDrop}
+                                        handleRemoveCurrentPackageImage={handleRemoveCurrentPackageImage}
                                         isUploadingPackageImage={isUploadingPackageImage}
                                         packageCategories={packageCategories}
                                         packageSizes={packageSizes}

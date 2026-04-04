@@ -16,6 +16,7 @@ import Location from "@/app/api/models/locationModel";
 import Order from "@/app/api/models/orderModel";
 import User from "@/app/api/models/userModel";
 import { buildDefaultRefundPolicySnapshot } from "@/app/api/lib/orderCancellation";
+import { collectPackageImageUrls, releaseTemporaryPackageImageLeases } from "@/app/api/lib/packageImageCleanup";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -99,8 +100,7 @@ async function movePackageImagesToCloudinary(
 }
 
 export async function POST(request: NextRequest) {
-  const tx = await mongoose.startSession();
-  tx.startTransaction();
+  let tx: mongoose.ClientSession | null = null;
   const newlyUploadedPackageUrls: string[] = [];
   let transactionCommitted = false;
   let customerEmail = "";
@@ -108,6 +108,8 @@ export async function POST(request: NextRequest) {
 
   try {
     await dbConnect();
+    tx = await mongoose.startSession();
+    tx.startTransaction();
 
     const actorId = extractTokenUserId(request);
     const actor = await User.findById(actorId).select("_id role travelCompanyId buses");
@@ -239,6 +241,12 @@ export async function POST(request: NextRequest) {
 
     await tx.commitTransaction();
     transactionCommitted = true;
+    const committedPackageImageUrls = collectPackageImageUrls(orderPackages);
+    if (committedPackageImageUrls.length > 0) {
+      void releaseTemporaryPackageImageLeases(committedPackageImageUrls).catch((error: unknown) => {
+        console.error("[admin-confirm] Failed to release package image leases:", error);
+      });
+    }
 
     try {
       await sendOrderConfirmedEmail({
@@ -260,7 +268,7 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     );
   } catch (error: unknown) {
-    if (tx.inTransaction()) {
+    if (tx?.inTransaction()) {
       await tx.abortTransaction();
     }
 
@@ -291,6 +299,6 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   } finally {
-    tx.endSession();
+    tx?.endSession();
   }
 }

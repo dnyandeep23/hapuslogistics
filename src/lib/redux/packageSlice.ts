@@ -1,74 +1,27 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
-import { DEFAULT_PACKAGE_SIZES, getActivePackageSizes } from '@/lib/packageCatalog';
+import type { CartItem, PackageDraft, PackageFormData, PackageState } from '@/app/package/types';
+import { createDefaultPackageState, loadPackageStateFromStorage } from '@/app/package/state';
 
-interface PackageState {
-    formData: any;
-    currentPackage: any;
-    editIndex: number | null;
-    currentStep: number;
-}
-
-const defaultInitialState: PackageState = {
-    formData: {
-        pickupLocationId: '',
-        dropLocationId: '',
-        cart: [],
-        senderName: '',
-        senderContact: '',
-        receiverName: '',
-        receiverContact: '',
-        coupon: '',
-        discount: 0,
-    },
-    currentPackage: {
-        packageName: '',
-        packageType: '',
-        otherPackageType: '',
-        packageSize: getActivePackageSizes(DEFAULT_PACKAGE_SIZES)[0]?.name || 'Small',
-        packageWeight: 0,
-        packageQuantities: 1,
-        pickUpDate: '',
-        packageImage: '',
-    },
-    editIndex: null,
-    currentStep: 1,
-};
-
-const getInitialState = (): PackageState => {
-    if (typeof window === "undefined") {
-        return defaultInitialState;
-    }
-
-    try {
-        const savedState = localStorage.getItem('packageState');
-        if (savedState) {
-            return JSON.parse(savedState);
-        }
-    } catch (e) {
-        console.error("Could not load state from local storage", e);
-    }
-    return defaultInitialState;
-};
-
+const getInitialState = (): PackageState => loadPackageStateFromStorage();
 
 const packageSlice = createSlice({
     name: 'package',
     initialState: getInitialState(),
     reducers: {
-        setFormData: (state, action: PayloadAction<any>) => {
+        setFormData: (state, action: PayloadAction<PackageFormData>) => {
             state.formData = action.payload;
         },
-        setCurrentPackage: (state, action: PayloadAction<any>) => {
+        setCurrentPackage: (state, action: PayloadAction<PackageDraft>) => {
             state.currentPackage = action.payload;
         },
-        setCart: (state, action: PayloadAction<any[]>) => {
+        setCart: (state, action: PayloadAction<CartItem[]>) => {
             state.formData.cart = action.payload;
         },
-        addToCart: (state, action: PayloadAction<any>) => {
+        addToCart: (state, action: PayloadAction<CartItem>) => {
             state.formData.cart.push(action.payload);
         },
-        updateCartItem: (state, action: PayloadAction<{ index: number, item: any }>) => {
+        updateCartItem: (state, action: PayloadAction<{ index: number, item: CartItem }>) => {
             state.formData.cart[action.payload.index] = action.payload.item;
         },
         deleteFromCart: (state, action: PayloadAction<number>) => {
@@ -83,11 +36,23 @@ const packageSlice = createSlice({
         setEditIndex: (state, action: PayloadAction<number | null>) => {
             state.editIndex = action.payload;
         },
+        replacePackageState: (state, action: PayloadAction<PackageState>) => {
+            state.formData = action.payload.formData;
+            state.currentPackage = action.payload.currentPackage;
+            state.editIndex = action.payload.editIndex;
+            state.currentStep = action.payload.currentStep;
+            state.recoveryNotice = action.payload.recoveryNotice;
+        },
+        clearPackageRecoveryNotice: (state) => {
+            state.recoveryNotice = null;
+        },
         resetPackageState: (state) => {
-            state.formData = defaultInitialState.formData;
-            state.currentPackage = defaultInitialState.currentPackage;
-            state.editIndex = defaultInitialState.editIndex;
-            state.currentStep = defaultInitialState.currentStep;
+            const defaultState = createDefaultPackageState();
+            state.formData = defaultState.formData;
+            state.currentPackage = defaultState.currentPackage;
+            state.editIndex = defaultState.editIndex;
+            state.currentStep = defaultState.currentStep;
+            state.recoveryNotice = defaultState.recoveryNotice;
         },
     },
 });
@@ -102,6 +67,8 @@ export const {
     clearCart,
     setStep,
     setEditIndex,
+    replacePackageState,
+    clearPackageRecoveryNotice,
     resetPackageState,
 } = packageSlice.actions;
 

@@ -119,6 +119,7 @@ export async function GET(request: NextRequest) {
     const pickupLocationId = searchParams.get("pickupLocationId");
     const dropLocationId = searchParams.get("dropLocationId");
     const userTimestamp = searchParams.get("userTimestamp");
+    const requiredWeightKgRaw = searchParams.get("requiredWeightKg");
 
     if (!pickupLocationId || !dropLocationId || !userTimestamp) {
       return NextResponse.json(
@@ -137,6 +138,11 @@ export async function GET(request: NextRequest) {
     const userDate = new Date(userTimestamp);
     if (Number.isNaN(userDate.getTime())) {
       return NextResponse.json({ message: "Invalid userTimestamp format" }, { status: 400 });
+    }
+
+    const requiredWeightKg = requiredWeightKgRaw ? Number(requiredWeightKgRaw) : 0;
+    if (requiredWeightKgRaw && (!Number.isFinite(requiredWeightKg) || requiredWeightKg <= 0)) {
+      return NextResponse.json({ message: "Invalid requiredWeightKg value" }, { status: 400 });
     }
 
     userDate.setUTCHours(0, 0, 0, 0);
@@ -172,7 +178,9 @@ export async function GET(request: NextRequest) {
         const slotDate = new Date(slot?.date ?? "");
         slotDate.setUTCHours(0, 0, 0, 0);
         if (Number.isNaN(slotDate.getTime()) || slotDate < userDate) continue;
-        if (Number(slot?.availableCapacityKg ?? 0) <= 0) continue;
+        const availableCapacityKg = Number(slot?.availableCapacityKg ?? 0);
+        if (availableCapacityKg <= 0) continue;
+        if (requiredWeightKg > 0 && availableCapacityKg < requiredWeightKg) continue;
 
         let hasActiveRoutePricing = false;
         if (matchingIntervals.length > 0) {

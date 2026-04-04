@@ -24,3 +24,11 @@ export type PackageFormData = {
   coupon: string;
   discount: number;
 };
+
+export type PackageState = {
+  formData: PackageFormData;
+  currentPackage: PackageDraft;
+  editIndex: number | null;
+  currentStep: number;
+  recoveryNotice: string | null;
+};

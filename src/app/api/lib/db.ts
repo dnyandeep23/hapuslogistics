@@ -1,22 +1,48 @@
 import mongoose from "mongoose";
 
-export async function dbConnect() {
+type MongooseCache = {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+};
+
+declare global {
+  var mongooseCache: MongooseCache | undefined;
+}
+
+const globalCache = globalThis as typeof globalThis & {
+  mongooseCache?: MongooseCache;
+};
+
+const cached = globalCache.mongooseCache ?? { conn: null, promise: null };
+globalCache.mongooseCache = cached;
+
+export async function dbConnect(): Promise<typeof mongoose> {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is not configured.");
+  }
+
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    cached.conn = mongoose;
+    return mongoose;
+  }
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(databaseUrl, {
+      serverSelectionTimeoutMS: 10000,
+    });
+  }
+
   try {
-    mongoose.connect(process.env.DATABASE_URL!);
-    const connection = mongoose.connection;
-
-    connection.on("connected", () => {
-      // console.log("MongoDB connected successfully");
-    });
-
-    connection.on("error", (err) => {
-      // console.log(
-      //   "MongoDB connection error. Please make sure MongoDB is running. " + err
-      // );
-      process.exit();
-    });
+    cached.conn = await cached.promise;
+    return cached.conn;
   } catch (error) {
-    // console.log("Something went wrong!");
-    // console.log(error);
+    cached.promise = null;
+    throw error;
   }
 }

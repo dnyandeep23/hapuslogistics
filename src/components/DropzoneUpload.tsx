@@ -11,12 +11,14 @@ export default function DropzoneUpload({
     currentPackage,
     setCurrentPackage,
     onFileDrop,
+    onRemoveImage,
     errors,
     isUploading = false,
 }: {
     currentPackage: PackageDraft;
     setCurrentPackage: (next: PackageDraft) => void;
     onFileDrop?: (file: File) => void;
+    onRemoveImage?: () => void;
     errors: Record<string, string>;
     isUploading?: boolean;
 }) {
@@ -89,10 +91,14 @@ export default function DropzoneUpload({
                                     URL.revokeObjectURL(previewUrl);
                                 }
                                 setPreviewUrl(null);
-                                setCurrentPackage({
-                                    ...currentPackage,
-                                    packageImage: "",
-                                });
+                                if (onRemoveImage) {
+                                    onRemoveImage();
+                                } else {
+                                    setCurrentPackage({
+                                        ...currentPackage,
+                                        packageImage: "",
+                                    });
+                                }
                             }}
                             className="absolute right-3 top-3 rounded-full border border-white/20 bg-black/55 p-2 transition hover:bg-red-500"
                             disabled={isUploading}

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
 import { Location } from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
+import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 
 interface CustomSelectProps {
     options: Location[];
@@ -27,6 +28,7 @@ export default function CustomSelect({
 }: CustomSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const selectRef = useRef<HTMLDivElement>(null);
+    const { isMobile } = useResponsiveMode();
 
     const selectedOption = options.find((opt) => opt._id === value);
     const selectedLabel = selectedOption
@@ -43,9 +45,8 @@ export default function CustomSelect({
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            // For desktop, close if click is outside the select box.
-            // For mobile portal, the backdrop itself handles the close onClick, so we only need this for desktop.
-            if (window.innerWidth >= 640 && selectRef.current && !selectRef.current.contains(event.target as Node)) {
+            // Mobile uses a bottom sheet portal, so outside clicks are handled by its backdrop.
+            if (!isMobile && selectRef.current && !selectRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
@@ -54,7 +55,7 @@ export default function CustomSelect({
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, []);
+    }, [isMobile]);
 
     return (
         <div className="relative w-full" ref={selectRef}>
@@ -64,7 +65,7 @@ export default function CustomSelect({
                     } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                     }`}
                 role="button"
-                aria-haspopup="dialog"
+                aria-haspopup={isMobile ? "dialog" : "listbox"}
                 aria-expanded={isOpen}
                 aria-disabled={disabled}
             >
@@ -91,7 +92,7 @@ export default function CustomSelect({
             {isOpen && !disabled && (
                 <>
                     {/* Desktop Dropdown */}
-                    <div className="hidden lg:block package-panel absolute z-[100] mt-2 max-h-72 w-full overflow-y-auto rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.6)]">
+                    <div className={`${isMobile ? "hidden" : "block"} package-panel absolute z-[100] mt-2 max-h-72 w-full overflow-y-auto rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.6)]`}>
                         <ul>
                             {isLoading ? (
                                 <li className="space-y-2 px-4 py-3">
@@ -122,7 +123,7 @@ export default function CustomSelect({
                     </div>
 
                     {/* Mobile Bottom Sheet Drawer (Portaled) */}
-                    {canRenderPortal && createPortal(
+                    {canRenderPortal && isMobile && createPortal(
                         <div className="fixed inset-0 z-[100] flex flex-col justify-end lg:hidden pointer-events-auto">
                             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-modalFadeIn" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
                             <div className="relative flex max-h-[75vh] min-h-[50vh] flex-col rounded-t-[2rem] border-t border-white/10 bg-[#141B12] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] animate-modalSlideUp">

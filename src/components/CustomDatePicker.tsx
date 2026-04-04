@@ -19,6 +19,8 @@ interface CustomDatePickerProps {
   restrictToAvailableDates?: boolean;
   syncWithCartDate?: boolean;
   disablePastDates?: boolean;
+  requiredWeightKg?: number;
+  calendarPlacement?: "top" | "bottom";
 }
 
 const WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -59,6 +61,8 @@ export default function CustomDatePicker({
   restrictToAvailableDates,
   syncWithCartDate,
   disablePastDates = true,
+  requiredWeightKg,
+  calendarPlacement = "bottom",
 }: CustomDatePickerProps) {
   const { formData } = useSelector(selectPackage);
   const { isMobile, isTablet } = useResponsiveMode();
@@ -108,12 +112,12 @@ export default function CustomDatePicker({
     setIsLoading(true);
     setAvailabilityMessage("");
     try {
-      const fetchedDates = await getAvailableDates(pickupLocationId, dropLocationId);
+      const fetchedDates = await getAvailableDates(pickupLocationId, dropLocationId, requiredWeightKg);
       const normalized = Array.isArray(fetchedDates)
         ? fetchedDates
-            .map((item) => String(item ?? "").slice(0, 10))
-            .filter((item) => Boolean(parseIsoDate(item)))
-            .sort()
+          .map((item) => String(item ?? "").slice(0, 10))
+          .filter((item) => Boolean(parseIsoDate(item)))
+          .sort()
         : [];
 
       setAvailableDates(normalized);
@@ -137,6 +141,7 @@ export default function CustomDatePicker({
     effectiveMinDate,
     onChange,
     pickupLocationId,
+    requiredWeightKg,
     shouldRestrictToAvailableDates,
     value,
   ]);
@@ -186,9 +191,8 @@ export default function CustomDatePicker({
       <button
         type="button"
         onClick={handleOpenToggle}
-        className={`relative w-full rounded-xl border-b-2 bg-[#1e241b] px-4 py-3 pr-12 text-left text-sm text-white transition ${
-          error ? "border-red-500" : "border-[#CDD645]/60"
-        } ${isMobile ? "min-h-12" : ""}`}
+        className={`relative w-full rounded-xl border-b-2 bg-[#1e241b] px-4 py-3 pr-12 text-left text-sm text-white transition ${error ? "border-red-500" : "border-[#CDD645]/60"
+          } ${isMobile ? "min-h-12" : ""}`}
       >
         {formatDateForDisplay(value) || <span className="text-white/45">{placeholder}</span>}
         <Icon
@@ -198,7 +202,7 @@ export default function CustomDatePicker({
       </button>
 
       {isOpen && (
-        <div className={`absolute z-20 mt-2 w-full rounded-xl border border-[#CDD645]/60 bg-[#1e241b] p-4 shadow-2xl ${isMobile ? "max-h-[70vh]" : isTablet ? "sm:w-[22rem]" : "sm:w-80"}`}>
+        <div className={`absolute z-20 w-full rounded-xl border border-[#CDD645]/60 bg-[#1e241b] p-4 shadow-2xl ${calendarPlacement === "top" ? "bottom-full mb-2" : "mt-2"} ${isMobile ? "max-h-[70vh]" : isTablet ? "sm:w-[22rem]" : "sm:w-80"}`}>
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -253,11 +257,10 @@ export default function CustomDatePicker({
                     onChange(isoDate);
                     setIsOpen(false);
                   }}
-                  className={`m-0.5 rounded-full p-1 text-sm transition ${
-                    disabled
-                      ? "cursor-not-allowed text-white/30"
-                      : "cursor-pointer text-white hover:bg-[#3E4936]"
-                  } ${selected ? "bg-[#CDD645] text-black hover:bg-[#CDD645]" : ""}`}
+                  className={`m-0.5 rounded-full p-1 text-sm transition ${disabled
+                    ? "cursor-not-allowed text-white/30"
+                    : "cursor-pointer text-white hover:bg-[#3E4936]"
+                    } ${selected ? "bg-[#CDD645] text-yellow-950 hover:bg-[#CDD645] " : "text-white"}`}
                 >
                   {cell.getDate()}
                 </button>

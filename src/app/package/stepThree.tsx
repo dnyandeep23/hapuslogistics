@@ -1,14 +1,17 @@
 import { Icon } from "@iconify/react";
 import Image from "next/image";
 import { useState, useEffect, useMemo, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
+import { useRouter } from "next/navigation";
 import {
     AvailableCoupon,
     calculatePrice,
     getAvailableCoupons,
+    getAvailableDates,
     type PricingInfo,
     type PricingItem,
 } from "@/services/logistics";
 import Skeleton from "@/components/Skeleton";
+import CustomDatePicker from "@/components/CustomDatePicker";
 import { formatIndiaPhoneInput } from "@/lib/phone";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
 import type { CartItem, PackageFormData } from "./types";
@@ -37,7 +40,26 @@ function hasNumericWeight(item: CartItem): item is CartItem & { packageWeight: n
     return typeof item.packageWeight === "number";
 }
 
+const parseIsoDate = (value: string) => {
+    if (!value) return null;
+    const [yearRaw, monthRaw, dayRaw] = value.split("-");
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    const day = Number(dayRaw);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+    const date = new Date(year, month - 1, day);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
+};
+
+const formatPickupDate = (value: string) => {
+    const parsed = parseIsoDate(value);
+    if (!parsed) return value;
+    return parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: StepThreeProps) {
+    const router = useRouter();
     const { isMobile, isTablet, isDesktop } = useResponsiveMode();
     const pickUpLoc = pickupLocations.find((opt) => opt._id === formData.pickupLocationId);
     const dropLoc = dropLocations.find((opt) => opt._id === formData.dropLocationId);
@@ -55,6 +77,8 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
     const [isLoadingPrice, setIsLoadingPrice] = useState(false);
     const [pricingError, setPricingError] = useState<string | null>(null);
+    const [routeAvailableDates, setRouteAvailableDates] = useState<string[]>([]);
+    const [isLoadingRouteDates, setIsLoadingRouteDates] = useState(false);
     const pricingCartItems = useMemo<PricingItem[]>(
         () =>
             formData.cart
@@ -66,10 +90,66 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 })),
         [formData.cart],
     );
+    const totalRequestedQuantity = useMemo(
+        () =>
+            formData.cart.reduce((sum, item) => sum + Math.max(0, Number(item.packageQuantities) || 0), 0),
+        [formData.cart],
+    );
+    const totalRequestedWeightKg = useMemo(
+        () =>
+            pricingCartItems.reduce(
+                (sum, item) => sum + (Number(item.packageWeight) || 0) * Math.max(0, Number(item.packageQuantities) || 0),
+                0,
+            ),
+        [pricingCartItems],
+    );
 
     useEffect(() => {
         setCoupon(formData.coupon || "");
     }, [formData.coupon]);
+
+    useEffect(() => {
+        let active = true;
+
+        const loadAvailableRouteDates = async () => {
+            if (!formData.pickupLocationId || !formData.dropLocationId) {
+                setRouteAvailableDates([]);
+                setIsLoadingRouteDates(false);
+                return;
+            }
+
+            setIsLoadingRouteDates(true);
+            try {
+                const fetchedDates = await getAvailableDates(
+                    formData.pickupLocationId,
+                    formData.dropLocationId,
+                    totalRequestedWeightKg,
+                );
+                if (!active) return;
+
+                const normalized = Array.isArray(fetchedDates)
+                    ? fetchedDates
+                        .map((entry) => String(entry ?? "").slice(0, 10))
+                        .filter((entry) => Boolean(parseIsoDate(entry)))
+                        .sort()
+                    : [];
+
+                setRouteAvailableDates(normalized);
+            } catch {
+                if (!active) return;
+                setRouteAvailableDates([]);
+            } finally {
+                if (active) {
+                    setIsLoadingRouteDates(false);
+                }
+            }
+        };
+
+        loadAvailableRouteDates();
+        return () => {
+            active = false;
+        };
+    }, [formData.dropLocationId, formData.pickupLocationId, totalRequestedWeightKg]);
 
     useEffect(() => {
         let isMounted = true;
@@ -128,9 +208,11 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 } catch (error: unknown) {
                     console.error(error);
                     const errorMessage = error instanceof Error ? error.message : "";
-                    setCouponStatus(hasCoupon ? "error" : "idle");
-                    setCouponError(errorMessage);
+                    const isCouponError = /coupon|expired|invalid/i.test(errorMessage);
+                    setCouponStatus(hasCoupon && isCouponError ? "error" : "idle");
+                    setCouponError(hasCoupon && isCouponError ? errorMessage : "");
                     setPricingError(errorMessage || "An error occurred while calculating the price.");
+                    setPricingInfo(null);
                 } finally {
                     setIsLoadingPrice(false);
                 }
@@ -201,8 +283,47 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
     const pickupDate = formData.cart?.[0]?.pickUpDate
         ? formData.cart[0].pickUpDate.split("-").reverse().join("/")
         : "--/--/----";
+    const selectedPickupDate = String(formData.cart?.[0]?.pickUpDate ?? "").trim();
+    const isCapacityDateError = pricingError === "No route pricing found with enough capacity for this date";
+    const shouldSuggestSingleQuantity =
+        isCapacityDateError &&
+        !isLoadingRouteDates &&
+        routeAvailableDates.length === 0 &&
+        totalRequestedQuantity > 1;
+    const shouldRedirectToSupport =
+        isCapacityDateError &&
+        !isLoadingRouteDates &&
+        routeAvailableDates.length === 0 &&
+        totalRequestedQuantity <= 1;
+    const availableAlternativeDates = useMemo(
+        () => routeAvailableDates.filter((date) => date !== selectedPickupDate),
+        [routeAvailableDates, selectedPickupDate],
+    );
     const visibleItems = isMobile && !showAllPackages ? displayedItems.slice(0, 1) : displayedItems;
     const hasCartItems = displayedItems.length > 0;
+
+    useEffect(() => {
+        if (!shouldRedirectToSupport) return;
+
+        const timeoutId = window.setTimeout(() => {
+            router.push("/dashboard/support?source=package-capacity");
+        }, 2200);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [router, shouldRedirectToSupport]);
+
+    const handlePickupDateChange = (date: string) => {
+        if (!date || date === selectedPickupDate) return;
+        setPricingError(null);
+        setPricingInfo(null);
+        setFormData({
+            ...formData,
+            cart: formData.cart.map((item) => ({
+                ...item,
+                pickUpDate: date,
+            })),
+        });
+    };
 
     return (
         <div className="space-y-5 text-white sm:space-y-8">
@@ -523,7 +644,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
 
                 {/* Amount */}
-                <div className={`package-panel w-full rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-right space-y-1 sm:p-5 ${isDesktop ? "xl:w-96" : ""}`}>
+                <div className={`${isCapacityDateError ? "w-full" : `package-panel w-full rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-right space-y-1 sm:p-5 ${isDesktop ? "xl:w-96" : ""}`}`}>
                     {isLoadingPrice && (
                         <div className="space-y-2">
                             <Skeleton className="ml-auto h-4 w-44" />
@@ -532,7 +653,89 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                             <Skeleton className="ml-auto h-6 w-36" />
                         </div>
                     )}
-                    {pricingError && <p className="text-red-400">{pricingError}</p>}
+                    {pricingError && (
+                        <div className="space-y-3 text-left">
+                            {isCapacityDateError ? (
+                                <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                                    {isLoadingRouteDates ? (
+                                        <div className="space-y-2">
+                                            <Skeleton className="h-4 w-36" />
+                                            <Skeleton className="h-3 w-48" />
+                                            <Skeleton className="h-10 w-full rounded-full" />
+                                        </div>
+                                    ) : shouldSuggestSingleQuantity ? (
+                                        <>
+                                            <p className="font-semibold text-amber-50">Not enough space for the selected quantity</p>
+                                            <p className="mt-1 text-xs leading-5 text-amber-100/80">
+                                                We could not find nearby dates with enough space for <span className="font-semibold">{totalRequestedQuantity}</span> items on this route. Try placing one quantity per order and check again.
+                                            </p>
+                                        </>
+                                    ) : shouldRedirectToSupport ? (
+                                        <>
+                                            <p className="font-semibold text-amber-50">No space available right now</p>
+                                            <p className="mt-1 text-xs leading-5 text-amber-100/80">
+                                                There is not enough capacity for this order even with one quantity. Redirecting you to support for help with the next available option.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push("/dashboard/support?source=package-capacity")}
+                                                className="mt-3 inline-flex items-center justify-center rounded-full border border-amber-100/20 bg-white/10 px-3 py-2 text-xs font-semibold text-amber-50 transition hover:bg-white/15"
+                                            >
+                                                Open support
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="font-semibold text-amber-50">Choose another available pickup date</p>
+                                            <p className="mt-1 text-xs leading-5 text-amber-100/75">
+                                                The selected date <span className="font-semibold">{formatPickupDate(selectedPickupDate)}</span> is full for this route. Pick another date here and pricing will refresh automatically.
+                                            </p>
+
+                                            <div className="mt-3">
+                                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/55">
+                                                    Available dates
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {availableAlternativeDates.length > 0 ? availableAlternativeDates.map((date) => (
+                                                        <button
+                                                            key={`available-${date}`}
+                                                            type="button"
+                                                            onClick={() => handlePickupDateChange(date)}
+                                                            className="rounded-full border border-amber-100/15 bg-white/8 px-3 py-1.5 text-xs font-semibold text-amber-50 transition hover:bg-white/15"
+                                                        >
+                                                            {formatPickupDate(date)}
+                                                        </button>
+                                                    )) : (
+                                                        <span className="text-xs text-amber-100/55">
+                                                            No other route dates are available right now.
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4">
+                                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/55">
+                                                    Select another date
+                                                </p>
+                                                <CustomDatePicker
+                                                    value={selectedPickupDate}
+                                                    pickupLocationId={formData.pickupLocationId}
+                                                    dropLocationId={formData.dropLocationId}
+                                                    onChange={handlePickupDateChange}
+                                                    placeholder="Choose another pickup date"
+                                                    restrictToAvailableDates
+                                                    requiredWeightKg={totalRequestedWeightKg}
+                                                    calendarPlacement="top"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-red-400">{pricingError}</p>
+                            )}
+                        </div>
+                    )}
                     {!isLoadingPrice && !pricingError && !pricingInfo ? (
                         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/60">
                             Pricing will appear after route and package details are ready.

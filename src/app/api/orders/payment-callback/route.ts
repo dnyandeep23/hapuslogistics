@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createRazorpayClient, getServerRazorpayKeySecret } from '@/app/api/lib/razorpayServer';
 import { sendOrderConfirmedEmail } from '@/app/api/lib/mailer';
 import { CouponUsageLimitError, reserveCouponUsageForUser } from '@/app/api/lib/couponUsage';
+import { collectPackageImageUrls, releaseTemporaryPackageImageLeases } from '@/app/api/lib/packageImageCleanup';
 
 class ApiError extends Error {
     status: number;
@@ -74,13 +75,14 @@ async function movePackageImagesToCloudinary(
 }
 
 export async function POST(request: NextRequest) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    let session: mongoose.ClientSession | null = null;
     const newlyUploadedPackageUrls: string[] = [];
     let transactionCommitted = false;
 
     try {
         await dbConnect();
+        session = await mongoose.startSession();
+        session.startTransaction();
         const razorpay = createRazorpayClient();
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await request.json();
 
@@ -218,6 +220,12 @@ export async function POST(request: NextRequest) {
         
         await session.commitTransaction();
         transactionCommitted = true;
+        const committedPackageImageUrls = collectPackageImageUrls(orderPackages);
+        if (committedPackageImageUrls.length > 0) {
+            void releaseTemporaryPackageImageLeases(committedPackageImageUrls).catch((error: unknown) => {
+                console.error("[payment-callback] Failed to release package image leases:", error);
+            });
+        }
 
         const orderUserEmail = String(
           (await User.findById(bookingSession.userId).select("email").lean<{ email?: string } | null>())?.email ?? "",
@@ -241,7 +249,9 @@ export async function POST(request: NextRequest) {
         }, { status: 201 });
 
     } catch (error) {
-        await session.abortTransaction();
+        if (session?.inTransaction()) {
+            await session.abortTransaction();
+        }
         if (!transactionCommitted && newlyUploadedPackageUrls.length > 0) {
             const cleanupResult = await Promise.allSettled(
                 newlyUploadedPackageUrls.map((url) => deleteCloudinaryImageByUrl(url)),
@@ -265,6 +275,6 @@ export async function POST(request: NextRequest) {
         const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
         return NextResponse.json({ error: errorMessage }, { status: 500 });
     } finally {
-        session.endSession();
+        session?.endSession();
     }
 }

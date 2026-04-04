@@ -145,6 +145,7 @@ export default function StepTwo({
   handleEdit,
   handleDelete,
   handleFileDrop,
+  handleRemoveCurrentPackageImage,
   isUploadingPackageImage,
   packageCategories,
   packageSizes,
@@ -160,6 +161,7 @@ export default function StepTwo({
   handleEdit: (index: number) => void;
   handleDelete: (index: number) => void;
   handleFileDrop: (file: File) => Promise<void>;
+  handleRemoveCurrentPackageImage: () => void;
   isUploadingPackageImage: boolean;
   packageCategories: PackageCategoryConfig[];
   packageSizes: PackageSizeConfig[];
@@ -407,6 +409,7 @@ export default function StepTwo({
             setCurrentPackage={setCurrentPackage}
             errors={errors}
             onFileDrop={handleFileDrop}
+            onRemoveImage={handleRemoveCurrentPackageImage}
             isUploading={isUploadingPackageImage}
           />
           {isUploadingPackageImage && (

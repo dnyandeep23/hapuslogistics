@@ -33,6 +33,7 @@ export interface PricingItem {
 export interface UploadedImageResponse {
   success?: boolean;
   imageUrl?: string;
+  deleted?: boolean;
   error?: string;
   message?: string;
 }
@@ -171,16 +172,24 @@ export const getDropLocations = async (pickupLocationId: string): Promise<Locati
  */
 export const getAvailableDates = async (
   pickupLocationId: string,
-  dropLocationId: string
+  dropLocationId: string,
+  requiredWeightKg?: number,
 ): Promise<string[]> => {
   if (!pickupLocationId || !dropLocationId) return [];
 
   try {
     // console.log(" Called Fetching available dates...");
     const userTimestamp = new Date().toISOString();
+    const normalizedRequiredWeightKg =
+      typeof requiredWeightKg === "number" && Number.isFinite(requiredWeightKg) && requiredWeightKg > 0
+        ? requiredWeightKg
+        : undefined;
+    const weightQuery = normalizedRequiredWeightKg
+      ? `&requiredWeightKg=${encodeURIComponent(String(normalizedRequiredWeightKg))}`
+      : "";
 
     const response = await fetch(
-      `/api/availability?pickupLocationId=${encodeURIComponent(pickupLocationId)}&dropLocationId=${encodeURIComponent(dropLocationId)}&userTimestamp=${encodeURIComponent(userTimestamp)}`,
+      `/api/availability?pickupLocationId=${encodeURIComponent(pickupLocationId)}&dropLocationId=${encodeURIComponent(dropLocationId)}&userTimestamp=${encodeURIComponent(userTimestamp)}${weightQuery}`,
       { cache: "no-store" } // important in Next.js
     );
     return await parseJsonResponse<string[]>(
@@ -297,6 +306,21 @@ export const uploadPackageImage = async (file: File): Promise<string> => {
   }
 
   return String(data.imageUrl);
+};
+
+export const deletePackageImage = async (imageUrl: string): Promise<boolean> => {
+  const response = await fetch("/api/uploads/image", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageUrl }),
+  });
+
+  const data = await parseJsonResponse<UploadedImageResponse>(
+    response,
+    "Failed to delete package image",
+  );
+
+  return Boolean(data.deleted ?? data.success);
 };
 
 export const confirmBookingPayment = async (payload: {
