@@ -4,6 +4,9 @@ import { STRINGS } from '@/lib/strings';
 // Assuming production URL, adjust if needed by env
 const BASE_URL = process.env.DOMAIN || 'https://hapuslogistics.vercel.app';
 
+export const revalidate = 0;
+
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     '',
@@ -13,7 +16,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/hapus-logistics',
     '/courier-services-mumbai',
   ];
-
 
   return routes.map((route) => ({
     url: `${BASE_URL}${route}`,
