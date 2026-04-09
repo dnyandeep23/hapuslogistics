@@ -10,6 +10,7 @@ import {
   type PackageCategoryConfig,
   type PackageSizeConfig,
 } from "@/lib/packageCatalog";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { PackageDraft, PackageFormData } from "./types";
 
 type PackageTypeOption = {
@@ -90,10 +91,12 @@ export function PackageSizeSelector({
     });
   };
 
+  const { t } = useTranslation();
+
   return (
     <div className="package-panel-soft flex w-full flex-col items-start overflow-hidden rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 lg:w-1/3">
       <label className="mb-2.5 md:mb-3 text-[13px] md:text-sm font-medium text-white/85">
-        Select package size <span className="text-red-400">*</span>
+        {t.package.stepTwo.selectSize} <span className="text-red-400">*</span>
       </label>
 
       <div className="flex w-full items-center justify-center gap-6 sm:gap-12">
@@ -167,6 +170,7 @@ export default function StepTwo({
   packageSizes: PackageSizeConfig[];
 }) {
   const { isMobile, isTablet, isDesktop } = useResponsiveMode();
+  const { t } = useTranslation();
   const safePackageTypes: PackageTypeOption[] =
     Array.isArray(packageCategories) && packageCategories.length > 0
       ? packageCategories.map((entry: PackageCategoryConfig, index: number) => ({
@@ -207,7 +211,7 @@ export default function StepTwo({
 
   const datePickerError =
     errors.pickUpDate ||
-    (hasDateConflict ? "Changing this date will update the date for all packages in the cart." : undefined);
+    (hasDateConflict ? t.package.stepTwo.dateConflictAlert : undefined);
 
   const handleAddToCartClick = () => {
     if (hasDateConflict) {
@@ -225,20 +229,20 @@ export default function StepTwo({
   return (
     <div className="space-y-5 text-[#f7fac7] sm:space-y-8">
       <div className="max-w-2xl text-[#F6FF6A]">
-        <h2 className="text-xl font-bold sm:text-3xl">{isMobile ? "Describe the package" : "Package Details"}</h2>
+        <h2 className="text-xl font-bold sm:text-3xl">{isMobile ? t.package.stepTwo.mobileTitle : t.package.stepTwo.desktopTitle}</h2>
         <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">
           {isMobile
-            ? "Phone view focuses on only the fields you need right now."
+            ? t.package.stepTwo.mobileDesc
             : isTablet
-              ? "Tablet keeps package controls visible without overloading the form."
-              : "Provide details of the package you want to send."}
+              ? t.package.stepTwo.tabletDesc
+              : t.package.stepTwo.desktopDesc}
         </p>
       </div>
 
       <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
-        <label className="mb-1.5 md:mb-2 block text-[13px] md:text-sm font-medium text-white/85">Package Name (optional)</label>
+        <label className="mb-1.5 md:mb-2 block text-[13px] md:text-sm font-medium text-white/85">{t.package.stepTwo.packageName}</label>
         <input
-          placeholder="Package Name"
+          placeholder={t.package.stepTwo.packageName}
           className="package-input text-xs md:text-sm w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3"
           value={currentPackage.packageName}
           onChange={(e) => setCurrentPackage({ ...currentPackage, packageName: e.target.value })}
@@ -248,7 +252,7 @@ export default function StepTwo({
 
       <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
         <label className="mb-2 md:mb-3 block text-[13px] md:text-sm font-medium text-white/85">
-          Select package type <span className="text-red-400">*</span>
+          {t.package.stepTwo.selectType} <span className="text-red-400">*</span>
         </label>
 
         <div className="flex flex-wrap gap-2 md:gap-3">
@@ -273,7 +277,7 @@ export default function StepTwo({
 
       {isOtherCategorySelected && (
         <div className="package-panel rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
-          <label className="block text-[13px] md:text-sm font-medium text-white/85">Specify (Other type)</label>
+          <label className="block text-[13px] md:text-sm font-medium text-white/85">{t.package.stepTwo.otherType}</label>
           <input
             className="package-input text-xs md:text-sm mt-2 md:mt-3 w-full rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3"
             value={currentPackage.otherPackageType}
@@ -289,10 +293,7 @@ export default function StepTwo({
           <div className="mt-4 rounded-2xl border border-amber-400/45 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             <p className="flex items-start gap-2">
               <Icon icon="solar:danger-triangle-linear" className="mt-0.5 text-base" />
-              <span>
-                Pickup pricing for <strong>Other</strong> category may be charged higher if applicable.
-                Please request a call booking for an exact quote.
-              </span>
+              <span dangerouslySetInnerHTML={{ __html: t.package.stepTwo.otherPricingAlert.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
             </p>
           </div>
         </div>
@@ -308,7 +309,7 @@ export default function StepTwo({
         <div className={`package-panel-soft flex w-full flex-col gap-3.5 md:gap-5 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 ${isDesktop ? "xl:w-1/3" : ""}`}>
           <div>
             <label className="text-[13px] md:text-sm font-medium text-white/85">
-              Enter weight <span className="text-red-400 ">*</span>
+              {t.package.stepTwo.enterWeight} <span className="text-red-400 ">*</span>
             </label>
             <input
               type="number"
@@ -335,7 +336,7 @@ export default function StepTwo({
 
           <div>
             <label className="text-[13px] md:text-sm font-medium text-white/85">
-              Select quantities <span className="text-red-400 ">*</span>
+              {t.package.stepTwo.selectQuantities} <span className="text-red-400 ">*</span>
             </label>
             <div
               className={`package-input mt-2 flex items-center justify-between rounded-full p-1 ${errors.packageQuantities ? "border-red-500" : ""}`}
@@ -376,13 +377,13 @@ export default function StepTwo({
             {formData.cart.length > 0 && editIndex === null && (
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-3 w-max max-w-xs -translate-x-1/2 scale-95 opacity-0 transition-all duration-150 ease-in-out group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100">
                 <div className="relative rounded-md border border-amber-500 bg-black/70 px-4 py-2 text-sm font-semibold text-yellow-400 shadow-lg">
-                  Changing date for this package will change the date for all the packages in your cart.
+                  {t.package.stepTwo.dateConflictAlert}
                   <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-amber-500"></div>
                 </div>
               </div>
             )}
             <label className="text-[13px] md:text-sm font-medium text-white/85">
-              Pickup Date <span className="text-red-400 ">*</span>
+              {t.package.stepTwo.pickupDate} <span className="text-red-400 ">*</span>
             </label>
             <CustomDatePicker
               value={currentPackage.pickUpDate}
@@ -401,7 +402,7 @@ export default function StepTwo({
 
         <div className={`package-panel-soft flex w-full flex-col rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5 ${isDesktop ? "xl:w-1/3" : ""}`}>
           <label className="mb-1.5 md:mb-3 text-[13px] md:text-sm font-medium text-white/85">
-            Upload package image <span className="text-red-400">*</span>
+            {t.package.stepTwo.uploadImage} <span className="text-red-400">*</span>
           </label>
 
           <DropzoneUpload
@@ -416,7 +417,7 @@ export default function StepTwo({
             <div className="mt-2 space-y-2">
               <p className="inline-flex items-center gap-1 text-xs text-[#F6FF6A]">
                 <Icon icon="line-md:loading-loop" className="text-sm" />
-                Uploading image...
+                {t.package.stepTwo.uploading}
               </p>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#CDD645]/20">
                 <div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-[#CDD645]" />
@@ -432,7 +433,7 @@ export default function StepTwo({
           onClick={handleClearForm}
           className="package-panel-soft flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl md:rounded-2xl py-2 md:py-3 text-xs md:text-base font-bold text-white/70 transition hover:bg-white/10 sm:w-56"
         >
-          <Icon icon="mdi:close" className="text-lg md:text-xl" /> Clear Form
+          <Icon icon="mdi:close" className="text-lg md:text-xl" /> {t.package.stepTwo.clearForm}
         </button>
 
         <button
@@ -443,11 +444,11 @@ export default function StepTwo({
         >
           {editIndex !== null ? (
             <>
-              <Icon icon="mdi:cart-check" className="text-lg md:text-xl" /> Update Cart
+              <Icon icon="mdi:cart-check" className="text-lg md:text-xl" /> {t.package.stepTwo.updateCart}
             </>
           ) : (
             <>
-              <Icon icon="mdi:cart-plus" className="text-lg md:text-xl" /> Drop into Cart
+              <Icon icon="mdi:cart-plus" className="text-lg md:text-xl" /> {t.package.stepTwo.dropIntoCart}
             </>
           )}
         </button>

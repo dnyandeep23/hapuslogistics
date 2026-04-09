@@ -3,8 +3,11 @@ import Banner from "@/app/Home/Banner";
 import FAQ from "@/app/Home/FAQ";
 import TestimonialCarousel from "@/app/Home/Testimonials";
 import PublicAppShell from "@/components/PublicAppShell";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 export default function Home() {
+  const { t } = useTranslation();
+
   return (
     <PublicAppShell className="w-full bg-[#1A1F1B]" contentClassName="pt-0">
       <Banner />
@@ -19,10 +22,10 @@ export default function Home() {
         
         <div className="relative mx-auto max-w-3xl text-center">
             <h2 className="text-5xl font-extrabold leading-tight text-white sm:text-7xl mb-6">
-              Ready to move?
+              {t.home.readyToMove}
             </h2>
             <p className="text-xl text-white/50 mb-12">
-              Book a parcel, review pricing, or ask for help without digging around.
+              {t.home.readyToMoveDesc}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -30,13 +33,13 @@ export default function Home() {
                 href="/package"
                 className="w-full sm:w-auto inline-flex items-center justify-center rounded-full bg-[#D5E400] px-10 py-5 text-sm font-bold text-black transition-transform hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(213,228,0,0.15)]"
               >
-                Start Booking
+                {t.home.startBooking}
               </Link>
               <Link
                 href="/contact"
                 className="w-full sm:w-auto inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-10 py-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 active:scale-95"
               >
-                Contact Hapus
+                {t.home.contactBtn}
               </Link>
             </div>
         </div>

@@ -1,7 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import applogo from "@/assets/images/applogo.png";
 import { STRINGS } from "@/lib/strings";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 const primaryLinks = [
   { label: "Home", href: "/" },
@@ -17,6 +20,7 @@ const policyLinks = [
 ];
 
 export default function Footer() {
+  const { t } = useTranslation();
   return (
     <footer className="relative overflow-hidden border-t border-white/5 bg-[#0A0D09] text-white pt-10 pb-8 sm:pb-32 lg:pb-10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(213,228,0,0.06),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(115,161,67,0.08),transparent_30%)]" />
@@ -37,37 +41,44 @@ export default function Footer() {
           </div>
 
           <div className="group rounded-[2rem] border border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent)] p-6 transition-all hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),transparent)] hover:border-white/10 backdrop-blur-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F6FF6A]">Explore</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F6FF6A]">{t.footer.explore}</p>
             <div className="mt-4 space-y-3">
-              {primaryLinks.map((link) => (
+              {primaryLinks.map((link) => {
+                const translatedLabel = t.nav[link.label.toLowerCase() as keyof typeof t.nav] || link.label;
+                return (
                 <Link
                   key={link.href}
                   href={link.href}
                   className="block text-sm text-white/72 transition hover:text-white"
                 >
-                  {link.label}
+                  {translatedLabel}
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           <div className="group rounded-[2rem] border border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent)] p-6 transition-all hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),transparent)] hover:border-white/10 backdrop-blur-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F6FF6A]">Policies</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F6FF6A]">{t.footer.policies}</p>
             <div className="mt-4 space-y-3">
-              {policyLinks.map((link) => (
+              {policyLinks.map((link) => {
+                const key = link.label === "Pricing Details" ? "pricingDetails" : link.label === "Terms & Conditions" ? "terms" : link.label === "Privacy Policy" ? "privacy" : "refunds";
+                const translatedLabel = t.footer[key as keyof typeof t.footer] || link.label;
+                return (
                 <Link
                   key={link.href}
                   href={link.href}
                   className="block text-sm text-white/72 transition hover:text-white"
                 >
-                  {link.label}
+                  {translatedLabel}
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           <div className="group rounded-[2rem] border border-[#D5E400]/15 bg-[linear-gradient(180deg,rgba(213,228,0,0.03),transparent)] p-6 transition-all hover:bg-[linear-gradient(180deg,rgba(213,228,0,0.06),transparent)] hover:border-[#D5E400]/30 backdrop-blur-3xl">
-            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#D5E400]">Contact</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#D5E400]">{t.footer.contact}</p>
             <div className="mt-5 space-y-4 text-sm leading-relaxed text-white/60">
               <p className="transition-colors hover:text-white">{STRINGS.contact.email}</p>
               <p className="transition-colors hover:text-white">{STRINGS.contact.phone}</p>
@@ -77,11 +88,11 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/48 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} {STRINGS.brand.appName}. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} {STRINGS.brand.appName}. {t.footer.allRightsReserved}</p>
           <div className="flex flex-col gap-2 text-left sm:items-end sm:text-right">
             <p>{STRINGS.brand.supportPromise}</p>
             <p>
-              Developed by{" "}
+              {t.footer.developedBy}{" "}
               <Link
                 href="https://dnyandeep-gaonkar-portfolio.onrender.com/"
                 target="_blank"

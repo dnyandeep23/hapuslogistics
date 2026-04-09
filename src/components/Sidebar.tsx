@@ -9,6 +9,7 @@ import { useAppDispatch } from "@/lib/redux/hooks";
 import { logoutUser } from "@/lib/redux/userSlice";
 import { STRINGS } from "@/lib/strings";
 import { resetPackageState } from "@/lib/redux/packageSlice";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 type Props = {
     user: User | null;
@@ -24,6 +25,7 @@ export default function Sidebar({ user, role = "user", menus, isExpanded, setIsE
     const searchParams = useSearchParams();
     const router = useRouter();
     const dispatch = useAppDispatch();
+    const { t, language, setLanguage } = useTranslation();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const items = menus[role] ?? menus["user"] ?? [];
     const currentPathWithQuery = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
@@ -95,11 +97,13 @@ hover:shadow-2xl hover:shadow-[#E4E67A]`}
             <div className="flex h-full flex-col px-3 py-4">
                 <div className={`mb-4 ${isExpanded ? "px-2" : "flex justify-center"}`}>
                     {isExpanded ? (
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d8e0b1]">
-                                {STRINGS.brand.companyName}
-                            </p>
-                            <p className="mt-1 text-xs text-white/55">{STRINGS.brand.dashboardWorkspaceLabel}</p>
+                        <div className="flex w-full items-start justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d8e0b1]">
+                                    {t.brand.companyName}
+                                </p>
+                                <p className="mt-1 text-xs text-white/55">{t.brand.dashboardWorkspaceLabel}</p>
+                            </div>
                         </div>
                     ) : (<></>
                         // <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E4E67A]">
@@ -179,12 +183,12 @@ hover:shadow-2xl hover:shadow-[#E4E67A]`}
                                 </span>
                                 {isExpanded ? (
                                     <>
-                                        <span className="text-sm font-medium tracking-tight">{item.label}</span>
+                                        <span className="text-sm font-medium tracking-tight whitespace-pre-wrap">{(item.i18nKey ? t.nav[item.i18nKey as keyof typeof t.nav] : item.label) || item.label}</span>
                                         {active ? <Icon icon="mdi:chevron-right" className="ml-auto text-base text-[#F2FF8F]/80" /> : null}
                                     </>
                                 ) : (
                                     <span className="max-w-full text-[10px] font-semibold uppercase tracking-[0.14em]">
-                                        {item.label}
+                                        {(item.i18nKey ? t.nav[item.i18nKey as keyof typeof t.nav] : item.label) || item.label}
                                     </span>
                                 )}
                             </Link>
@@ -210,7 +214,7 @@ hover:shadow-2xl hover:shadow-[#E4E67A]`}
                         </span>
                         <span className="inline-flex items-center gap-2 text-sm font-medium">
                             {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-base" />}
-                            {isLoggingOut ? "Logging out..." : "Logout"}
+                            {isLoggingOut ? t.nav.loggingOut : t.nav.logout}
                         </span>
                     </button>
                 </div>

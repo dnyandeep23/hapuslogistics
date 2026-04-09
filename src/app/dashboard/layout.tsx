@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/BottomNav";
 import MobileHeader from "@/components/MobileHeader";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { defaultRole, roleMenus } from "@/data/roleMenus";
 import type { MenuItem } from "@/data/roleMenus";
 
@@ -23,6 +24,7 @@ const getRoleKey = (user: { role?: string } | null): DashboardRoleKey => {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, isTablet } = useResponsiveMode();
   const { user, loading, reason } = useAppSelector((state) => state.user);
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(true);
@@ -83,8 +85,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) {
     return (
       <LoadingScreen
-        title="Preparing dashboard"
-        message="Loading your workspace modules."
+        title={t.nav.preparingDashboard}
+        message={t.nav.loadingWorkspace}
       />
     );
   }
@@ -92,8 +94,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!user) {
     return (
       <LoadingScreen
-        title="Redirecting"
-        message="Please log in to continue."
+        title={t.nav.redirecting}
+        message={t.nav.pleaseLogin}
         showLoginLink
       />
     );

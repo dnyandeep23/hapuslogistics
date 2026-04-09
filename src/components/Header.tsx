@@ -9,6 +9,7 @@ import { ThemeContext } from "./ThemeProvider";
 import applogo from "@/assets/images/applogo.png";
 import { HEADER_NAV_LINKS, HEADER_ACTIONS } from "@/data/nav";
 import { STRINGS } from "@/lib/strings";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 type AuthAction = "Login" | "Register";
 
@@ -35,6 +36,7 @@ export default function Header() {
   const [authMenuOpen, setAuthMenuOpen] = useState<AuthAction | null>(null);
   const [mobileAuthMenuOpen, setMobileAuthMenuOpen] = useState<AuthAction | null>(null);
   const authActionsRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 18);
@@ -93,6 +95,8 @@ export default function Header() {
           <nav className="hidden items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-2 py-2 lg:flex">
             {HEADER_NAV_LINKS.map(({ label, href, icon }) => {
               const isActive = pathname === href;
+              // Ensure fallback to label if translation not found
+              const translatedLabel = t.nav[label.toLowerCase() as keyof typeof t.nav] || label; 
               return (
                 <Link
                   key={label}
@@ -105,7 +109,7 @@ export default function Header() {
                   }`}
                 >
                   <Icon icon={icon} className="text-base" />
-                  {label}
+                  {translatedLabel}
                 </Link>
               );
             })}
@@ -115,6 +119,7 @@ export default function Header() {
             {HEADER_ACTIONS.map(({ label, route }) => {
               const authAction = isAuthAction(label) ? label : null;
               const isOpen = authAction ? authMenuOpen === authAction : false;
+              const translatedLabel = label === "Login" ? t.header.login : label === "Register" ? t.header.register : label;
 
               return (
                 <div key={label} className="relative">
@@ -134,7 +139,7 @@ export default function Header() {
                         : "border-white/10 bg-white/[0.04] text-white/90 hover:bg-white/[0.1] shadow-sm"
                     }`}
                   >
-                    <span>{label}</span>
+                    <span>{translatedLabel}</span>
                     {authAction ? (
                       <Icon
                         icon={isOpen ? "solar:alt-arrow-up-line-duotone" : "solar:alt-arrow-down-line-duotone"}
@@ -145,20 +150,26 @@ export default function Header() {
 
                   {authAction && isOpen ? (
                     <div className="absolute right-0 mt-3 w-72 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[#10150f]/94 shadow-2xl backdrop-blur-xl">
-                      {AUTH_OPTIONS[authAction].map(({ label: optionLabel, route: optionRoute, hint }) => (
-                        <button
-                          key={optionRoute}
-                          type="button"
-                          onClick={() => {
-                            setAuthMenuOpen(null);
-                            router.push(optionRoute);
-                          }}
-                          className="w-full border-b border-white/8 px-4 py-4 text-left transition last:border-b-0 hover:bg-white/[0.05]"
-                        >
-                          <p className="text-sm font-medium text-white">{optionLabel}</p>
-                          <p className="mt-1 text-xs text-white/52">{hint}</p>
-                        </button>
-                      ))}
+                      {AUTH_OPTIONS[authAction].map(({ label: optionLabel, route: optionRoute, hint }) => {
+                        const optionKey = optionRoute.includes("operator") ? `operator${authAction}` : optionRoute.includes("admin") ? `admin${authAction}` : `public${authAction}`;
+                        const translatedOptionLabel = optionRoute.includes("operator") ? t.header.operator : optionRoute.includes("admin") ? t.header.admin : t.header.publicUser;
+                        const translatedHint = t.header.hints[optionKey as keyof typeof t.header.hints] || hint;
+                        
+                        return (
+                          <button
+                            key={optionRoute}
+                            type="button"
+                            onClick={() => {
+                              setAuthMenuOpen(null);
+                              router.push(optionRoute);
+                            }}
+                            className="w-full border-b border-white/8 px-4 py-4 text-left transition last:border-b-0 hover:bg-white/[0.05]"
+                          >
+                            <p className="text-sm font-medium text-white">{translatedOptionLabel}</p>
+                            <p className="mt-1 text-xs text-white/52">{translatedHint}</p>
+                          </button>
+                        )
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -191,10 +202,11 @@ export default function Header() {
           }`}
         >
           <div className="rounded-[1.6rem] border border-[#D5E400]/15 bg-[linear-gradient(180deg,rgba(205,214,69,0.08),rgba(255,255,255,0.02))] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#F6FF6A]">Navigate</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#F6FF6A]">{t.header.navigate}</p>
             <div className="mt-4 grid gap-2">
               {HEADER_NAV_LINKS.map(({ label, href, icon }) => {
                 const isActive = pathname === href;
+                const translatedLabel = t.nav[label.toLowerCase() as keyof typeof t.nav] || label;
                 return (
                   <Link
                     key={label}
@@ -210,7 +222,7 @@ export default function Header() {
                       <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/20">
                         <Icon icon={icon} className="text-lg" />
                       </span>
-                      {label}
+                      {translatedLabel}
                     </span>
                     <Icon icon="solar:arrow-right-up-linear" className="text-base text-white/35" />
                   </Link>
@@ -223,6 +235,7 @@ export default function Header() {
             {HEADER_ACTIONS.map(({ label, route }) => {
               const authAction = isAuthAction(label) ? label : null;
               const isOpen = authAction ? mobileAuthMenuOpen === authAction : false;
+              const translatedLabel = label === "Login" ? t.header.login : label === "Register" ? t.header.register : label;
 
               if (!authAction) {
                 return (
@@ -235,7 +248,7 @@ export default function Header() {
                     }}
                     className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium text-white"
                   >
-                    {label}
+                    {translatedLabel}
                   </button>
                 );
               }
@@ -247,7 +260,7 @@ export default function Header() {
                     onClick={() => setMobileAuthMenuOpen((current) => (current === authAction ? null : authAction))}
                     className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-white"
                   >
-                    <span>{label}</span>
+                    <span>{translatedLabel}</span>
                     <Icon
                       icon={isOpen ? "solar:alt-arrow-up-line-duotone" : "solar:alt-arrow-down-line-duotone"}
                       className="text-base"
@@ -256,20 +269,26 @@ export default function Header() {
 
                   {isOpen ? (
                     <div className="border-t border-white/8 bg-black/20 px-3 py-2">
-                      {AUTH_OPTIONS[authAction].map(({ label: optionLabel, route: optionRoute, hint }) => (
-                        <button
-                          key={optionRoute}
-                          type="button"
-                          onClick={() => {
-                            closeMenus();
-                            router.push(optionRoute);
-                          }}
-                          className="mb-2 w-full rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 text-left last:mb-0"
-                        >
-                          <p className="text-sm text-white">{optionLabel}</p>
-                          <p className="mt-1 text-xs text-white/52">{hint}</p>
-                        </button>
-                      ))}
+                      {AUTH_OPTIONS[authAction].map(({ label: optionLabel, route: optionRoute, hint }) => {
+                        const optionKey = optionRoute.includes("operator") ? `operator${authAction}` : optionRoute.includes("admin") ? `admin${authAction}` : `public${authAction}`;
+                        const translatedOptionLabel = optionRoute.includes("operator") ? t.header.operator : optionRoute.includes("admin") ? t.header.admin : t.header.publicUser;
+                        const translatedHint = t.header.hints[optionKey as keyof typeof t.header.hints] || hint;
+                        
+                        return (
+                          <button
+                            key={optionRoute}
+                            type="button"
+                            onClick={() => {
+                              closeMenus();
+                              router.push(optionRoute);
+                            }}
+                            className="mb-2 w-full rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3 text-left last:mb-0"
+                          >
+                            <p className="text-sm text-white">{translatedOptionLabel}</p>
+                            <p className="mt-1 text-xs text-white/52">{translatedHint}</p>
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -279,15 +298,15 @@ export default function Header() {
 
           <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-white">Theme</p>
-              <p className="text-xs text-white/52">Switch the visual mode for the public site.</p>
+              <p className="text-sm font-medium text-white">{t.header.theme}</p>
+              <p className="text-xs text-white/52">{t.header.themeDesc}</p>
             </div>
             <button
               type="button"
               onClick={toggle}
               className="rounded-full border border-[#D5E400]/25 bg-[#D5E400]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]"
             >
-              Toggle
+              {t.header.toggle}
             </button>
           </div>
         </div>

@@ -8,35 +8,37 @@ import contactVector from "@/assets/images/contactVector.png";
 import { STRINGS } from "@/lib/strings";
 import PublicAppShell from "@/components/PublicAppShell";
 import { getIndiaPhoneDigits, isValidIndiaPhone } from "@/lib/phone";
-
-const contactPoints = [
-  {
-    label: "Head Office",
-    value: STRINGS.contact.address,
-    href: STRINGS.contact.mapsHref,
-    icon: "mdi:map-marker-outline",
-  },
-  {
-    label: "Email",
-    value: STRINGS.contact.email,
-    href: `mailto:${STRINGS.contact.email}`,
-    icon: "mdi:email-outline",
-  },
-  {
-    label: "Call Us",
-    value: STRINGS.contact.phone,
-    href: STRINGS.contact.phoneHref,
-    icon: "mdi:phone-outline",
-  },
-] as const;
-
-const quickStats = [
-  { label: "Response", value: "Within 1 business day" },
-  { label: "Coverage", value: "Pan-India bus logistics support" },
-  { label: "Support", value: "Booking, refund, and tracking help" },
-] as const;
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 export default function ContactPage() {
+  const { t } = useTranslation();
+  const contactPoints = useMemo(() => [
+    {
+      label: t.contactPage.points.headOffice,
+      value: STRINGS.contact.address,
+      href: STRINGS.contact.mapsHref,
+      icon: "mdi:map-marker-outline",
+    },
+    {
+      label: t.contactPage.points.email,
+      value: STRINGS.contact.email,
+      href: `mailto:${STRINGS.contact.email}`,
+      icon: "mdi:email-outline",
+    },
+    {
+      label: t.contactPage.points.callUs,
+      value: STRINGS.contact.phone,
+      href: STRINGS.contact.phoneHref,
+      icon: "mdi:phone-outline",
+    },
+  ], [t]);
+
+  const quickStats = useMemo(() => [
+    { label: t.contactPage.quickStats.response, value: t.contactPage.quickStats.responseTime },
+    { label: t.contactPage.quickStats.coverage, value: t.contactPage.quickStats.coverageArea },
+    { label: t.contactPage.quickStats.support, value: t.contactPage.quickStats.supportType },
+  ], [t]);
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [touched, setTouched] = useState<{
@@ -138,14 +140,13 @@ export default function ContactPage() {
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-28 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl pt-10 text-center">
             <span className="inline-flex rounded-full border border-[#D5E400]/25 bg-[#D5E400]/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#E4E67A]">
-              Contact Us
+              {t.contactPage.title}
             </span>
             <h1 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Connecting journeys and deliveries with care.
+              {t.contactPage.heading}
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/70 sm:text-base">
-              Talk to our team for booking help, shipment updates, refunds, or business partnerships. We keep the Hapus
-              experience fast, simple, and dependable on every screen.
+              {t.contactPage.subheading}
             </p>
           </div>
 
@@ -153,9 +154,9 @@ export default function ContactPage() {
             <aside className="dashboard-surface rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(53,62,44,0.92),rgba(34,40,28,0.98))] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-2xl font-semibold text-white sm:text-3xl">Get in touch</p>
+                  <p className="text-2xl font-semibold text-white sm:text-3xl">{t.contactPage.getInTouch}</p>
                   <p className="mt-2 text-sm text-white/65">
-                    Reach us by call, email, or visit our office. We are happy to help with shipping and support.
+                    {t.contactPage.getInTouchDesc}
                   </p>
                 </div>
                 <div className="hidden rounded-2xl border border-[#D5E400]/20 bg-[#D5E400]/10 p-3 text-[#E4E67A] sm:flex">
@@ -186,13 +187,13 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Business Details</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{t.contactPage.businessDetails}</p>
                 <p className="mt-2 text-sm leading-6 text-white/75">
                   {STRINGS.brand.appName} Pvt. Ltd.
                   <br />
-                  Parcel and bus logistics support for India.
+                  {t.contactPage.businessDesc}
                   <br />
-                  Monday to Saturday, 9:30 AM to 7:00 PM.
+                  {t.contactPage.businessHours}
                 </p>
               </div>
 
@@ -206,9 +207,9 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-6 rounded-2xl border border-[#D5E400]/20 bg-[#D5E400]/10 p-4">
-                <p className="text-sm font-semibold text-[#F6FF6A]">Need a quick response?</p>
+                <p className="text-sm font-semibold text-[#F6FF6A]">{t.contactPage.quickResponse}</p>
                 <p className="mt-1 text-sm text-white/70">
-                  Call or email us directly and our support team will guide you through the next step.
+                  {t.contactPage.quickResponseDesc}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <a
@@ -216,14 +217,14 @@ export default function ContactPage() {
                     className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/35"
                   >
                     <Icon icon="mdi:phone-outline" className="text-base text-[#E4E67A]" />
-                    Call Now
+                    {t.contactPage.callNow}
                   </a>
                   <a
                     href={`mailto:${STRINGS.contact.email}`}
                     className="inline-flex items-center gap-2 rounded-full border border-[#D5E400]/30 bg-[#D5E400]/10 px-4 py-2 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#D5E400]/20"
                   >
                     <Icon icon="mdi:email-outline" className="text-base" />
-                    Email Support
+                    {t.contactPage.emailSupport}
                   </a>
                 </div>
               </div>
@@ -232,9 +233,9 @@ export default function ContactPage() {
             <div className="dashboard-surface rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(38,44,31,0.92),rgba(22,26,19,0.98))] p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-2xl font-semibold text-white sm:text-3xl">Send us a Message</p>
+                  <p className="text-2xl font-semibold text-white sm:text-3xl">{t.contactPage.sendMessage}</p>
                   <p className="mt-2 text-sm text-white/65">
-                    Share your question and our team will get back to you with the right answer.
+                    {t.contactPage.sendMessageDesc}
                   </p>
                 </div>
                 <div className="hidden rounded-2xl border border-[#D5E400]/20 bg-[#D5E400]/10 p-3 text-[#E4E67A] sm:flex">
@@ -246,7 +247,7 @@ export default function ContactPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
-                      Name
+                      {t.contactPage.name}
                     </span>
                     <input
                       value={form.name}
@@ -266,7 +267,7 @@ export default function ContactPage() {
                   </label>
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
-                      Contact No
+                      {t.contactPage.contactNo}
                     </span>
                     <div className={`flex items-center gap-2 rounded-2xl border bg-black/20 px-4 py-3 ${
                       errors.phone ? "border-red-500/70 bg-red-500/10" : "border-white/14"
@@ -298,7 +299,7 @@ export default function ContactPage() {
 
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
-                    Subject
+                    {t.contactPage.subject}
                   </span>
                   <input
                     value={form.subject}
@@ -306,7 +307,7 @@ export default function ContactPage() {
                     onBlur={() =>
                       setTouched((prev) => ({ ...prev, subject: true }))
                     }
-                    placeholder="Booking, refund, tracking, or business inquiry"
+                    placeholder={t.contactPage.subjectPlaceholder}
                     className={`dashboard-input w-full rounded-2xl px-4 py-3 text-sm ${
                       errors.subject ? "border-red-500/70 bg-red-500/10" : ""
                     }`}
@@ -319,7 +320,7 @@ export default function ContactPage() {
 
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
-                    Message
+                    {t.contactPage.message}
                   </span>
                   <textarea
                     value={form.message}
@@ -327,7 +328,7 @@ export default function ContactPage() {
                     onBlur={() =>
                       setTouched((prev) => ({ ...prev, message: true }))
                     }
-                    placeholder="Please tell us a little about your request..."
+                    placeholder={t.contactPage.messagePlaceholder}
                     rows={6}
                     maxLength={200}
                     className={`dashboard-input w-full rounded-[1.5rem] px-4 py-3 text-sm ${
@@ -339,14 +340,14 @@ export default function ContactPage() {
                     {errors.message || " "}
                   </span>
                   <div className="mt-2 flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-white/45">
-                    <span>Message limit</span>
+                    <span>{t.contactPage.messageLimit}</span>
                     <span>{form.message.length}/200</span>
                   </div>
                 </label>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-white/60">
-                    By submitting, you agree to be contacted by our support team for this request.
+                    {t.contactPage.agreement}
                   </p>
                   <button
                     type="submit"
@@ -354,7 +355,7 @@ export default function ContactPage() {
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-[#D5E400]/30 bg-[#D5E400]/12 px-5 py-3 text-sm font-semibold text-[#F6FF6A] transition hover:bg-[#D5E400]/20"
                   >
                     <Icon icon="mdi:send-outline" className="text-base" />
-                    Submit
+                    {t.contactPage.submit}
                   </button>
                 </div>
               </form>
@@ -370,22 +371,22 @@ export default function ContactPage() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white"
           >
             <Icon icon="mdi:phone-outline" className="text-base text-[#E4E67A]" />
-            Call
+            {t.contactPage.points.callUs}
           </a>
           <a
             href={`mailto:${STRINGS.contact.email}`}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#D5E400]/25 bg-[#D5E400]/12 px-4 py-3 text-sm font-semibold text-[#F6FF6A]"
           >
             <Icon icon="mdi:email-outline" className="text-base" />
-            Email
+            {t.contactPage.points.email}
           </a>
         </div>
       </div>
 
       <ConfirmationModal
         isOpen={showSuccessModal}
-        title="Message Sent"
-        description="Thanks for reaching out. Our support team will get back to you shortly."
+        title={t.contactPage.successTitle}
+        description={t.contactPage.successMessage}
         confirmLabel="Close"
         hideCancel
         confirmVariant="success"

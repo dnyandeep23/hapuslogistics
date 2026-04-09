@@ -14,6 +14,7 @@ import Skeleton from "@/components/Skeleton";
 import CustomDatePicker from "@/components/CustomDatePicker";
 import { formatIndiaPhoneInput } from "@/lib/phone";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { CartItem, PackageFormData } from "./types";
 
 type LocationOption = {
@@ -61,6 +62,7 @@ const formatPickupDate = (value: string) => {
 export default function StepThree({ errors, setFormData, formData, pickupLocations, dropLocations, pricingInfo, setPricingInfo, userId }: StepThreeProps) {
     const router = useRouter();
     const { isMobile, isTablet, isDesktop } = useResponsiveMode();
+    const { t } = useTranslation();
     const pickUpLoc = pickupLocations.find((opt) => opt._id === formData.pickupLocationId);
     const dropLoc = dropLocations.find((opt) => opt._id === formData.dropLocationId);
     const displayedItems = formData.cart.map((item, index) => ({
@@ -330,30 +332,30 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
             {/* Header */}
             <div className="max-w-2xl text-[#F6FF6A]">
-                <h2 className="text-xl font-bold sm:text-3xl">{isMobile ? "Review before paying" : "Review & Checkout"}</h2>
+                <h2 className="text-xl font-bold sm:text-3xl">{isMobile ? t.package.stepThree.mobileTitle : t.package.stepThree.desktopTitle}</h2>
                 <p className="mt-1.5 md:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">
                     {isMobile
-                        ? "Phone view shows the essentials first. Expand package details only when needed."
+                        ? t.package.stepThree.mobileDesc
                         : isTablet
-                            ? "Tablet keeps route, package, and checkout details balanced."
-                            : "Review your order details and proceed to payment."}
+                            ? t.package.stepThree.tabletDesc
+                            : t.package.stepThree.desktopDesc}
                 </p>
             </div>
 
             {/* Location Information */}
             <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
                 <span className="package-badge absolute top-0 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
-                    Location Information
+                    {t.package.stepThree.locationInfo}
                 </span>
 
                 <div className={`mt-4 md:mt-6 grid gap-3 lg:gap-4 ${isDesktop ? "lg:grid-cols-2" : ""}`}>
                     <div className="package-panel-soft flex items-start gap-2 md:gap-3 rounded-[1.3rem] p-3 md:p-4">
                         <Icon icon="streamline-plump:location-pin-solid" className="text-green-400 text-2xl md:text-3xl" />
                         <div>
-                            <p className="text-xs md:text-sm text-[#F4FF9F]">Pickup Location</p>
-                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{pickUpLoc?.name || "Select a pickup location"}</p>
+                            <p className="text-xs md:text-sm text-[#F4FF9F]">{t.package.stepThree.pickupLocation}</p>
+                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{pickUpLoc?.name || t.package.stepOne.pickupLabel}</p>
                             <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">
-                                {pickUpLoc ? `${pickUpLoc.address || "--"}, ${pickUpLoc.city || "--"}, ${pickUpLoc.state || "--"} ${pickUpLoc.zip || ""}` : "Route details will appear here."}
+                                {pickUpLoc ? `${pickUpLoc.address || "--"}, ${pickUpLoc.city || "--"}, ${pickUpLoc.state || "--"} ${pickUpLoc.zip || ""}` : t.package.stepThree.pricingPlaceholder}
                             </p>
                         </div>
                     </div>
@@ -361,10 +363,10 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                     <div className="package-panel-soft flex items-start gap-2 md:gap-3 rounded-[1.3rem] p-3 md:p-4">
                         <Icon icon="streamline-plump:location-pin-solid" className="text-red-400 text-2xl md:text-3xl" />
                         <div>
-                            <p className="text-xs md:text-sm text-[#F4FF9F]">Drop Location</p>
-                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{dropLoc?.name || "Select a drop location"}</p>
+                            <p className="text-xs md:text-sm text-[#F4FF9F]">{t.package.stepThree.dropLocation}</p>
+                            <p className="font-bold text-sm md:text-base text-[#e7f868]">{dropLoc?.name || t.package.stepOne.dropLabel}</p>
                             <p className="mt-0.5 md:mt-1 text-xs md:text-sm text-white/65">
-                                {dropLoc ? `${dropLoc.address || "--"}, ${dropLoc.city || "--"}, ${dropLoc.state || "--"} ${dropLoc.zip || ""}` : "Destination details will appear here."}
+                                {dropLoc ? `${dropLoc.address || "--"}, ${dropLoc.city || "--"}, ${dropLoc.state || "--"} ${dropLoc.zip || ""}` : t.package.stepThree.pricingPlaceholder}
                             </p>
                         </div>
                     </div>
@@ -374,15 +376,15 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
             {/* Package Information */}
             <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] px-3.5 pb-3.5 pt-6 sm:px-5 sm:pb-5 sm:pt-6">
                 <span className="package-badge absolute top-0 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
-                    Package Information
+                    {t.package.stepThree.packageInfo}
                 </span>
-                <div className="package-badge absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-1 md:gap-2 rounded-full px-2 md:px-3 py-1 text-[10px] md:text-sm text-white/90"> <Icon icon="solar:calendar-linear" className=" text-white text-sm md:text-base" /> <span>Pickup Date {pickupDate}</span>
+                <div className="package-badge absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-1 md:gap-2 rounded-full px-2 md:px-3 py-1 text-[10px] md:text-sm text-white/90"> <Icon icon="solar:calendar-linear" className=" text-white text-sm md:text-base" /> <span>{t.package.stepTwo.pickupDate} {pickupDate}</span>
                 </div>
 
                 <div className="mt-6 space-y-3">
                     {!hasCartItems ? (
                         <div className="package-panel-soft rounded-[1.3rem] p-4 text-sm text-white/70">
-                            No packages are in the cart yet. Add at least one package before reviewing payment.
+                            {t.package.stepThree.noPackages}
                         </div>
                     ) : null}
                     {visibleItems.map((item: CartItem, index: number) => (
@@ -443,11 +445,11 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-[#F6FF6A]"
                     >
                         <Icon icon={showAllPackages ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} className="text-sm" />
-                        {showAllPackages ? "Show fewer packages" : `View ${displayedItems.length - 1} more package${displayedItems.length > 2 ? "s" : ""}`}
+                        {showAllPackages ? t.package.stepThree.showFewer : (displayedItems.length > 2 ? t.package.stepThree.viewMorePlural.replace('{count}', String(displayedItems.length - 1)) : t.package.stepThree.viewMore.replace('{count}', String(displayedItems.length - 1)))}
                     </button>
                 ) : null}
                 {!isMobile && !hasCartItems ? (
-                    <p className="mt-3 text-sm text-white/55">Package details will appear here once items are added.</p>
+                    <p className="mt-3 text-sm text-white/55">{t.package.stepThree.placeholderInfo}</p>
                 ) : null}
             </div>
 
@@ -457,12 +459,12 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 {/* Sender */}
                 <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
                     <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
-                        Sender Information
+                        {t.package.stepThree.senderInfo}
                     </span>
 
                     <div className="mt-4 md:mt-6 space-y-3">
                         <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
-                            Sender name <span className="text-red-400">*</span>
+                            {t.package.stepThree.senderName} <span className="text-red-400">*</span>
                         </label>
                         <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
                             <Icon icon="heroicons:identification" className="text-[#F0FF73] text-lg md:text-xl" />
@@ -479,7 +481,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         {errors.senderName && <p className="text-red-400 text-xs md:text-sm">{errors.senderName}</p>}
 
                         <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
-                            Sender contact no <span className="text-red-400">*</span>
+                            {t.package.stepThree.senderContact} <span className="text-red-400">*</span>
                         </label>
                         <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
                             <Icon icon="heroicons:phone" className="text-[#F0FF73] text-lg md:text-xl " />
@@ -502,12 +504,12 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 {/* Receiver */}
                 <div className="package-panel relative rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 pt-6 sm:p-5 sm:pt-6">
                     <span className="package-badge absolute left-1/2 top-0 w-fit -translate-x-1/2 rounded-b-xl px-2.5 md:px-4 py-0.5 md:py-1 text-[11px] md:text-sm font-semibold">
-                        Receiver Information
+                        {t.package.stepThree.receiverInfo}
                     </span>
 
                     <div className="mt-4 md:mt-6 space-y-3">
                         <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
-                            Receiver name <span className="text-red-400">*</span>
+                            {t.package.stepThree.receiverName} <span className="text-red-400">*</span>
                         </label>
                         <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
                             <Icon icon="heroicons:identification" className="text-[#F0FF73] text-lg md:text-xl" />
@@ -523,7 +525,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                         </div>
                         {errors.receiverName && <p className="text-red-400 text-xs md:text-sm">{errors.receiverName}</p>}
                         <label className="mb-2 md:mb-3 block text-xs md:text-sm font-medium text-white/85">
-                            Receiver contact no <span className="text-red-400">*</span>
+                            {t.package.stepThree.receiverContact} <span className="text-red-400">*</span>
                         </label>
                         <div className="package-input flex items-center gap-2 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
                             <Icon icon="heroicons:phone" className="text-[#F0FF73] text-lg md:text-xl " />
@@ -549,7 +551,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                 {/* Coupon */}
                 {shouldShowCouponSection ? (
                 <div className="package-panel flex-1 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 sm:p-5">
-                    <p className="mb-2 text-[13px] md:text-sm font-semibold">Have a coupon code?</p>
+                    <p className="mb-2 text-[13px] md:text-sm font-semibold">{t.package.stepThree.haveCoupon}</p>
                     {couponStatus === 'success' && pricingInfo?.coupon ? (
                         <div>
                             <div className="flex items-center gap-2">
@@ -562,16 +564,16 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     onClick={() => handleCouponInputChange({ target: { value: "" } } as ChangeEvent<HTMLInputElement>)}
                                     className="text-sm text-gray-400 hover:text-white"
                                 >
-                                    Change
+                                    {t.package.stepThree.change}
                                 </button>
                             </div>
-                            <p className="text-green-400 text-sm mt-1">Coupon applied! You got a {pricingInfo.coupon.discount}% discount.</p>
+                            <p className="text-green-400 text-sm mt-1">{t.package.stepThree.couponApplied.replace('{discount}', String(pricingInfo.coupon.discount))}</p>
                         </div>
                     ) : (
                         <div>
                             <div className="flex flex-col gap-2 sm:flex-row">
                                 <input
-                                    placeholder="Enter Coupon Code"
+                                    placeholder={t.package.stepThree.enterCoupon}
                                     value={coupon}
                                     onChange={handleCouponInputChange}
                                     className="package-input w-full rounded-2xl px-4 py-2 sm:w-56"
@@ -581,14 +583,14 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     className="rounded-2xl bg-[#CDD645] px-4 py-2 text-black transition hover:bg-[#dbe86b] disabled:bg-gray-500"
                                     disabled={couponStatus === 'loading' || !coupon}
                                 >
-                                    {couponStatus === 'loading' ? "Applying..." : "Apply"}
+                                    {couponStatus === 'loading' ? t.package.stepThree.applying : t.package.stepThree.apply}
                                 </button>
                             </div>
                             {couponStatus === 'error' && <p className="text-red-400 text-sm mt-1">{couponError}</p>}
 
                             <div className="mt-3 flex flex-col items-start gap-2">
                                 <span className="text-sm text-[#F0FF73]/80">
-                                    Available coupons (highest discount first):
+                                    {t.package.stepThree.availableCoupons}
                                 </span>
                                 {isLoadingCoupons ? (
                                     <div className="flex w-full max-w-[720px] gap-2 overflow-x-auto pb-1">
@@ -633,7 +635,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                     </div>
                                 ) : (
                                     <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
-                                        No coupons are available right now.
+                                        {t.package.stepThree.noCoupons}
                                     </div>
                                 )}
                             </div>
@@ -665,35 +667,35 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                         </div>
                                     ) : shouldSuggestSingleQuantity ? (
                                         <>
-                                            <p className="font-semibold text-amber-50">Not enough space for the selected quantity</p>
+                                            <p className="font-semibold text-amber-50">{t.package.stepThree.noSpaceForQuantity}</p>
                                             <p className="mt-1 text-xs leading-5 text-amber-100/80">
-                                                We could not find nearby dates with enough space for <span className="font-semibold">{totalRequestedQuantity}</span> items on this route. Try placing one quantity per order and check again.
+                                                <span dangerouslySetInnerHTML={{ __html: t.package.stepThree.noSpaceForQuantityDesc.replace('{count}', `<strong>${totalRequestedQuantity}</strong>`) }} />
                                             </p>
                                         </>
                                     ) : shouldRedirectToSupport ? (
                                         <>
-                                            <p className="font-semibold text-amber-50">No space available right now</p>
+                                            <p className="font-semibold text-amber-50">{t.package.stepThree.noSpaceAtAll}</p>
                                             <p className="mt-1 text-xs leading-5 text-amber-100/80">
-                                                There is not enough capacity for this order even with one quantity. Redirecting you to support for help with the next available option.
+                                                {t.package.stepThree.noSpaceAtAllDesc}
                                             </p>
                                             <button
                                                 type="button"
                                                 onClick={() => router.push("/dashboard/support?source=package-capacity")}
                                                 className="mt-3 inline-flex items-center justify-center rounded-full border border-amber-100/20 bg-white/10 px-3 py-2 text-xs font-semibold text-amber-50 transition hover:bg-white/15"
                                             >
-                                                Open support
+                                                {t.package.stepThree.openSupport}
                                             </button>
                                         </>
                                     ) : (
                                         <>
-                                            <p className="font-semibold text-amber-50">Choose another available pickup date</p>
+                                            <p className="font-semibold text-amber-50">{t.package.stepThree.chooseAnotherDate}</p>
                                             <p className="mt-1 text-xs leading-5 text-amber-100/75">
-                                                The selected date <span className="font-semibold">{formatPickupDate(selectedPickupDate)}</span> is full for this route. Pick another date here and pricing will refresh automatically.
+                                                <span dangerouslySetInnerHTML={{ __html: t.package.stepThree.dateFullDesc.replace('{date}', `<strong>${formatPickupDate(selectedPickupDate)}</strong>`) }} />
                                             </p>
 
                                             <div className="mt-3">
                                                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/55">
-                                                    Available dates
+                                                    {t.package.stepThree.availableDates}
                                                 </p>
                                                 <div className="flex flex-wrap gap-2">
                                                     {availableAlternativeDates.length > 0 ? availableAlternativeDates.map((date) => (
@@ -707,7 +709,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                                         </button>
                                                     )) : (
                                                         <span className="text-xs text-amber-100/55">
-                                                            No other route dates are available right now.
+                                                            {t.package.stepThree.noOtherDates}
                                                         </span>
                                                     )}
                                                 </div>
@@ -715,14 +717,14 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
 
                                             <div className="mt-4">
                                                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/55">
-                                                    Select another date
+                                                    {t.package.stepThree.selectAnotherDate}
                                                 </p>
                                                 <CustomDatePicker
                                                     value={selectedPickupDate}
                                                     pickupLocationId={formData.pickupLocationId}
                                                     dropLocationId={formData.dropLocationId}
                                                     onChange={handlePickupDateChange}
-                                                    placeholder="Choose another pickup date"
+                                                    placeholder={t.package.stepThree.choosePlaceholder}
                                                     restrictToAvailableDates
                                                     requiredWeightKg={totalRequestedWeightKg}
                                                     calendarPlacement="top"
@@ -738,7 +740,7 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                     )}
                     {!isLoadingPrice && !pricingError && !pricingInfo ? (
                         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-white/60">
-                            Pricing will appear after route and package details are ready.
+                            {t.package.stepThree.pricingPlaceholder}
                         </div>
                     ) : null}
                     {!isLoadingPrice && !pricingError && pricingInfo && (
@@ -764,17 +766,17 @@ export default function StepThree({ errors, setFormData, formData, pickupLocatio
                                 })}
                             </div>
                             <div className="flex justify-between">
-                                <span>Subtotal</span>
+                                <span>{t.package.stepThree.subtotal}</span>
                                 <span>₹ {pricingInfo.subtotal.toFixed(2)}</span>
                             </div>
                             {pricingInfo.discount > 0 && (
                                 <div className="flex justify-between text-green-400">
-                                    <span>Discount</span>
+                                    <span>{t.package.stepThree.discount}</span>
                                     <span>- ₹ {pricingInfo.discount.toFixed(2)}</span>
                                 </div>
                             )}
                             <div className="font-bold text-lg flex justify-between mt-2 pt-2 border-t border-gray-500">
-                                <span>Total Amount</span>
+                                <span>{t.package.stepThree.totalAmount}</span>
                                 <span>₹ {pricingInfo.total.toFixed(2)}</span>
                             </div>
                         </>

@@ -10,6 +10,7 @@ import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
 import { formatIndiaPhoneInput, normalizeIndiaPhone } from "@/lib/phone";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 interface BusContact {
   _id: string;
@@ -338,6 +339,7 @@ function classifyOperatorOrderTab(order: RoleDashboardOrder, now: Date): Operato
 export default function OrderPage() {
   const { isMobile, isTablet } = useResponsiveMode();
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const { user } = useAppSelector((state) => state.user);
   const searchParams = useSearchParams();
   const [userOrders, setUserOrders] = useState<UserDashboardOrder[]>([]);
@@ -773,7 +775,7 @@ export default function OrderPage() {
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" />
       <div className="dashboard-surface relative w-full max-w-md rounded-2xl p-5 shadow-2xl">
-        <h2 className="text-lg font-semibold text-[#F6FF6A]">Add Contact Number</h2>
+        <h2 className="text-lg font-semibold text-[#F6FF6A]">{t.orders.addContactNumber}</h2>
         <p className="mt-2 text-sm text-white/75">
           Add your contact number first. This is required for admin/operator workflows.
         </p>
@@ -854,7 +856,7 @@ export default function OrderPage() {
       return (
         <div className={pagePaddingClass}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-bold text-[#F6FF6A]">My Orders</h1>
+            <h1 className="text-2xl font-bold text-[#F6FF6A]">{t.orders.myOrders}</h1>
             <div className="relative w-full max-w-sm">
               <Icon icon="mdi:magnify" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
               <input
@@ -957,7 +959,7 @@ export default function OrderPage() {
               <span className="rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
                 Orders workspace
               </span>
-              <h1 className="mt-3 text-3xl font-bold text-white">My Orders</h1>
+              <h1 className="mt-3 text-3xl font-bold text-white">{t.orders.myOrders}</h1>
               <p className="mt-2 text-sm text-white/68">
                 {isMobile
                   ? "Essential tracking first. Open any card for full order details."
@@ -1039,7 +1041,7 @@ export default function OrderPage() {
             >
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-[#F6FF6A]">Verification Proofs</h3>
+                  <h3 className="text-lg font-semibold text-[#F6FF6A]">{t.orders.verificationProofs}</h3>
                   <p className="text-xs text-white/60">{proofModalOrder.trackingId}</p>
                 </div>
                 <button
@@ -1196,7 +1198,7 @@ export default function OrderPage() {
                 <span className="rounded-full border border-[#CDD645]/30 bg-[#CDD645]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#F6FF6A]">
                   Bus wise view
                 </span>
-                <h1 className="mt-3 text-3xl font-bold text-white">All Orders</h1>
+                <h1 className="mt-3 text-3xl font-bold text-white">{t.orders.allOrders}</h1>
                 <p className="mt-2 text-sm text-white/68">
                   {isMobile
                     ? "Compact bus-wise oversight. Tap into any order for the full package view."

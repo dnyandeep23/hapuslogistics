@@ -8,6 +8,7 @@ import { Icon } from "@iconify/react";
 import { useToast } from "@/context/ToastContext";
 import { downloadOrderInvoice } from "@/lib/orderInvoice";
 import { appendRedirectParam } from "@/lib/authFlow";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { fetchUser } from "@/lib/redux/userSlice";
 import Skeleton from "@/components/Skeleton";
@@ -611,6 +612,7 @@ export default function OrderDetailPage() {
   const dispatch = useAppDispatch();
   const params = useParams<{ orderId: string }>();
   const router = useRouter();
+  const { t } = useTranslation();
   const { isMobile, isTablet } = useResponsiveMode();
   const { addToast } = useToast();
   const { user } = useAppSelector((state) => state.user);
@@ -1434,8 +1436,8 @@ export default function OrderDetailPage() {
         <div className={`relative mt-5 grid gap-3 ${isMobile ? "" : "lg:grid-cols-[1.2fr_0.8fr]"}`}>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">Shipment progress</p>
-              <span className="text-xs text-[#DDE98D]">Live order snapshot</span>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">{t.orders.shipmentProgress}</p>
+              <span className="text-xs text-[#DDE98D]">{t.orders.liveOrderSnapshot}</span>
             </div>
             {statusStepIndex >= 0 ? (
               isMobile ? (
@@ -1899,7 +1901,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-white/65">Bus details will appear after allocation.</p>
+            <p className="text-sm text-white/65">{t.orders.busDetailsAllocated}</p>
           )}
 
           {isAdminView && adminEditMode ? (
@@ -1911,7 +1913,7 @@ export default function OrderDetailPage() {
               ) : null}
               {transferCandidates.length > 0 ? (
                 <div className="mt-2 grid gap-3">
-                  <label className="text-xs text-white/60">Transfer to another bus (same or different company)</label>
+                  <label className="text-xs text-white/60">{t.orders.transferAnotherBus}</label>
                   <select
                     value={transferBusIdDraft}
                     onChange={(event) => setTransferBusIdDraft(event.target.value)}
@@ -1946,7 +1948,7 @@ export default function OrderDetailPage() {
               )}
             </div>
           ) : isAdminView ? (
-            <p className="mt-3 text-xs text-white/55">Enable update mode to edit/transfer this order.</p>
+            <p className="mt-3 text-xs text-white/55">{t.orders.enableUpdateModeMsg}</p>
           ) : null}
         </div>
 
@@ -1965,16 +1967,16 @@ export default function OrderDetailPage() {
           ) : hideContactByTime && order.busContact ? (
             <div className="dashboard-subsurface relative overflow-hidden rounded-lg p-2">
               <div className="select-none blur-sm">
-                <p className="text-sm text-white">Assigned Operator</p>
+                <p className="text-sm text-white">{t.orders.assignedOperator}</p>
                 <p className="font-mono text-sm text-[#F6FF6A]">XXXXXXXXXX</p>
               </div>
               <div className="pointer-events-none absolute inset-0 bg-black/40" />
-              <p className="mt-2 text-xs text-white/70">Contact unlocks 1 day before pickup.</p>
+              <p className="mt-2 text-xs text-white/70">{t.orders.contactUnlocksWarning}</p>
             </div>
           ) : isDelivered ? (
-            <p className="text-sm text-white/65">Hidden after delivery is completed.</p>
+            <p className="text-sm text-white/65">{t.orders.hiddenAfterDelivery}</p>
           ) : (
-            <p className="text-sm text-white/65">Not available for this order.</p>
+            <p className="text-sm text-white/65">{t.orders.notAvailableOrder}</p>
           )}
         </div>
       </div>
@@ -1999,7 +2001,7 @@ export default function OrderDetailPage() {
           />
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <p className="mb-2 text-sm text-white/80">Pickup Proof</p>
+              <p className="mb-2 text-sm text-white/80">{t.forms.pickupProof}</p>
               {order.pickupProofImage ? (
                 <button
                   type="button"
@@ -2021,7 +2023,7 @@ export default function OrderDetailPage() {
               )}
             </div>
             <div>
-              <p className="mb-2 text-sm text-white/80">Drop Proof</p>
+              <p className="mb-2 text-sm text-white/80">{t.forms.dropProof}</p>
               {order.dropProofImage ? (
                 <button
                   type="button"
@@ -2227,7 +2229,7 @@ export default function OrderDetailPage() {
 
         {isAdminView ? (
           <div className="dashboard-surface-soft mb-4 rounded-2xl p-4">
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Customer Email</p>
+            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">{t.forms.customerEmail}</p>
             {canEditAsAdminNow ? (
               <input
                 type="email"
@@ -2244,7 +2246,7 @@ export default function OrderDetailPage() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="dashboard-surface-soft rounded-2xl p-4">
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Sender Info</p>
+            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">{t.forms.senderInfo}</p>
             {canEditContacts ? (
               <div className="space-y-2">
                 <input
@@ -2284,7 +2286,7 @@ export default function OrderDetailPage() {
             ) : null}
           </div>
           <div className="dashboard-surface-soft rounded-2xl p-4">
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Receiver Info</p>
+            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">{t.forms.receiverInfo}</p>
             {canEditAsAdminNow ? (
               <div className="space-y-2">
                 <input
@@ -2355,7 +2357,7 @@ export default function OrderDetailPage() {
             <>
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
-                  <p className="mb-1 text-xs text-white/60">Note For Operator</p>
+                  <p className="mb-1 text-xs text-white/60">{t.forms.noteForOperator}</p>
                   <textarea
                     rows={4}
                     value={operatorNoteDraft}
@@ -2365,7 +2367,7 @@ export default function OrderDetailPage() {
                   />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs text-white/60">Note For Customer</p>
+                  <p className="mb-1 text-xs text-white/60">{t.forms.noteForCustomer}</p>
                   <textarea
                     rows={4}
                     value={customerNoteDraft}
@@ -2534,7 +2536,7 @@ export default function OrderDetailPage() {
         {isAdminView && adminEditMode ? (
           <div className="mb-4 rounded-[1.35rem] border border-white/10 bg-white/5 p-4">
             <div className="max-w-sm">
-              <p className="mb-2 text-xs uppercase tracking-wide text-white/50">Order Date</p>
+              <p className="mb-2 text-xs uppercase tracking-wide text-white/50">{t.forms.orderDate}</p>
               <CustomDatePicker
                 value={orderDateDraft}
                 onChange={(value) => syncOrderAndPackageDates(value)}
@@ -2682,7 +2684,7 @@ export default function OrderDetailPage() {
                         />
                       ) : pkg.description ? (
                         <p className="mt-3 text-sm text-white/80">
-                          <span className="text-white/50">Description:</span> {pkg.description}
+                          <span className="text-white/50">{t.forms.description}</span> {pkg.description}
                         </p>
                       ) : null}
 
@@ -2731,7 +2733,7 @@ export default function OrderDetailPage() {
             aria-label="Verification proofs"
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[#F6FF6A]">Verification Proofs</h3>
+              <h3 className="text-lg font-semibold text-[#F6FF6A]">{t.orders.verificationProofs}</h3>
               <button
                 type="button"
                 onClick={() => setIsProofModalOpen(false)}
@@ -2744,7 +2746,7 @@ export default function OrderDetailPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm text-white/80">Pickup Proof</p>
+                <p className="mb-2 text-sm text-white/80">{t.forms.pickupProof}</p>
                 {order.pickupProofImage ? (
                   <Image
                     src={order.pickupProofImage}
@@ -2761,7 +2763,7 @@ export default function OrderDetailPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm text-white/80">Drop Proof</p>
+                <p className="mb-2 text-sm text-white/80">{t.forms.dropProof}</p>
                 {order.dropProofImage ? (
                   <Image
                     src={order.dropProofImage}
@@ -3078,7 +3080,7 @@ export default function OrderDetailPage() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70" />
           <div className="dashboard-surface relative w-full max-w-md rounded-2xl p-5 shadow-2xl">
-            <h2 className="text-lg font-semibold text-[#F6FF6A]">Add Contact Number</h2>
+            <h2 className="text-lg font-semibold text-[#F6FF6A]">{t.orders.addContactNumber}</h2>
             <p className="mt-2 text-sm text-white/75">
               Add your contact number first. This is required for admin/operator workflows.
             </p>

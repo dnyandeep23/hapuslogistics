@@ -3,6 +3,7 @@ import { Icon } from "@iconify/react";
 import { Location } from "@/services/logistics";
 import CustomSelect from "@/components/CustomSelect";
 import { useResponsiveMode } from "@/hooks/useResponsiveMode";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 type StepOneFormData = {
     pickupLocationId: string;
@@ -29,6 +30,7 @@ export default function StepOne({
     isLoadingDrop: boolean;
 }) {
     const { isMobile, isTablet, isDesktop } = useResponsiveMode();
+    const { t } = useTranslation();
 
     const handlePickupChange = (pickupId: string) => {
         setFormData({ ...formData, pickupLocationId: pickupId, dropLocationId: "" });
@@ -42,14 +44,14 @@ export default function StepOne({
         <div className="space-y-5 sm:space-y-8">
             <div className="max-w-2xl text-[#F6FF6A]">
                 <h2 className="text-xl sm:text-3xl font-bold">
-                    {isMobile ? "Choose the route" : "Select Pickup & Drop location"}
+                    {isMobile ? t.package.stepOne.mobileTitle : t.package.stepOne.desktopTitle}
                 </h2>
                 <p className="mt-1.5 sm:mt-2 text-[13px] leading-5 text-white/68 sm:text-base sm:leading-6">
                     {isMobile
-                        ? "Start with the route only. Package details come in the next step."
+                        ? t.package.stepOne.mobileDesc
                         : isTablet
-                            ? "Choose the route first, then continue with package information."
-                            : "Choose where your package will be picked up and delivered."}
+                            ? t.package.stepOne.tabletDesc
+                            : t.package.stepOne.desktopDesc}
                 </p>
             </div>
 
@@ -61,14 +63,14 @@ export default function StepOne({
                         </div>
                         <div className="min-w-0 w-full">
                             <label className="mb-1.5 sm:mb-2 block text-[13px] sm:text-sm font-medium text-white/85">
-                                Select pickup location <span className="text-red-400"> *</span>
+                                {t.package.stepOne.pickupLabel} <span className="text-red-400"> *</span>
                             </label>
-                            <p className="mb-2 sm:mb-3 text-[11px] sm:text-xs leading-[1.3] sm:leading-normal text-white/55">Choose the origin point where the package enters the route.</p>
+                            <p className="mb-2 sm:mb-3 text-[11px] sm:text-xs leading-[1.3] sm:leading-normal text-white/55">{t.package.stepOne.pickupDesc}</p>
                             <CustomSelect
                                 value={formData.pickupLocationId}
                                 onChange={handlePickupChange}
                                 options={pickupLocations}
-                                placeholder={isLoadingPickup ? 'Loading...' : 'Select pickup location'}
+                                placeholder={isLoadingPickup ? 'Loading...' : t.package.stepOne.pickupPlaceholder}
                                 isLoading={isLoadingPickup}
                                 error={errors.pickupLocationId}
                             />
@@ -84,15 +86,15 @@ export default function StepOne({
                         </div>
                         <div className="min-w-0 w-full">
                             <label className="mb-1.5 sm:mb-2 block text-[13px] sm:text-sm font-medium text-white/85">
-                                Select drop location <span className="text-red-400"> *</span>
+                                {t.package.stepOne.dropLabel} <span className="text-red-400"> *</span>
                             </label>
-                            <p className="mb-2 sm:mb-3 text-[11px] sm:text-xs leading-[1.3] sm:leading-normal text-white/55">Choose the destination point for final delivery.</p>
+                            <p className="mb-2 sm:mb-3 text-[11px] sm:text-xs leading-[1.3] sm:leading-normal text-white/55">{t.package.stepOne.dropDesc}</p>
                             <CustomSelect
 
                                 value={formData.dropLocationId}
                                 onChange={handleDropChange}
                                 options={dropLocations}
-                                placeholder={isLoadingDrop ? 'Loading...' : (formData.pickupLocationId ? 'Select drop location' : 'Select a pickup location first')}
+                                placeholder={isLoadingDrop ? 'Loading...' : (formData.pickupLocationId ? t.package.stepOne.dropPlaceholder : t.package.stepOne.dropPlaceholderDisabled)}
                                 disabled={!formData.pickupLocationId || isLoadingDrop}
                                 isLoading={isLoadingDrop}
                                 error={errors.dropLocationId}
@@ -105,23 +107,23 @@ export default function StepOne({
 
             <div className={`package-panel-soft grid gap-3 sm:gap-4 rounded-[1.4rem] md:rounded-[1.6rem] p-3.5 text-[13px] sm:text-sm text-white/68 sm:p-5 ${isDesktop ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 <div>
-                    <p className="font-semibold text-[#F6FF6A]">Pickup first</p>
-                    <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">Drop options are filtered after you choose a pickup point.</p>
+                    <p className="font-semibold text-[#F6FF6A]">{t.package.stepOne.pickupFirst}</p>
+                    <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">{t.package.stepOne.pickupFirstDesc}</p>
                 </div>
                 <div>
-                    <p className="font-semibold text-[#F6FF6A]">{isMobile ? "Phone-first" : isTablet ? "Tablet balance" : "Desktop context"}</p>
+                    <p className="font-semibold text-[#F6FF6A]">{isMobile ? t.package.stepOne.responsiveTitleMobile : isTablet ? t.package.stepOne.responsiveTitleTablet : t.package.stepOne.responsiveTitleDesktop}</p>
                     <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">
                         {isMobile
-                            ? "Only the essential route selectors stay visible on smaller screens."
+                            ? t.package.stepOne.responsiveDescMobile
                             : isTablet
-                                ? "Tablet keeps route controls side by side for faster scanning."
-                                : "Desktop leaves more room for route context and the next booking steps."}
+                                ? t.package.stepOne.responsiveDescTablet
+                                : t.package.stepOne.responsiveDescDesktop}
                     </p>
                 </div>
                 {isDesktop ? (
                     <div>
-                        <p className="font-semibold text-[#F6FF6A]">Next step</p>
-                        <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">Once the route is fixed, weight, size, and review details can expand safely.</p>
+                        <p className="font-semibold text-[#F6FF6A]">{t.package.stepOne.nextStep}</p>
+                        <p className="mt-0.5 sm:mt-1 leading-5 sm:leading-normal">{t.package.stepOne.nextStepDesc}</p>
                     </div>
                 ) : null}
             </div>

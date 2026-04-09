@@ -7,6 +7,7 @@ import type { MenuItem } from "../data/roleMenus";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { logoutUser } from "@/lib/redux/userSlice";
 import { resetPackageState } from "@/lib/redux/packageSlice";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 type Props = {
     menus: MenuItem[];
@@ -23,6 +24,7 @@ export default function BottomNav({ menus }: Props) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const dispatch = useAppDispatch();
+    const { t } = useTranslation();
     const { user } = useAppSelector((state) => state.user);
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -133,7 +135,7 @@ export default function BottomNav({ menus }: Props) {
                                     <span className={`relative flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-300 ${active ? "bg-[#d5e400]/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
                                         <Icon icon={item.icon ?? "mdi:circle"} className="text-xl" />
                                     </span>
-                                    <span className="mt-1 text-[11px] font-medium tracking-tight">{item.label}</span>
+                                    <span className="mt-1 text-[11px] font-medium tracking-tight">{(item.i18nKey ? t.nav[item.i18nKey as keyof typeof t.nav] : item.label) || item.label}</span>
                                 </Link>
                             );
                         })}
@@ -147,7 +149,7 @@ export default function BottomNav({ menus }: Props) {
                                 <span className={`relative flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-300 ${moreActive ? "bg-[#d5e400]/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
                                     <Icon icon="mdi:dots-horizontal-circle-outline" className="text-xl" />
                                 </span>
-                                <span className="mt-1 text-[11px] font-semibold tracking-wide">More</span>
+                                <span className="mt-1 text-[11px] font-semibold tracking-wide">{t.nav.more}</span>
                             </button>
                         ) : (
                             <button
@@ -165,7 +167,7 @@ export default function BottomNav({ menus }: Props) {
                                 </span>
                                 <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium tracking-tight">
                                     {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-sm" />}
-                                    {isLoggingOut ? "Logging out..." : "Logout"}
+                                    {isLoggingOut ? t.nav.loggingOut : t.nav.logout}
                                 </span>
                             </button>
                         )}
@@ -194,8 +196,8 @@ export default function BottomNav({ menus }: Props) {
                                     <Icon icon="mdi:menu-open" className="text-lg" />
                                 </span>
                                 <div>
-                                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">Navigation</p>
-                                    <h2 id="more-navigation-title" className="mt-1 text-lg font-semibold text-[#F2FF8F]">More options</h2>
+                                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">{t.nav.navigation}</p>
+                                    <h2 id="more-navigation-title" className="mt-1 text-lg font-semibold text-[#F2FF8F]">{t.nav.moreOptions}</h2>
                                 </div>
                             </div>
                             <button
@@ -229,7 +231,7 @@ export default function BottomNav({ menus }: Props) {
                                         <span className={`flex h-9 w-9 items-center justify-center rounded-2xl transition-all duration-300 ${active ? "bg-[#d5e400]/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]" : "bg-white/5 group-hover/item:bg-white/10"}`}>
                                             <Icon icon={item.icon ?? "mdi:circle"} className="text-xl" />
                                         </span>
-                                        <span className="font-medium tracking-tight">{item.label}</span>
+                                        <span className="font-medium tracking-tight">{(item.i18nKey ? t.nav[item.i18nKey as keyof typeof t.nav] : item.label) || item.label}</span>
                                     </Link>
                                 );
                             })}
@@ -247,7 +249,7 @@ export default function BottomNav({ menus }: Props) {
                                 </span>
                                 <span className="inline-flex items-center gap-2 font-medium tracking-tight">
                                     {isLoggingOut && <Icon icon="line-md:loading-loop" className="text-base" />}
-                                    {isLoggingOut ? "Logging out..." : "Logout"}
+                                    {isLoggingOut ? t.nav.loggingOut : t.nav.logout}
                                 </span>
                             </button>
                         </div>
