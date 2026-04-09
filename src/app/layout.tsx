@@ -32,11 +32,11 @@ const BASE_URL = process.env.DOMAIN || "https://hapuslogistics.com";
 
 export const metadata: Metadata = {
   title: {
-    default: `${STRINGS.brand.appName} | Logistics, Transport & Courier Services`,
+    default: "Hapus Logistics | Logistics, Transport & Courier Services",
     template: `%s | ${STRINGS.brand.appName}`,
   },
   description: STRINGS.homeSubtitle + "Hapus Logistics is a simple delivery app for transporting parcels from Mumbai to Sindhudurg. It offers easy booking, real-time tracking, affordable pricing, and safe delivery, including special support for Devgad mango shipments.",
-  applicationName: STRINGS.brand.appName,
+  applicationName: "Hapus Logistics",
   keywords: [
     // Brand & Core Services
     "Hapus",
@@ -174,6 +174,7 @@ export default function RootLayout({
               telephone: STRINGS.contact.phone,
               contactType: "customer service",
             },
+
           }}
         />
         <ReduxProvider>
