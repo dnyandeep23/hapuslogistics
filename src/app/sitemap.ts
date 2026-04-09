@@ -10,21 +10,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/about',
     '/contact',
     '/pricing',
-    '/refunds',
-    '/privacy',
-    '/terms',
-    '/login',
-    '/register',
-    // New SEO target landing pages
     '/hapus-logistics',
-    '/logistics-services-india',
     '/courier-services-mumbai',
   ];
+
 
   return routes.map((route) => ({
     url: `${BASE_URL}${route}`,
     lastModified: new Date(),
-    changeFrequency: 'weekly',
-    priority: route === '' ? 1 : 0.8,
+    changeFrequency: route === '' ? 'daily' : 'weekly',
+    priority:
+      route === ''
+        ? 1.0
+        : route === '/hapus-logistics'
+          ? 0.9
+          : route === '/courier-services-mumbai'
+            ? 0.9
+            : 0.7,
   }));
 }
