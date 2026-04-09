@@ -127,6 +127,16 @@ export const metadata: Metadata = {
   verification: {
     google: "6weKQahst-iZTXi41v8cE7szC29uBKvX3vE81Br2bJw",
   },
+  icons: {
+    icon: [
+      { url: '/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  },
   openGraph: {
     title: `${STRINGS.brand.appName} | Logistics & Courier Services`,
     description: STRINGS.homeSubtitle,
@@ -149,7 +159,7 @@ export default function RootLayout({
             "@type": "Organization",
             name: STRINGS.brand.appName,
             url: BASE_URL,
-            logo: `${BASE_URL}/icon.png`,
+            logo: `${BASE_URL}/web-app-manifest-512x512.png`,
             description: STRINGS.brand.description,
             address: {
               "@type": "PostalAddress",
