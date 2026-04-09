@@ -39,12 +39,57 @@ export const metadata: Metadata = {
   applicationName: STRINGS.brand.appName,
   keywords: [
     "Hapus Logistics",
-    "logistics services",
-    "delivery services India",
-    "courier services Mumbai",
-    "logistics company in Mumbai",
-    "best courier partners India",
-    "express delivery services",
+    "hapus logistics mumbai",
+    "hapus logistics devgad",
+    "hapus courier services",
+    "hapus logistics near me",
+
+    "logistics services mumbai",
+    "logistics services devgad",
+    "logistics company in mumbai",
+    "logistics company in devgad",
+    "best logistics company mumbai",
+    "top logistics company devgad",
+
+    "delivery services mumbai",
+    "delivery services devgad",
+    "same day delivery mumbai",
+    "fast delivery devgad",
+    "express delivery mumbai",
+    "express courier devgad",
+
+    "courier services mumbai",
+    "courier services devgad",
+    "courier service near me mumbai",
+    "courier service near me devgad",
+    "best courier service mumbai",
+    "affordable courier devgad",
+
+    "parcel delivery mumbai",
+    "parcel delivery devgad",
+    "door to door delivery mumbai",
+    "door to door courier devgad",
+
+    "last mile delivery mumbai",
+    "hyperlocal delivery mumbai",
+    "local courier devgad",
+
+    "devgad mango courier",
+    "hapus mango delivery mumbai",
+    "mango transport devgad to mumbai",
+    "devgad mango logistics",
+    "fruit transport devgad",
+    "hapus export logistics devgad",
+
+    "cargo services mumbai",
+    "freight services mumbai",
+    "bulk courier mumbai",
+
+    "trusted courier partner mumbai",
+    "reliable logistics devgad",
+    "secure parcel delivery mumbai",
+    "cheap courier devgad"
+
   ],
   metadataBase: new URL(BASE_URL),
   alternates: {
@@ -106,7 +151,7 @@ export default function RootLayout({
 
                     {/* Footer always at bottom */}
                     <Footer />
-                    
+
                     {/* Cookie Consent Banner */}
                     <CookieConsent />
                   </div>
