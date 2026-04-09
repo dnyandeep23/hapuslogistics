@@ -95,6 +95,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  verification: {
+    google: "6weKQahst-iZTXi41v8cE7szC29uBKvX3vE81Br2bJw",
+  },
   openGraph: {
     title: `${STRINGS.brand.appName} | Logistics & Courier Services`,
     description: STRINGS.homeSubtitle,
