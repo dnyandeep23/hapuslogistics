@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { STRINGS } from '@/lib/strings';
 
 // Assuming production URL, adjust if needed by env
-const BASE_URL = process.env.DOMAIN || 'https://hapuslogistics.com';
+const BASE_URL = process.env.DOMAIN || 'https://hapuslogistics.vercel.app';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
