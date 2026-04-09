@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     default: `${STRINGS.brand.appName} | Logistics, Transport & Courier Services`,
     template: `%s | ${STRINGS.brand.appName}`,
   },
-  description: STRINGS.homeSubtitle + " Custom transport solutions to suit your specific business needs. ROBUST MOBILE APP. Own Delivery Management & Package Tracker App. Affordable road freight. Reliable express parcel delivery across India.",
+  description: STRINGS.homeSubtitle + "Hapus Logistics is a simple delivery app for transporting parcels from Mumbai to Sindhudurg. It offers easy booking, real-time tracking, affordable pricing, and safe delivery, including special support for Devgad mango shipments.",
   applicationName: STRINGS.brand.appName,
   keywords: [
     // Brand & Core Services
